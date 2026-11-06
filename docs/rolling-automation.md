@@ -191,3 +191,16 @@ started before midnight and finished afterward.
 The database activation trigger also handles flag changes from older application versions during
 deployment. Disabling preserves the last activation anchor for history; re-enabling records a new
 wall-clock timestamp. Never-enabled paused plans may have no activation anchor.
+
+## Bulk selection and action feedback
+
+Manual quantity mode offers Select all matching dishes and Clear matching selections. These
+operate across every page in the current search/filter. Bulk selection adds only eligible,
+selectable policies, preserves existing quantity/approval choices, and defaults new selections to
+valid policy maximums with automatic approval. Without a valid maximum, quantity remains blank
+and must be entered before saving. Clearing removes only matching selections. Read-only staff
+cannot use either action. Automatic maximum mode continues to include eligible policies directly.
+
+Save/generation feedback appears beside the action and is brought into view, including failures
+and no-op explanations. Saving a paused plan confirms that this job will not run and explains
+that existing stock/bookings are preserved and legacy scheduling resumes its existing rules.

@@ -1,8 +1,13 @@
 import assert from "node:assert/strict";
+import {mkdir} from "node:fs/promises";
+import {tmpdir} from "node:os";
+import {join} from "node:path";
 import {createRequire} from "node:module";
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??"playwright");
 const browser=await chromium.launch({headless:true,...(process.env.BROWSER_EXECUTABLE?{executablePath:process.env.BROWSER_EXECUTABLE,args:["--no-sandbox"]}:{})});
 const base=process.env.BROWSER_BASE??"http://127.0.0.1:3311";
+const evidenceDir=join(tmpdir(),"gokul-layouts");
+await mkdir(evidenceDir,{recursive:true});
 try{
  for(const [width,viewOnly,largeCatalog,maximumMode] of [[390,false,false,false],[1280,false,false,false],[390,true,false,false],[1280,true,false,false],[390,false,true,false],[1280,false,true,false],[390,false,false,true],[1280,false,false,true]]){
   const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:"block"});
@@ -87,6 +92,16 @@ try{
    await source.selectOption("selected");
    await page.getByRole("combobox",{name:"Show",exact:true}).selectOption("all");
    assert.equal(await page.getByRole("spinbutton",{name:/Guaranteed daily quantity/}).inputValue(),"80");
+   await page.getByRole("button",{name:"Select all matching dishes",exact:true}).click();
+   const samosa=page.locator('[data-policy-row]').filter({has:page.getByRole("checkbox",{name:"Samosa",exact:true})});
+   assert.equal(await samosa.getByRole("spinbutton").inputValue(),"80","bulk preserves individual quantity");
+   assert.equal(await samosa.getByRole("combobox",{name:"Approval mode",exact:true}).inputValue(),"draft","bulk preserves manual approval choice");
+   assert.equal(await page.getByRole("checkbox",{name:"Offline policy",exact:true}).isChecked(),false,"bulk skips offline policies");
+   const noMaximum=page.locator('[data-policy-row]').filter({has:page.getByRole("checkbox",{name:"No maximum",exact:true})});
+   assert.equal(await noMaximum.getByRole("spinbutton").inputValue(),"","missing maximum needs an explicit quantity");
+   await page.getByRole("button",{name:"Save automation settings",exact:true}).click();
+   await page.getByRole("alert").filter({hasText:"selected dishes need a valid daily quantity"}).waitFor();
+   assert.equal(saves,1,"bulk selection never saves invalid quantities");
    await context.close();console.log(`PASS: policy maxima preview, buffer-once, skip reasons and manual preservation at ${width}px`);continue;
   }
   if(largeCatalog){
@@ -125,6 +140,23 @@ try{
    await page.getByRole("checkbox",{name:"Fixture dish 299",exact:true}).waitFor();
    assert.equal(await rows.count(),1);
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+   await page.getByRole("checkbox",{name:"Fixture dish 299",exact:true}).click();
+   await page.getByRole("combobox",{name:"Show",exact:true}).selectOption("all");
+   await search.fill("");
+   await page.getByRole("button",{name:"Select all matching dishes",exact:true}).click();
+   assert.equal(await page.getByRole("button",{name:"Select all matching dishes",exact:true}).isDisabled(),true,"all eligible matches already selected");
+   await page.getByRole("button",{name:"Save automation settings",exact:true}).click();
+   await page.getByText("Schedule saved.",{exact:false}).waitFor();
+   assert.equal(saved.templates.length,302,"bulk selects eligible matches across every page, excluding capacity policies");
+   assert.equal(saved.templates.find(item=>item.policyId===6).quantity,80,"bulk preserves edited quantities");
+   assert.equal(saved.templates.find(item=>item.policyId===129).quantity,7,"bulk preserves off-page quantities");
+   assert.equal(saved.templates.find(item=>item.policyId===398).quantity,100,"new bulk selections use the valid maximum");
+   await search.fill("Fixture dish 299");
+   await page.getByRole("button",{name:"Clear matching selections",exact:true}).click();
+   assert.equal(await page.getByRole("checkbox",{name:"Fixture dish 299",exact:true}).isChecked(),false);
+   await page.getByRole("button",{name:"Select all matching dishes",exact:true}).click();
+   await search.fill("Samosa");
+   assert.equal(await page.getByRole("spinbutton",{name:/Guaranteed daily quantity/}).inputValue(),"80","filtered clearing keeps nonmatching edits");
    await context.close();console.log(`PASS: 303 dishes, bounded pages, cross-page edits, search and hidden validation at ${width}px`);continue;
   }
   if(viewOnly){
@@ -134,6 +166,8 @@ try{
    assert.ok(await controls.count()>10);
    for(const control of await controls.all())assert.equal(await control.isDisabled(),true,"view-only configuration stays disabled");
    assert.equal(await page.getByRole("button",{name:"Generate missing coverage now",exact:true}).isDisabled(),true);
+   assert.equal(await page.getByRole("button",{name:"Select all matching dishes",exact:true}).isDisabled(),true);
+   assert.equal(await page.getByRole("button",{name:"Clear matching selections",exact:true}).isDisabled(),true);
    assert.equal(saved,null);assert.equal(runs,0);
    console.log(`PASS: read-only field help and write protection at ${width}px`);
    await context.close();continue;
@@ -195,7 +229,7 @@ try{
   await enabled.uncheck();
   assert.equal(await run.isDisabled(),true,"unsaved edits cannot be used by generation");
   await page.getByRole("button",{name:"Save automation settings",exact:true}).click();
-  await page.getByText("Schedule saved.",{exact:false}).waitFor();
+  await page.getByRole("status").filter({hasText:"Automation paused. This daily job will not generate"}).waitFor();
   assert.equal(saved.enabled,false);
   assert.equal(await run.isDisabled(),true);
   await page.getByRole("checkbox",{name:"Samosa",exact:true}).uncheck();
@@ -210,7 +244,7 @@ try{
   await page.getByText(/Maximum: 5 ·/).waitFor();
   await enabled.uncheck();
   await page.getByRole("button",{name:"Save automation settings",exact:true}).click();
-  await page.getByText("Schedule saved.",{exact:false}).waitFor();
+  await page.getByRole("status").filter({hasText:"Automation paused. This daily job will not generate"}).waitFor();
   assert.equal(saved.enabled,false,"pause succeeds even after a policy limit becomes stricter");
   assert.equal(saved.templates[0].quantity,30);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,"automation form fits viewport");
@@ -274,7 +308,7 @@ try{
    await page.getByRole("button",{name:"Review shorter windows",exact:true}).click();
    assert.equal(await page.locator('[data-policy-row]').count(),2,"storefront cap shortens both dishes");
    await page.getByText("Review dishes & quantities",{exact:true}).click();
-   await page.screenshot({path:`/workspace/scratch/b3bb7636710f/automation-ux-preview-${width}.png`,fullPage:true});
+   await page.screenshot({path:join(evidenceDir,`automation-ux-preview-${width}.png`),fullPage:true});
   }
   const apply=page.getByRole("button",{name:"Save & generate now",exact:true});await apply.click();
   if(scenario==="saveFail"){await page.getByRole("alert").filter({hasText:"Saving is unavailable"}).waitFor();assert.deepEqual(calls,["save"],"failed save never generates");await page.getByText("You have unsaved changes",{exact:true}).waitFor();}
@@ -282,6 +316,8 @@ try{
   else if(scenario==="runFail"){await page.getByRole("alert").filter({hasText:"Settings saved, but daily stock generation did not finish"}).waitFor();await page.getByText("Your setup is saved",{exact:true}).waitFor();await apply.click();await page.getByRole("status").filter({hasText:"Saved setup checked. Eligible pickup dates have daily stock entries"}).waitFor();assert.deepEqual(calls,["save","run","run"],"retry after a saved setup does not resave");}
   else if(scenario==="zeroResult"){await page.getByRole("alert").filter({hasText:"No daily stock was created"}).waitFor();assert.deepEqual(calls,["save","run"]);}
   else{await page.getByRole("status").filter({hasText:"Saved setup checked. Eligible pickup dates have daily stock entries"}).waitFor();assert.deepEqual(calls,["save","run"]);await page.getByText("Your setup is saved",{exact:true}).waitFor();}
+  const feedback=page.getByTestId("action-feedback");
+  assert.equal(await feedback.evaluate(element=>{const r=element.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;}),true,"action result stays within the viewport beside generation controls");
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,"setup workflow fits viewport");
   await context.close();console.log(`PASS: setup-first ${scenario} at ${width}px`);
  }
