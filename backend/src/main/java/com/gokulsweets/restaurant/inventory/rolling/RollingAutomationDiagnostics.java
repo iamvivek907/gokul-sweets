@@ -59,7 +59,7 @@ public class RollingAutomationDiagnostics {
     private record Slot(LocalDate date, LocalTime start, LocalTime end, boolean active) {}
 
     /** Existing allocation state; quantities and operational overrides remain authoritative. */
-    private record Allocation(long product, LocalDate date, String status) {}
+    private record Allocation(long product, LocalDate date, String status, String unit) {}
 
     /** Starts a durable execution before taking the transactional branch lock. */
     public long start(long branch, String trigger, String actor) {
@@ -226,15 +226,16 @@ public class RollingAutomationDiagnostics {
                                     .add(slot));
             var allocations =
                     jdbc.query(
-                            "SELECT a.branch_product_id,a.service_date,a.status FROM"
-                                    + " inventory_daily_allocations a JOIN branch_products bp ON"
-                                    + " bp.id=a.branch_product_id WHERE bp.branch_id=? AND"
-                                    + " a.service_date BETWEEN ? AND ?",
+                            "SELECT a.branch_product_id,a.service_date,a.status,a.inventory_unit"
+                                + " FROM inventory_daily_allocations a JOIN branch_products bp ON"
+                                + " bp.id=a.branch_product_id WHERE bp.branch_id=? AND"
+                                + " a.service_date BETWEEN ? AND ?",
                             (rs, n) ->
                                     new Allocation(
                                             rs.getLong(1),
                                             rs.getObject(2, LocalDate.class),
-                                            rs.getString(3)),
+                                            rs.getString(3),
+                                            rs.getString(4)),
                             branch,
                             today,
                             lastDate);
@@ -245,7 +246,8 @@ public class RollingAutomationDiagnostics {
                     expected = 0,
                     closed = 0,
                     drafts = 0,
-                    readiness = 0;
+                    readiness = 0,
+                    unitMismatches = 0;
             var slotIssues = new ArrayList<Issue>();
             var itemIssues = new ArrayList<Issue>();
             for (int offset = 0; offset < plan.maintainDays(); offset++) {
@@ -303,6 +305,20 @@ public class RollingAutomationDiagnostics {
                                                     : "Allocation awaits a missing regular pickup"
                                                             + " slot."));
                     } else {
+                        if (!policy.unit().equals(allocation.unit())) {
+                            unitMismatches++;
+                            if (itemIssues.size() < 15)
+                                itemIssues.add(
+                                        new Issue(
+                                                date,
+                                                policy.name(),
+                                                "Stored inventory unit "
+                                                        + allocation.unit()
+                                                        + " differs from policy unit "
+                                                        + policy.unit()
+                                                        + ". Existing stock was preserved; review"
+                                                        + " this allocation manually."));
+                        }
                         if (allocation.status().equals("DRAFT")) drafts++;
                         if (policy.readyStockRequired() && allocation.status().equals("APPROVED"))
                             readiness++;
@@ -343,16 +359,23 @@ public class RollingAutomationDiagnostics {
                             || interrupted
                             || missingSlots > 0
                             || missingAllocations > 0
+                            || unitMismatches > 0
                             || included.isEmpty();
             String status = running ? "RUNNING" : attention ? "NEEDS_ATTENTION" : "COMPLETE";
             String message =
                     running
                             ? "A coverage run is in progress. Reload after it completes."
-                            : attention
-                                    ? "Review missing coverage or execution alerts. Save"
-                                            + " configuration changes before a manual retry."
-                                    : "Expected setup records are present. Stock, approval,"
-                                            + " readiness and service-time checks still apply.";
+                            : unitMismatches > 0
+                                    ? unitMismatches
+                                            + " allocations have inventory unit mismatches. Review"
+                                            + " affected dates and dishes below; existing units and"
+                                            + " quantities were preserved."
+                                    : attention
+                                            ? "Review missing coverage or execution alerts. Save"
+                                                  + " configuration changes before a manual retry."
+                                            : "Expected setup records are present. Stock, approval,"
+                                                    + " readiness and service-time checks still"
+                                                    + " apply.";
             return new Health(
                     status,
                     overdue,
