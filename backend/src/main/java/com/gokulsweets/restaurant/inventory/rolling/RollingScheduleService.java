@@ -105,7 +105,8 @@ public class RollingScheduleService {
             String lastSuccess,
             String message,
             RollingAutomationDiagnostics.Health health,
-            List<RollingAutomationDiagnostics.Run> runs) {
+            List<RollingAutomationDiagnostics.Run> runs,
+            Integer storefrontBookingDays) {
         /** Internal configuration reads omit expensive admin-only diagnostics. */
         public Workspace(
                 Plan plan,
@@ -113,7 +114,7 @@ public class RollingScheduleService {
                 String lastAttempt,
                 String lastSuccess,
                 String message) {
-            this(plan, policies, lastAttempt, lastSuccess, message, null, List.of());
+            this(plan, policies, lastAttempt, lastSuccess, message, null, List.of(), null);
         }
     }
 
@@ -130,7 +131,8 @@ public class RollingScheduleService {
                     workspace.lastSuccess(),
                     workspace.message(),
                     diagnostics.health(branchId, workspace, runs),
-                    runs);
+                    runs,
+                    features.getFutureOrderingDays());
         } finally {
             MethodTiming.finish(started, RollingScheduleService.class, "inspect(long)");
         }
@@ -446,8 +448,21 @@ capacity,maintain_days,weekdays,use_policy_maximum,updated_by) VALUES(?,?,?,?,?,
      * Repairs coverage with a five-minute transaction deadline and durable execution diagnostics.
      */
     public void reconcile(long branchId, String trigger, String actor) {
-        final long __gokulMethodStartedNanos =
+        final long started =
                 MethodTiming.start(RollingScheduleService.class, "reconcile(long,String,String)");
+        try {
+            reconcile(branchId, trigger, actor, null);
+        } finally {
+            MethodTiming.finish(
+                    started, RollingScheduleService.class, "reconcile(long,String,String)");
+        }
+    }
+
+    /** Runs only the reviewed saved version when supplied, preventing stale combined actions. */
+    public void reconcile(long branchId, String trigger, String actor, Long expectedVersion) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        RollingScheduleService.class, "reconcile(long,String,String,Long)");
         try {
             long began = System.nanoTime();
             long runId = diagnostics.start(branchId, trigger, actor);
@@ -480,6 +495,12 @@ capacity,maintain_days,weekdays,use_policy_maximum,updated_by) VALUES(?,?,?,?,?,
                                         "Branch must be active and operational.");
                             var config = workspace(branchId);
                             var plan = config.plan();
+                            if (expectedVersion != null
+                                    && (plan == null || plan.version() != expectedVersion))
+                                throw new ResponseStatusException(
+                                        HttpStatus.CONFLICT,
+                                        "The saved setup changed. Reload and review it before"
+                                                + " generating stock.");
                             if (plan == null || !plan.enabled()) return;
                             jdbc.update(
                                     "UPDATE rolling_branch_schedules SET last_attempt_at=now()"
@@ -767,7 +788,7 @@ ON CONFLICT(branch_product_id,service_date) DO NOTHING
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
                     RollingScheduleService.class,
-                    "reconcile(long,String,String)");
+                    "reconcile(long,String,String,Long)");
         }
     }
 }

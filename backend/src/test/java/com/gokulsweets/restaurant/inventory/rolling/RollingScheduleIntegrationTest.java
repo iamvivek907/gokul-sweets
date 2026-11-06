@@ -1274,4 +1274,43 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
                         .toInstant();
         assertThat(completed).isAfter(began);
     }
+
+    @Test
+    void reviewedSavedVersionIsRequiredForCombinedGeneration() {
+        var f = fixture();
+        service.save(f.branch(), maximumPlan(-1, 2), "manager");
+        service.save(f.branch(), maximumPlan(0, 3), "other-manager");
+        assertThatThrownBy(() -> service.reconcile(f.branch(), "MANUAL", "manager", 0L))
+                .hasMessageContaining("saved setup changed");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM pickup_slots WHERE branch_id=?",
+                                Integer.class,
+                                f.branch()))
+                .isZero();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM inventory_daily_allocations WHERE"
+                                        + " branch_product_id=?",
+                                Integer.class,
+                                f.product()))
+                .isZero();
+    }
+
+    @Test
+    void matchingSavedVersionGeneratesStockAndReturnsActualStorefrontLimit() {
+        var f = fixture();
+        service.save(f.branch(), maximumPlan(-1, 2), "manager");
+        service.reconcile(f.branch(), "MANUAL", "manager", 0L);
+        entityManager.flush();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM inventory_daily_allocations WHERE"
+                                        + " branch_product_id=?",
+                                Integer.class,
+                                f.product()))
+                .isPositive();
+        assertThat(service.inspect(f.branch()).storefrontBookingDays())
+                .isEqualTo(features.getFutureOrderingDays());
+    }
 }
