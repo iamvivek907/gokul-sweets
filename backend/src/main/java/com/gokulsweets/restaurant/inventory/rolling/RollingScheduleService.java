@@ -51,7 +51,32 @@ public class RollingScheduleService {
             int maintainDays,
             int weekdays,
             long version,
-            List<Template> templates) {}
+            List<Template> templates,
+            boolean usePolicyMaximum) {
+        /** Existing callers retain explicit template mode. */
+        public Plan(
+                boolean enabled,
+                LocalTime openingTime,
+                LocalTime closingTime,
+                int slotMinutes,
+                int capacity,
+                int maintainDays,
+                int weekdays,
+                long version,
+                List<Template> templates) {
+            this(
+                    enabled,
+                    openingTime,
+                    closingTime,
+                    slotMinutes,
+                    capacity,
+                    maintainDays,
+                    weekdays,
+                    version,
+                    templates,
+                    false);
+        }
+    }
 
     /** Eligible configured policy and its visible quantity limits. */
     public record Policy(
@@ -113,7 +138,8 @@ public class RollingScheduleService {
                                                     rs.getInt("maintain_days"),
                                                     rs.getInt("weekdays"),
                                                     rs.getLong("version"),
-                                                    templates(branchId))
+                                                    templates(branchId),
+                                                    rs.getBoolean("use_policy_maximum"))
                                             : null,
                             branchId);
             var policies =
@@ -254,6 +280,7 @@ ORDER BY pr.name,p.id
                                                     .compareTo(new BigDecimal("99999999999.999"))
                                             > 0
                                     || plan.enabled()
+                                            && !plan.usePolicyMaximum()
                                             && policy.selectable()
                                             && ((!"GRAM".equals(policy.unit())
                                                             && template.quantity()
@@ -278,7 +305,7 @@ ORDER BY pr.name,p.id
                                 jdbc.update(
                                         """
 UPDATE rolling_branch_schedules SET enabled=?,opening_time=?,closing_time=?,slot_minutes=?,
-capacity=?,maintain_days=?,weekdays=?,version=version+1,updated_by=?,updated_at=now()
+capacity=?,maintain_days=?,weekdays=?,use_policy_maximum=?,version=version+1,updated_by=?,updated_at=now()
 WHERE branch_id=? AND version=?
 """,
                                         plan.enabled(),
@@ -288,6 +315,7 @@ WHERE branch_id=? AND version=?
                                         plan.capacity(),
                                         plan.maintainDays(),
                                         plan.weekdays(),
+                                        plan.usePolicyMaximum(),
                                         actor,
                                         branchId,
                                         plan.version());
@@ -296,7 +324,7 @@ WHERE branch_id=? AND version=?
                                     || jdbc.update(
                                                     """
 INSERT INTO rolling_branch_schedules(branch_id,enabled,opening_time,closing_time,slot_minutes,
-capacity,maintain_days,weekdays,updated_by) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING
+capacity,maintain_days,weekdays,use_policy_maximum,updated_by) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING
 """,
                                                     branchId,
                                                     plan.enabled(),
@@ -306,6 +334,7 @@ capacity,maintain_days,weekdays,updated_by) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLIC
                                                     plan.capacity(),
                                                     plan.maintainDays(),
                                                     plan.weekdays(),
+                                                    plan.usePolicyMaximum(),
                                                     actor)
                                             == 0)
                                 throw new ResponseStatusException(
@@ -384,6 +413,42 @@ capacity,maintain_days,weekdays,updated_by) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLIC
                                             .collect(
                                                     java.util.stream.Collectors.toMap(
                                                             Policy::id, policy -> policy));
+                            // Maximum is the gross allocation. The existing approval service
+                            // withholds the policy buffer once; do not subtract it here.
+                            var effectiveTemplates =
+                                    plan.usePolicyMaximum()
+                                            ? config.policies().stream()
+                                                    .filter(
+                                                            p ->
+                                                                    p.eligible()
+                                                                            && p.maximum() != null
+                                                                            && p.maximum().signum()
+                                                                                    > 0
+                                                                            && p.maximum()
+                                                                                            .compareTo(
+                                                                                                    p
+                                                                                                            .buffer())
+                                                                                    > 0
+                                                                            && ("GRAM"
+                                                                                            .equals(
+                                                                                                    p
+                                                                                                            .unit())
+                                                                                    || p.maximum()
+                                                                                                    .stripTrailingZeros()
+                                                                                                    .scale()
+                                                                                            <= 0))
+                                                    .map(
+                                                            p ->
+                                                                    new Template(
+                                                                            p.id(),
+                                                                            p.maximum(),
+                                                                            true))
+                                                    .toList()
+                                            : plan.templates();
+                            int maximumModeSkips =
+                                    plan.usePolicyMaximum()
+                                            ? config.policies().size() - effectiveTemplates.size()
+                                            : 0;
                             for (int offset = 0; offset < plan.maintainDays(); offset++) {
                                 LocalDate date = today.plusDays(offset);
                                 if ((plan.weekdays() & (1 << (date.getDayOfWeek().getValue() - 1)))
@@ -461,7 +526,7 @@ AND occasion_enquiry_id IS NULL AND (slot_date<>? OR start_time>?)
                                                         Long.class,
                                                         branchId,
                                                         date));
-                                for (var template : plan.templates()) {
+                                for (var template : effectiveTemplates) {
                                     var policy = policyMap.get(template.policyId());
                                     if (policy == null || !policy.eligible()) {
                                         unavailable++;
@@ -510,7 +575,7 @@ ON CONFLICT(branch_product_id,service_date) DO NOTHING
                                                 date,
                                                 new AdminAllocationApprovalRequest(
                                                         template.quantity(),
-                                                        policy.buffer(),
+                                                        null,
                                                         null,
                                                         null,
                                                         date.atTime(first),
@@ -528,7 +593,7 @@ ON CONFLICT(branch_product_id,service_date) DO NOTHING
                                             + " allocations created; "
                                             + retained
                                             + " item-dates unchanged. "
-                                            + plan.templates().size()
+                                            + effectiveTemplates.size()
                                             + " selected policies; "
                                             + activeDates
                                             + " dates with upcoming regular pickup slots; "
@@ -543,11 +608,22 @@ ON CONFLICT(branch_product_id,service_date) DO NOTHING
                                             + " outside booking windows; "
                                             + limited
                                             + " policy-limit or concurrent-allocation checks.";
-                            if (plan.templates().isEmpty())
+                            if (plan.usePolicyMaximum())
                                 message +=
-                                        " No dishes selected in the saved plan. Select dishes,"
-                                                + " enter daily quantities and save to generate"
-                                                + " inventory.";
+                                        " Policy maximum mode: "
+                                                + maximumModeSkips
+                                                + " policies skipped because they are unavailable,"
+                                                + " unsupported or lack a usable maximum above the"
+                                                + " buffer.";
+                            if (effectiveTemplates.isEmpty())
+                                message +=
+                                        plan.usePolicyMaximum()
+                                                ? " No usable policy maximums. Configure an online"
+                                                        + " physical policy with a maximum greater"
+                                                        + " than its safety buffer."
+                                                : " No dishes selected in the saved plan. Select"
+                                                        + " dishes, enter daily quantities and save"
+                                                        + " to generate inventory.";
                             if (activeDates == 0)
                                 message +=
                                         " No upcoming active regular pickup slots on selected"

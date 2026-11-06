@@ -455,4 +455,167 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
         assertThatThrownBy(() -> service.save(other.branch(), plan(other, -1, true), "manager"))
                 .hasMessageContaining("supported physical inventory policy");
     }
+
+    private RollingScheduleService.Plan maximumPlan(long version, int days) {
+        return new RollingScheduleService.Plan(
+                true,
+                LocalTime.of(10, 0),
+                LocalTime.of(11, 0),
+                30,
+                5,
+                days,
+                127,
+                version,
+                List.of(),
+                true);
+    }
+
+    @Test
+    void maximumModeUsesGrossCapOnceAndSkipsPoliciesWithoutUsableMaximums() {
+        var f = fixture();
+        var missing = fixture();
+        var blocked = fixture();
+        var offline = fixture();
+        for (var extra : List.of(missing, blocked, offline))
+            jdbc.update(
+                    "UPDATE branch_products SET branch_id=? WHERE id=?",
+                    f.branch(),
+                    extra.product());
+        jdbc.update(
+                "UPDATE branch_inventory_policies SET maximum_daily_allocation=NULL WHERE id=?",
+                missing.policy());
+        jdbc.update(
+                "UPDATE branch_inventory_policies SET maximum_daily_allocation=2 WHERE id=?",
+                blocked.policy());
+        jdbc.update(
+                "UPDATE branch_inventory_policies SET online_enabled=FALSE WHERE id=?",
+                offline.policy());
+        service.save(f.branch(), maximumPlan(-1, 2), "manager");
+        assertThat(service.workspace(f.branch()).plan().usePolicyMaximum()).isTrue();
+        assertThat(service.workspace(f.branch()).plan().templates()).isEmpty();
+        service.reconcile(f.branch());
+        entityManager.flush();
+        entityManager.clear();
+        LocalDate tomorrow = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(1);
+        var row =
+                jdbc.queryForMap(
+                        "SELECT approved_quantity,safety_buffer_quantity,status FROM"
+                                + " inventory_daily_allocations WHERE branch_product_id=? AND"
+                                + " service_date=?",
+                        f.product(),
+                        tomorrow);
+        assertThat((BigDecimal) row.get("approved_quantity")).isEqualByComparingTo("100");
+        assertThat((BigDecimal) row.get("safety_buffer_quantity")).isEqualByComparingTo("2");
+        assertThat(
+                        ((BigDecimal) row.get("approved_quantity"))
+                                .subtract((BigDecimal) row.get("safety_buffer_quantity")))
+                .isEqualByComparingTo("98");
+        assertThat(row.get("status")).isEqualTo("APPROVED");
+        for (var extra : List.of(missing, blocked, offline))
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT count(*) FROM inventory_daily_allocations WHERE"
+                                            + " branch_product_id=?",
+                                    Integer.class,
+                                    extra.product()))
+                    .isZero();
+        assertThat(service.workspace(f.branch()).message())
+                .contains("Policy maximum mode: 3 policies skipped");
+    }
+
+    @Test
+    void maximumModeIsRepeatSafePreservesOverridesAndExtendsSlotBackedCoverage() {
+        var f = fixture();
+        service.save(f.branch(), maximumPlan(-1, 2), "manager");
+        service.reconcile(f.branch());
+        entityManager.flush();
+        entityManager.clear();
+        LocalDate tomorrow = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(1);
+        jdbc.update(
+                "UPDATE inventory_daily_allocations SET"
+                    + " approved_quantity=7,held_quantity=1,committed_quantity=2,ready_quantity=5,note='Manual"
+                    + " override' WHERE branch_product_id=? AND service_date=?",
+                f.product(),
+                tomorrow);
+        var preserved =
+                jdbc.queryForMap(
+                        "SELECT * FROM inventory_daily_allocations WHERE branch_product_id=? AND"
+                                + " service_date=?",
+                        f.product(),
+                        tomorrow);
+        int ledgers =
+                jdbc.queryForObject(
+                        "SELECT count(*) FROM inventory_stock_transactions WHERE"
+                                + " branch_product_id=?",
+                        Integer.class,
+                        f.product());
+        jdbc.update(
+                "UPDATE branch_inventory_policies SET maximum_daily_allocation=50 WHERE id=?",
+                f.policy());
+        for (int run = 0; run < 3; run++) service.reconcile(f.branch());
+        assertThat(
+                        jdbc.queryForMap(
+                                "SELECT * FROM inventory_daily_allocations WHERE"
+                                        + " branch_product_id=? AND service_date=?",
+                                f.product(),
+                                tomorrow))
+                .isEqualTo(preserved);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM inventory_stock_transactions WHERE"
+                                        + " branch_product_id=?",
+                                Integer.class,
+                                f.product()))
+                .isEqualTo(ledgers);
+        service.save(f.branch(), maximumPlan(0, 3), "manager");
+        service.reconcile(f.branch());
+        entityManager.flush();
+        entityManager.clear();
+        LocalDate future = tomorrow.plusDays(1);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM pickup_slots WHERE branch_id=? AND"
+                                        + " slot_date=? AND active",
+                                Integer.class,
+                                f.branch(),
+                                future))
+                .isEqualTo(2);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT approved_quantity FROM inventory_daily_allocations WHERE"
+                                        + " branch_product_id=? AND service_date=?",
+                                BigDecimal.class,
+                                f.product(),
+                                future))
+                .isEqualByComparingTo("50");
+        assertThat(
+                        jdbc.queryForMap(
+                                "SELECT * FROM inventory_daily_allocations WHERE"
+                                        + " branch_product_id=? AND service_date=?",
+                                f.product(),
+                                tomorrow))
+                .isEqualTo(preserved);
+        var added = fixture();
+        jdbc.update(
+                "UPDATE branch_products SET branch_id=? WHERE id=?", f.branch(), added.product());
+        service.reconcile(f.branch());
+        entityManager.flush();
+        entityManager.clear();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT approved_quantity FROM inventory_daily_allocations WHERE"
+                                        + " branch_product_id=? AND service_date=?",
+                                BigDecimal.class,
+                                added.product(),
+                                future))
+                .isEqualByComparingTo("100");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM inventory_daily_allocations WHERE"
+                                        + " branch_product_id=? AND service_date=?",
+                                Integer.class,
+                                f.product(),
+                                future))
+                .isEqualTo(1);
+    }
 }

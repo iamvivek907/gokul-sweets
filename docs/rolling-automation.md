@@ -90,3 +90,31 @@ Run messages count active pickup dates, dates without future regular slots, exis
 allocations and skips due to unavailable policies, booking windows or insert checks.
 Empty selections and a range without usable slots receive specific next steps. These
 diagnostics never enable a dish, refill an allocation or rewrite an existing timetable.
+
+## Automatic policy maximum quantities
+
+Choose Inventory quantity source → Policy maximums and save the enabled branch plan.
+The worker reevaluates current, configured branch policies on every check; individual
+selection and guaranteed quantity entry are not needed. New eligible policies are picked
+up automatically. Existing plans default to explicit selection until this mode is chosen.
+
+Only online, branch-available physical policies with a positive maximum greater than the
+safety buffer qualify. Missing maximums, maximums at/below the buffer, invalid piece units,
+manual/capacity policies and bulk-only dishes are skipped. The run report explains skips.
+The maximum is the gross approved quantity: maximum 200 and buffer 50 produces approved
+200, buffer 50 and 150 planned after buffer, before commitments/readiness/service checks.
+The buffer is never deducted twice. New rows use the audited automatic approval path.
+Physical readiness remains separate when required by the policy.
+
+Saved manual selections are retained separately when switching modes. Unsaved manual
+quantity edits are not used or saved by maximum mode. Policy changes affect missing future
+allocations only; existing drafts, overrides and approved stock are never rewritten.
+
+Repeated worker or manual Generate requests share the branch lock and unique item/date
+allocation constraint. Inserts use ON CONFLICT DO NOTHING; approval occurs only for rows
+inserted by that run. Existing holds, commitments, readiness, manual quantities and ledger
+entries are not reset or replenished. Coverage follows active regular slot dates on selected
+weekdays throughout the rolling horizon, capped by product and storefront booking limits.
+As dates enter that horizon, later checks create missing allocations using current policy
+maximums. Existing disabled/manual slot schedules and private occasion appointments retain
+their protections. No admin page or daily button action is required for scheduled checks.

@@ -4,13 +4,19 @@ const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??"
 const browser=await chromium.launch({headless:true,...(process.env.BROWSER_EXECUTABLE?{executablePath:process.env.BROWSER_EXECUTABLE,args:["--no-sandbox"]}:{})});
 const base=process.env.BROWSER_BASE??"http://127.0.0.1:3311";
 try{
- for(const [width,viewOnly,largeCatalog] of [[390,false,false],[1280,false,false],[390,true,false],[1280,true,false],[390,false,true],[1280,false,true]]){
+ for(const [width,viewOnly,largeCatalog,maximumMode] of [[390,false,false,false],[1280,false,false,false],[390,true,false,false],[1280,true,false,false],[390,false,true,false],[1280,false,true,false],[390,false,false,true],[1280,false,false,true]]){
   const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:"block"});
   let plan=null,saved=null,runs=0,saves=0,delayReload=false,releaseReload=null,reloadEntered=null,failReload=false;
   if(viewOnly)plan={enabled:true,openingTime:"10:00",closingTime:"21:00",slotMinutes:30,capacity:10,maintainDays:14,weekdays:127,version:0,templates:[{policyId:6,quantity:80,autoApprove:true}]};
+  if(maximumMode)plan={enabled:false,openingTime:"10:00",closingTime:"21:00",slotMinutes:30,capacity:10,maintainDays:14,weekdays:127,version:0,usePolicyMaximum:false,templates:[{policyId:6,quantity:80,autoApprove:false}]};
   const policies=[{id:6,name:"Samosa",unit:"PIECE",bookingDays:14,buffer:2,maximum:100,readyStockRequired:false,eligible:true,selectable:true,unavailableReason:null},
    {id:7,name:"Rasmalai",unit:"PIECE",bookingDays:3,buffer:1,maximum:40,readyStockRequired:true,eligible:true,selectable:true,unavailableReason:null},
    {id:8,name:"Counter capacity",unit:"CAPACITY_POINT",bookingDays:14,buffer:0,maximum:100,readyStockRequired:false,eligible:false,selectable:false,unavailableReason:"Capacity-only policies do not support physical inventory automation."}];
+  if(maximumMode)policies.push(
+   {id:9,name:"No maximum",unit:"PIECE",bookingDays:14,buffer:0,maximum:null,readyStockRequired:false,eligible:true,selectable:true,unavailableReason:null},
+   {id:10,name:"Buffer blocks",unit:"PIECE",bookingDays:14,buffer:10,maximum:10,readyStockRequired:false,eligible:true,selectable:true,unavailableReason:null},
+   {id:11,name:"Fractional cap",unit:"PIECE",bookingDays:14,buffer:0,maximum:2.5,readyStockRequired:false,eligible:true,selectable:true,unavailableReason:null},
+   {id:12,name:"Offline policy",unit:"PIECE",bookingDays:14,buffer:0,maximum:100,readyStockRequired:false,eligible:false,selectable:true,unavailableReason:"Offline policy is skipped."});
   if(largeCatalog)policies.push(...Array.from({length:300},(_,index)=>({id:100+index,name:`Fixture dish ${String(index+1).padStart(3,"0")}`,unit:"PIECE",bookingDays:14,buffer:0,maximum:100,readyStockRequired:false,eligible:true,selectable:true,unavailableReason:null})));
   await context.route("**/api/**",async route=>{
    const request=route.request(),path=new URL(request.url()).pathname;
@@ -62,6 +68,24 @@ try{
   ])await checkHelp(title,copy);
   assert.equal(saved,null,"opening help never saves the plan");
   assert.equal(runs,0,"opening help never runs generation");
+  if(maximumMode){
+   await checkHelp("Inventory quantity source",/buffer is deducted once|withholds 50 once/);
+   const source=page.getByRole("combobox",{name:"Inventory quantity source",exact:true});
+   await source.selectOption("maximum");await enabled.check();
+   await page.getByText("2 policies automatically included",{exact:true}).waitFor();
+   assert.equal(await page.getByRole("spinbutton",{name:/Guaranteed daily quantity/}).count(),0,"maximum mode needs no per-dish entries");
+   await page.getByText("Automatic approval: 100 PIECE · Planned after buffer: 98 PIECE",{exact:true}).waitFor();
+   await page.getByRole("combobox",{name:"Show",exact:true}).selectOption("attention");
+   assert.equal(await page.locator('[data-policy-row]').count(),5,"unsupported, missing, fractional and buffer-blocked maxima are skipped");
+   await page.getByRole("button",{name:"Save automation settings",exact:true}).click();
+   await page.getByText("Schedule saved.",{exact:false}).waitFor();
+   assert.equal(saved.usePolicyMaximum,true);
+   assert.deepEqual(saved.templates,[{policyId:6,quantity:80,autoApprove:false}],"saved manual settings are preserved separately");
+   await source.selectOption("selected");
+   await page.getByRole("combobox",{name:"Show",exact:true}).selectOption("all");
+   assert.equal(await page.getByRole("spinbutton",{name:/Guaranteed daily quantity/}).inputValue(),"80");
+   await context.close();console.log(`PASS: policy maxima preview, buffer-once, skip reasons and manual preservation at ${width}px`);continue;
+  }
   if(largeCatalog){
    const rows=page.locator('[data-policy-row]');
    assert.equal(await rows.count(),25,"a 303-dish catalogue renders only the requested page");
