@@ -11,7 +11,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/** Startup catch-up and repeated reconciliation, isolated from dedicated import workers. */
+/** Daily reconciliation, isolated from dedicated import workers. */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -29,10 +29,10 @@ public class RollingScheduleWorker {
     @Value("${gokul.jobs.worker-enabled:false}")
     private boolean importWorker;
 
-    /** Repairs coverage after startup and every ten minutes without changing existing records. */
-    @Scheduled(
-            initialDelayString = "${inventory.rolling.initial-delay-ms:30000}",
-            fixedDelayString = "${inventory.rolling.poll-ms:600000}")
+    /**
+     * Maintains the calendar window once daily at midnight IST; admins can run checks separately.
+     */
+    @Scheduled(cron = "0 0 0 * * *", zone = "Asia/Kolkata")
     public void reconcile() {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(RollingScheduleWorker.class, "reconcile()");

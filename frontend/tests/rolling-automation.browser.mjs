@@ -57,7 +57,7 @@ try{
   }
   for(const [title,copy] of [
    ["Branch",/does not configure another branch/],
-   ["Enable rolling automation",/every ten minutes/],
+   ["Enable rolling automation",/once daily at 12:00 AM IST/],
    ["Start time · IST",/10:00/],
    ["End time · IST",/20:30–21:00/],
    ["Slot duration · minutes",/5–180/],
