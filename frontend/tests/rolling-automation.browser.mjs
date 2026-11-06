@@ -4,13 +4,14 @@ const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??"
 const browser=await chromium.launch({headless:true,...(process.env.BROWSER_EXECUTABLE?{executablePath:process.env.BROWSER_EXECUTABLE,args:["--no-sandbox"]}:{})});
 const base=process.env.BROWSER_BASE??"http://127.0.0.1:3311";
 try{
- for(const [width,viewOnly] of [[390,false],[1280,false],[390,true],[1280,true]]){
+ for(const [width,viewOnly,largeCatalog] of [[390,false,false],[1280,false,false],[390,true,false],[1280,true,false],[390,false,true],[1280,false,true]]){
   const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:"block"});
-  let plan=null,saved=null,runs=0,delayReload=false,releaseReload=null,reloadEntered=null,failReload=false;
+  let plan=null,saved=null,runs=0,saves=0,delayReload=false,releaseReload=null,reloadEntered=null,failReload=false;
   if(viewOnly)plan={enabled:true,openingTime:"10:00",closingTime:"21:00",slotMinutes:30,capacity:10,maintainDays:14,weekdays:127,version:0,templates:[{policyId:6,quantity:80,autoApprove:true}]};
   const policies=[{id:6,name:"Samosa",unit:"PIECE",bookingDays:14,buffer:2,maximum:100,readyStockRequired:false,eligible:true,selectable:true,unavailableReason:null},
    {id:7,name:"Rasmalai",unit:"PIECE",bookingDays:3,buffer:1,maximum:40,readyStockRequired:true,eligible:true,selectable:true,unavailableReason:null},
    {id:8,name:"Counter capacity",unit:"CAPACITY_POINT",bookingDays:14,buffer:0,maximum:100,readyStockRequired:false,eligible:false,selectable:false,unavailableReason:"Capacity-only policies do not support physical inventory automation."}];
+  if(largeCatalog)policies.push(...Array.from({length:300},(_,index)=>({id:100+index,name:`Fixture dish ${String(index+1).padStart(3,"0")}`,unit:"PIECE",bookingDays:14,buffer:0,maximum:100,readyStockRequired:false,eligible:true,selectable:true,unavailableReason:null})));
   await context.route("**/api/**",async route=>{
    const request=route.request(),path=new URL(request.url()).pathname;
    const headers={"Access-Control-Allow-Origin":base,"Access-Control-Allow-Credentials":"true",
@@ -21,7 +22,7 @@ try{
    if(path==="/api/branches")return route.fulfill({headers,json:[{id:1,name:"Test branch",active:true}]});
    if(path.endsWith("/rolling-automation")&&request.method()==="PUT"){
     assert.equal(request.headers()["x-staff-csrf"],"test-csrf","writes carry the exposed CSRF token");
-    saved=request.postDataJSON();plan={...saved,version:plan?plan.version+1:0};
+    saves++;saved=request.postDataJSON();plan={...saved,version:plan?plan.version+1:0};
    }
    if(path.endsWith("/rolling-automation/reconcile"))runs++;
    if(path.includes("/rolling-automation")){
@@ -61,10 +62,48 @@ try{
   ])await checkHelp(title,copy);
   assert.equal(saved,null,"opening help never saves the plan");
   assert.equal(runs,0,"opening help never runs generation");
+  if(largeCatalog){
+   const rows=page.locator('[data-policy-row]');
+   assert.equal(await rows.count(),25,"a 303-dish catalogue renders only the requested page");
+   await enabled.check();
+   await page.getByRole("checkbox",{name:"Samosa",exact:true}).check();
+   await page.getByRole("spinbutton",{name:/Guaranteed daily quantity/}).fill("80");
+   await page.getByRole("button",{name:"Next dishes",exact:true}).click();
+   await page.getByText("Page 2 of 13",{exact:true}).waitFor();
+   await page.getByRole("checkbox",{name:"Fixture dish 030",exact:true}).check();
+   await page.getByRole("spinbutton",{name:/Guaranteed daily quantity/}).fill("7");
+   await page.getByRole("button",{name:"Previous dishes",exact:true}).click();
+   assert.equal(await page.getByRole("spinbutton",{name:/Guaranteed daily quantity/}).inputValue(),"80","returning to a page retains its quantity");
+   await page.getByRole("combobox",{name:"Rows per page",exact:true}).selectOption("10");
+   assert.equal(await rows.count(),10);
+   await page.getByRole("combobox",{name:"Show",exact:true}).selectOption("selected");
+   assert.equal(await rows.count(),2,"selected view includes selections from other pages");
+   await page.getByRole("button",{name:"Save automation settings",exact:true}).click();
+   await page.getByText("Schedule saved.",{exact:false}).waitFor();
+   assert.deepEqual(saved.templates.map(item=>[item.policyId,item.quantity]).sort((a,b)=>a[0]-b[0]),[[6,80],[129,7]],"save retains off-page selections");
+   const search=page.getByRole("searchbox",{name:"Find a dish",exact:true});
+   await search.fill("nothing matches");await search.press("Enter");
+   await page.getByText("No dishes match this view.",{exact:false}).waitFor();
+   assert.equal(saves,1,"search Enter never submits settings");
+   assert.equal(await page.getByRole("button",{name:"Next dishes",exact:true}).isDisabled(),true);
+   await page.getByRole("combobox",{name:"Show",exact:true}).selectOption("all");
+   await search.fill("Fixture dish 299");
+   await page.getByRole("checkbox",{name:"Fixture dish 299",exact:true}).check();
+   await search.fill("Samosa");
+   await page.getByRole("button",{name:"Save automation settings",exact:true}).click();
+   await page.getByRole("alert").filter({hasText:"selected dishes need a valid daily quantity"}).waitFor();
+   assert.equal(saves,1,"invalid off-page quantities block saving");
+   assert.equal(await search.inputValue(),"","validation clears a search that hides the invalid selection");
+   assert.equal(await page.getByRole("combobox",{name:"Show",exact:true}).inputValue(),"attention");
+   await page.getByRole("checkbox",{name:"Fixture dish 299",exact:true}).waitFor();
+   assert.equal(await rows.count(),1);
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+   await context.close();console.log(`PASS: 303 dishes, bounded pages, cross-page edits, search and hidden validation at ${width}px`);continue;
+  }
   if(viewOnly){
    await checkHelp("Guaranteed daily quantity · PIECE",/1,000 means 1 kg/);
    await checkHelp("Approval mode",/staff must still record actual production readiness/);
-   const controls=page.locator('form input, form select, form button[type="submit"]');
+   const controls=page.locator('form input:not([data-browse-control]), form select:not([data-browse-control]), form button[type="submit"]');
    assert.ok(await controls.count()>10);
    for(const control of await controls.all())assert.equal(await control.isDisabled(),true,"view-only configuration stays disabled");
    assert.equal(await page.getByRole("button",{name:"Generate missing coverage now",exact:true}).isDisabled(),true);

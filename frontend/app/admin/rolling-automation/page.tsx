@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {useEffect, useRef, useState} from "react";
+import {useEffect, useMemo, useRef, useState} from "react";
 import AdminHelp from "@/components/admin/AdminHelp";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
 import {adminFetch} from "@/services/adminApi";
@@ -34,6 +34,17 @@ function FieldLabel({id,title,helpKey}:{id:string;title:string;helpKey:string}){
     return <div className="flex items-center justify-between gap-2"><label htmlFor={id}>{title}</label><AdminHelp title={title} {...help[helpKey]}/></div>;
 }
 
+function runTime(value:string|null){
+    if(!value)return "Not run";
+    const parsed=new Date(value.replace(" ","T").replace(/(\.\d{3})\d+/,"$1").replace(/([+-]\d{2})$/,"$1:00"));
+    return Number.isNaN(parsed.getTime())?"Time unavailable":new Intl.DateTimeFormat("en-IN",{timeZone:"Asia/Kolkata",day:"numeric",month:"short",year:"numeric",hour:"numeric",minute:"2-digit",hour12:true}).format(parsed)+" IST";
+}
+function needsQuantity(template:Template,policy:Policy|undefined,enabled:boolean){
+    const q=template.quantity;
+    return !Number.isFinite(q)||q<=0||q>99999999999.999||Math.abs(q*1000-Math.round(q*1000))>0.000001
+        ||!!(enabled&&policy?.selectable&&(q<=policy.buffer||(policy.maximum!==null&&q>policy.maximum)||(policy.unit!=="GRAM"&&!Number.isInteger(q))));
+}
+
 export default function RollingAutomationPage(){
     const {profile,authorization,hasPermission}=useAdminAuth();
     const [branches,setBranches]=useState<{id:number;name:string}[]>([]);
@@ -47,6 +58,10 @@ export default function RollingAutomationPage(){
     const [error,setError]=useState("");
     const [notice,setNotice]=useState("");
     const [busy,setBusy]=useState(false);
+    const [policySearch,setPolicySearch]=useState("");
+    const [policyFilter,setPolicyFilter]=useState("all");
+    const [policyPage,setPolicyPage]=useState(1);
+    const [pageSize,setPageSize]=useState(25);
     const canManage=hasPermission("BRANCH_MANAGE")&&hasPermission("INVENTORY_MANAGE")&&hasPermission("APPROVAL_MANAGE");
     useEffect(()=>{
         if(!profile)return;
@@ -73,12 +88,27 @@ export default function RollingAutomationPage(){
     const loading=branchId!==null&&(settledLoad?.branchId!==branchId||settledLoad?.reload!==reload);
     const workspace=snapshot?.branchId===branchId?snapshot.data:null;
     const controlsDisabled=busy||loading||!canManage;
+    const policyById=useMemo(()=>new Map(workspace?.policies.map(policy=>[policy.id,policy])??[]),[workspace?.policies]);
+    const selectedIds=useMemo(()=>new Set(draft.templates.map(item=>item.policyId)),[draft.templates]);
+    const invalidIds=useMemo(()=>new Set(draft.templates.filter(item=>needsQuantity(item,policyById.get(item.policyId),draft.enabled)).map(item=>item.policyId)),[draft.templates,draft.enabled,policyById]);
+    const filteredPolicies=useMemo(()=>{
+        const query=policySearch.trim().toLocaleLowerCase();
+        return (workspace?.policies??[]).filter(policy=>(!query||policy.name.toLocaleLowerCase().includes(query))
+            &&(policyFilter==="all"||policyFilter==="selected"&&selectedIds.has(policy.id)
+                ||policyFilter==="attention"&&(invalidIds.has(policy.id)||selectedIds.has(policy.id)&&!policy.eligible)));
+    },[workspace?.policies,policySearch,policyFilter,selectedIds,invalidIds]);
+    const totalPages=Math.max(1,Math.ceil(filteredPolicies.length/pageSize));
+    const currentPage=Math.min(policyPage,totalPages);
+    const visiblePolicies=filteredPolicies.slice((currentPage-1)*pageSize,currentPage*pageSize);
+    const skippedSelections=draft.templates.filter(item=>!policyById.get(item.policyId)?.eligible).length;
+    const savedSelectionCount=workspace?.plan?.templates.length??0;
     function change(patch:Partial<Plan>){setDraft(current=>({...current,...patch}));setDirty(true);setNotice("");}
     function changeTemplate(policyId:number,patch:Partial<Template>){
         change({templates:draft.templates.map(item=>item.policyId===policyId?{...item,...patch}:item)});
     }
     async function submit(run:boolean){
         if(!branchId||!authorization||!workspace||busy||loading||!canManage)return;
+        if(!run&&invalidIds.size){setError(`${invalidIds.size} selected dishes need a valid daily quantity. Review Needs attention, including selections on other pages.`);setPolicySearch("");setPolicyFilter("attention");setPolicyPage(1);return;}
         const selectedBranch=branchId;
         const operation=++requestVersion.current;
         setBusy(true);setError("");setNotice("");
@@ -105,7 +135,7 @@ export default function RollingAutomationPage(){
             Your manual tools stay available. Enabling this flow gives it ownership of scheduled inventory for this branch, so the legacy inventory scheduler skips the branch. Turning it off allows the legacy scheduler to resume its existing rules. Neither action deletes slots, stock or bookings.
         </aside>
         <div className="flex flex-wrap items-end gap-3">
-            <div className="min-w-0 flex-1 font-semibold"><FieldLabel id="automation-branch" title="Branch" helpKey="branch"/><select id="automation-branch" className={control} value={branchId??""} disabled={busy||dirty||loading} onChange={event=>{requestVersion.current++;setBranchId(Number(event.target.value));setError("");setNotice("");}}>
+            <div className="min-w-0 flex-1 font-semibold"><FieldLabel id="automation-branch" title="Branch" helpKey="branch"/><select id="automation-branch" className={control} value={branchId??""} disabled={busy||dirty||loading} onChange={event=>{requestVersion.current++;setBranchId(Number(event.target.value));setPolicySearch("");setPolicyFilter("all");setPolicyPage(1);setError("");setNotice("");}}>
                 {!branches.length&&<option value="">No accessible branches</option>}{branches.map(branch=><option key={branch.id} value={branch.id}>{branch.name}</option>)}
             </select></div>
             <button className={action} disabled={busy||loading||!branchId} onClick={()=>{requestVersion.current++;setReload(value=>value+1);setNotice("");setError("");}}>Reload saved settings</button>
@@ -114,7 +144,22 @@ export default function RollingAutomationPage(){
         {error&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-red-900">{error}</p>}
         {notice&&<p role="status" className="rounded-xl bg-green-50 p-3 text-green-900">{notice}</p>}
         {loading&&<p role="status">Loading saved settings…</p>}
+        {workspace&&<section className="space-y-3 rounded-2xl border bg-white p-5">
+            <h2 className="text-xl font-bold">Generation activity</h2>
+            <p className="text-sm font-semibold text-[#8f1838]">{workspace.plan?.enabled?"Saved automation is on":"Saved automation is paused"} · {savedSelectionCount} saved dish selections</p>
+            {savedSelectionCount===0&&<p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">No dishes are selected in the saved plan. Pickup slots can be maintained, but no dish allocations will be generated until you select dishes, enter quantities and save.</p>}
+            {dirty&&<p className="text-sm text-amber-900">Unsaved changes are not used by the scheduler. Save or reload before running a check.</p>}
+            <p className="text-sm">Last attempt: {runTime(workspace.lastAttempt)} · Last completed check: {runTime(workspace.lastSuccess)}</p>
+            <p role="status" className="rounded-xl bg-stone-50 p-3 leading-relaxed">{workspace.message??"Save and enable a schedule. Coverage is generated automatically at the next background check."}</p>
+            <button type="button" className={action} disabled={busy||loading||dirty||!workspace.plan?.enabled||!canManage} onClick={()=>void submit(true)}>Generate missing coverage now</button>
+            <p className="text-sm text-stone-600">Optional immediate check using saved settings; daily generation and retries do not require this button. Safe to repeat: existing dates and allocations are preserved. A failed run is retried at the next background check. If a run fails, resolve the reported setup problem and try again.</p>
+            <Link href="/admin/inventory" className="inline-flex min-h-11 items-center font-semibold underline">Review daily allocations and drafts</Link>
+        </section>}
         {workspace&&<form className="space-y-6" noValidate={!draft.enabled} onSubmit={event=>{event.preventDefault();void submit(false);}}>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#ead7df] bg-[#fff7f9] p-4">
+                <div><p className="font-semibold">{draft.templates.length} dishes selected across all pages</p><p className="text-sm text-stone-600">{invalidIds.size} need a quantity fix · {skippedSelections} currently skipped by policy/availability</p></div>
+                <button type="submit" disabled={controlsDisabled} className="min-h-11 rounded-xl bg-[#8f1838] px-5 py-3 font-semibold text-white">{busy?"Saving…":"Save automation settings"}</button>
+            </div>
             <fieldset className="space-y-6">
                 <section className="space-y-4 rounded-2xl border bg-white p-5">
                     <h2 className="text-xl font-bold">1. Choose when pickup is offered</h2>
@@ -131,14 +176,22 @@ export default function RollingAutomationPage(){
                     <p className="rounded-xl bg-stone-50 p-3 text-sm">A date with manual slots is preserved in full. Generated dates are not regenerated or rewritten when you change these settings. Edit or disable an existing slot manually. Private bulk appointments remain separate.</p>
                 </section>
                 <section className="space-y-4 rounded-2xl border bg-white p-5">
-                    <h2 className="text-xl font-bold">2. Select configured inventory policies</h2>
+                    <h2 id="automation-policies-title" className="text-xl font-bold">2. Choose dishes to automate</h2>
                     <p className="text-sm text-stone-600">Only policies configured for this branch appear. Menu items without a policy, capacity-only policies and manual-control policies are excluded. Saved selections that become unsupported stay visible so you can remove them or pause safely. Quantities use the unit shown below: grams for GRAM policies, whole units otherwise. Policies, safety buffers and booking windows are not changed here.</p>
                     {!workspace.policies.length&&<p>No inventory policies configured for this branch yet.</p>}
-                    {workspace.policies.map(policy=>{
+                    <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                        <label className="min-w-0 text-sm font-semibold">Find a dish<input data-browse-control type="search" className={control} value={policySearch} placeholder="Search dish name…" onKeyDown={event=>{if(event.key==="Enter")event.preventDefault();}} onChange={event=>{setPolicySearch(event.target.value);setPolicyPage(1);}}/></label>
+                        <label className="text-sm font-semibold">Show<select data-browse-control className={control} value={policyFilter} onChange={event=>{setPolicyFilter(event.target.value);setPolicyPage(1);}}><option value="all">All dishes</option><option value="selected">Selected dishes</option><option value="attention">Needs attention</option></select></label>
+                        <label className="text-sm font-semibold">Rows per page<select data-browse-control className={control} value={pageSize} onChange={event=>{setPageSize(Number(event.target.value));setPolicyPage(1);}}>{[10,25,50].map(size=><option key={size} value={size}>{size}</option>)}</select></label>
+                    </div>
+                    <p role="status" className="text-sm text-stone-600">{filteredPolicies.length?`Showing ${(currentPage-1)*pageSize+1}–${Math.min(currentPage*pageSize,filteredPolicies.length)} of ${filteredPolicies.length} dishes`:"No dishes match this view."} · {draft.templates.length} selected across all pages. Changing page or search keeps your selections and quantities.</p>
+                    <div aria-labelledby="automation-policies-title" className="space-y-2">
+                    {visiblePolicies.map(policy=>{
                         const template=draft.templates.find(item=>item.policyId===policy.id);
-                        return <div key={policy.id} className="space-y-3 rounded-xl border p-4">
+                        return <div key={policy.id} data-policy-row className="space-y-2 rounded-xl border border-stone-200 bg-white p-3">
                             <div className="flex items-center justify-between gap-2"><label className="flex min-h-11 items-center gap-3 font-semibold"><input type="checkbox" checked={!!template} disabled={controlsDisabled||!policy.selectable&&!template} onChange={event=>change({templates:event.target.checked?[...draft.templates,{policyId:policy.id,quantity:0,autoApprove:true}]:draft.templates.filter(item=>item.policyId!==policy.id)})}/>{policy.name}</label><AdminHelp title={`Inventory policy: ${policy.name}`} {...help.policy}/></div>
                             <p className="text-sm text-stone-600">Unit: {policy.unit} · Buffer: {policy.buffer} · Maximum: {policy.maximum??"Not set"} · Booking window: {policy.bookingDays} days ahead</p>
+                            {invalidIds.has(policy.id)&&<p className="text-sm font-semibold text-red-800">Enter a positive daily quantity in the correct unit, above the buffer and within the maximum.</p>}
                             {policy.unavailableReason&&<p className="text-sm text-amber-900">{policy.unavailableReason}</p>}
                             {template&&<div className="grid gap-4 sm:grid-cols-2">
                                 <div><FieldLabel id={`automation-quantity-${policy.id}`} title={`Guaranteed daily quantity · ${policy.unit}`} helpKey="quantity"/><input id={`automation-quantity-${policy.id}`} className={control} type="number" disabled={controlsDisabled||!policy.selectable} min={policy.unit==="GRAM"?0.001:1} step={policy.unit==="GRAM"?0.001:1} max={policy.maximum??undefined} required value={template.quantity||""} onChange={event=>changeTemplate(policy.id,{quantity:Number(event.target.value)})}/><small className="mt-2 block text-stone-600">Enter the quantity you can reliably provide. It must exceed the safety buffer and stay within the policy maximum.</small></div>
@@ -146,19 +199,18 @@ export default function RollingAutomationPage(){
                             </div>}
                         </div>;
                     })}
+                    </div>
+                    <nav aria-label="Dish pages" className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-stone-50 p-3">
+                        <button type="button" className={action} disabled={currentPage<=1} onClick={()=>setPolicyPage(currentPage-1)}>Previous dishes</button>
+                        <span className="text-sm font-semibold">Page {currentPage} of {totalPages}</span>
+                        <button type="button" className={action} disabled={currentPage>=totalPages} onClick={()=>setPolicyPage(currentPage+1)}>Next dishes</button>
+                    </nav>
                     <p className="text-sm text-stone-600">Allocations are created only on selected weekdays with active regular pickup slots, within the booking window of each policy and the storefront horizon. Offline dishes and bulk-only products are skipped. Existing allocations are never topped up, replaced or reset.</p>
                     <Link href="/admin/inventory/setup" className="inline-flex min-h-11 items-center font-semibold underline">Open existing product policy setup</Link>
                 </section>
-                <button type="submit" disabled={controlsDisabled} className="min-h-11 rounded-xl bg-[#8f1838] px-5 py-3 font-semibold text-white">{busy?"Saving…":"Save automation settings"}</button>
+
             </fieldset>
         </form>}
-        {workspace&&<section className="space-y-3 rounded-2xl border bg-white p-5">
-            <h2 className="text-xl font-bold">3. Check generation</h2>
-            <p className="text-sm">Last attempt: {workspace.lastAttempt??"Not run"} · Last success: {workspace.lastSuccess??"Not run"}</p>
-            <p role="status">{workspace.message??"Save and enable a schedule. Coverage is generated automatically at the next background check."}</p>
-            <button type="button" className={action} disabled={busy||loading||dirty||!workspace.plan?.enabled||!canManage} onClick={()=>void submit(true)}>Generate missing coverage now</button>
-            <p className="text-sm text-stone-600">Optional immediate check using saved settings; daily generation and retries do not require this button. Safe to repeat: existing dates and allocations are preserved. A failed run is retried at the next background check. If a run fails, resolve the reported setup problem and try again.</p>
-            <Link href="/admin/inventory" className="inline-flex min-h-11 items-center font-semibold underline">Review daily allocations and drafts</Link>
-        </section>}
+
     </main>;
 }

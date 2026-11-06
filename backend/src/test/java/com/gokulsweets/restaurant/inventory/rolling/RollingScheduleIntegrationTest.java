@@ -177,6 +177,8 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
                         List.of());
         service.save(f.branch(), noItems, "manager");
         service.reconcile(f.branch());
+        assertThat(service.workspace(f.branch()).message())
+                .contains("No dishes selected in the saved plan", "0 allocations created");
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT count(*) FROM inventory_daily_allocations WHERE"
@@ -194,6 +196,40 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
                                         + " branch_product_id=?",
                                 Integer.class,
                                 f.product()))
+                .isZero();
+    }
+
+    @Test
+    void explainsZeroAllocationsWhenExistingDatesHaveNoActiveRegularSlots() {
+        var f = fixture();
+        service.save(f.branch(), plan(f, -1, true), "manager");
+        LocalDate today = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata")));
+        for (int day = 0; day < 2; day++) {
+            jdbc.update(
+                    "INSERT INTO"
+                        + " pickup_slots(branch_id,slot_date,start_time,end_time,capacity,active)"
+                        + " VALUES(?,?,'10:00','11:00',10,FALSE)",
+                    f.branch(),
+                    today.plusDays(day));
+        }
+        service.reconcile(f.branch());
+        assertThat(service.workspace(f.branch()).message())
+                .contains(
+                        "0 allocations created",
+                        "1 selected policies",
+                        "No upcoming active regular pickup slots");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM inventory_daily_allocations WHERE"
+                                        + " branch_product_id=?",
+                                Integer.class,
+                                f.product()))
+                .isZero();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM pickup_slots WHERE branch_id=? AND active",
+                                Integer.class,
+                                f.branch()))
                 .isZero();
     }
 

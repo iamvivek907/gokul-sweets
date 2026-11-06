@@ -377,6 +377,8 @@ capacity,maintain_days,weekdays,updated_by) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLIC
                             LocalDateTime now = LocalDateTime.now(clock.withZone(IST));
                             LocalDate today = now.toLocalDate();
                             int slots = 0, allocations = 0, retained = 0;
+                            int activeDates = 0, noSlotDates = 0, existingAllocations = 0;
+                            int unavailable = 0, outsideWindow = 0, limited = 0;
                             var policyMap =
                                     config.policies().stream()
                                             .collect(
@@ -442,7 +444,11 @@ AND occasion_enquiry_id IS NULL AND (slot_date<>? OR start_time>?)
                                                 date,
                                                 today,
                                                 now.toLocalTime());
-                                if (first == null) continue;
+                                if (first == null) {
+                                    noSlotDates++;
+                                    continue;
+                                }
+                                activeDates++;
                                 var existing =
                                         new java.util.HashSet<>(
                                                 jdbc.queryForList(
@@ -457,11 +463,19 @@ AND occasion_enquiry_id IS NULL AND (slot_date<>? OR start_time>?)
                                                         date));
                                 for (var template : plan.templates()) {
                                     var policy = policyMap.get(template.policyId());
-                                    if (policy == null
-                                            || !policy.eligible()
-                                            || existing.contains(policy.branchProductId())
-                                            || offset > policy.bookingDays()
+                                    if (policy == null || !policy.eligible()) {
+                                        unavailable++;
+                                        retained++;
+                                        continue;
+                                    }
+                                    if (existing.contains(policy.branchProductId())) {
+                                        existingAllocations++;
+                                        retained++;
+                                        continue;
+                                    }
+                                    if (offset > policy.bookingDays()
                                             || offset > features.getFutureOrderingDays()) {
+                                        outsideWindow++;
                                         retained++;
                                         continue;
                                     }
@@ -486,6 +500,7 @@ ON CONFLICT(branch_product_id,service_date) DO NOTHING
                                                     template.quantity(),
                                                     template.quantity());
                                     if (inserted == 0) {
+                                        limited++;
                                         retained++;
                                         continue;
                                     }
@@ -506,17 +521,45 @@ ON CONFLICT(branch_product_id,service_date) DO NOTHING
                                     allocations++;
                                 }
                             }
-                            jdbc.update(
-                                    """
-UPDATE rolling_branch_schedules SET last_success_at=now(),last_message=? WHERE branch_id=?
-""",
+                            String message =
                                     slots
                                             + " slots created; "
                                             + allocations
                                             + " allocations created; "
                                             + retained
-                                            + " existing or ineligible item-dates left unchanged."
-                                            + " Drafts and ready stock may need staff action.",
+                                            + " item-dates unchanged. "
+                                            + plan.templates().size()
+                                            + " selected policies; "
+                                            + activeDates
+                                            + " dates with upcoming regular pickup slots; "
+                                            + noSlotDates
+                                            + " selected dates without upcoming regular slots."
+                                            + " Skips: "
+                                            + existingAllocations
+                                            + " existing allocations; "
+                                            + unavailable
+                                            + " unavailable/offline/unsupported item-dates; "
+                                            + outsideWindow
+                                            + " outside booking windows; "
+                                            + limited
+                                            + " policy-limit or concurrent-allocation checks.";
+                            if (plan.templates().isEmpty())
+                                message +=
+                                        " No dishes selected in the saved plan. Select dishes,"
+                                                + " enter daily quantities and save to generate"
+                                                + " inventory.";
+                            if (activeDates == 0)
+                                message +=
+                                        " No upcoming active regular pickup slots on selected"
+                                            + " weekdays in this range. Review Pickup scheduling;"
+                                            + " existing disabled or elapsed dates are preserved.";
+                            message +=
+                                    " Existing allocations are never replenished. Draft approval"
+                                        + " and physical readiness remain separate where required.";
+                            jdbc.update(
+                                    "UPDATE rolling_branch_schedules SET"
+                                        + " last_success_at=now(),last_message=? WHERE branch_id=?",
+                                    message,
                                     branchId);
                         });
             } catch (RuntimeException failure) {

@@ -75,3 +75,18 @@ The application must be running for scheduled execution. Startup catch-up fills 
 after downtime; it does not guarantee availability while the service is offline.
 Pausing the worker globally while branch plans are enabled does not transfer ownership back
 to the legacy scheduler. Disable a branch plan explicitly if that transfer is intended.
+
+## Managing large catalogues and no-op runs
+
+The dish picker renders 25 policies per page by default (10/25/50 choices), with local
+name search and All / Selected / Needs attention views over the bounded branch catalogue.
+Selections and quantity drafts are retained across pages and filters; saving submits the
+whole selection. Invalid off-page quantities are revealed before a save is sent.
+Browsing and help remain available to read-only staff without enabling write actions.
+
+Generation activity is shown before the setup form, with saved selection counts and IST
+timestamps. Draft changes are explicitly separated from the settings used by the worker.
+Run messages count active pickup dates, dates without future regular slots, existing
+allocations and skips due to unavailable policies, booking windows or insert checks.
+Empty selections and a range without usable slots receive specific next steps. These
+diagnostics never enable a dish, refill an allocation or rewrite an existing timetable.
