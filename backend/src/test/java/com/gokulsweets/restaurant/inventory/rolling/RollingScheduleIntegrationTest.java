@@ -26,6 +26,7 @@ class RollingScheduleIntegrationTest {
     @Autowired jakarta.persistence.EntityManager entityManager;
     @Autowired RollingScheduleService service;
     @Autowired Clock clock;
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
     @Autowired EnhancementProperties features;
     @Autowired com.gokulsweets.restaurant.menu.MenuPickupDiscoveryService discovery;
     @Autowired com.gokulsweets.restaurant.order.service.CartAvailabilityService cart;
@@ -617,5 +618,109 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
                                 f.product(),
                                 future))
                 .isEqualTo(1);
+    }
+
+    @Test
+    @Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void concurrentMaximumJobsCreateOneAllocationAndOneApprovalPerItemDate() throws Exception {
+        var tx =
+                new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        var f =
+                tx.execute(
+                        status -> {
+                            var created = fixture();
+                            service.save(created.branch(), maximumPlan(-1, 2), "manager");
+                            return created;
+                        });
+        try {
+            try (var workers = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+                var start = new java.util.concurrent.CountDownLatch(1);
+                java.util.concurrent.Callable<Void> job =
+                        () -> {
+                            start.await();
+                            service.reconcile(f.branch());
+                            return null;
+                        };
+                var first = workers.submit(job);
+                var second = workers.submit(job);
+                start.countDown();
+                first.get(30, java.util.concurrent.TimeUnit.SECONDS);
+                second.get(30, java.util.concurrent.TimeUnit.SECONDS);
+            }
+            LocalDate tomorrow =
+                    LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(1);
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT count(*) FROM inventory_daily_allocations WHERE"
+                                            + " branch_product_id=? AND service_date=?",
+                                    Integer.class,
+                                    f.product(),
+                                    tomorrow))
+                    .isEqualTo(1);
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT count(*) FROM pickup_slots WHERE branch_id=? AND"
+                                            + " slot_date=?",
+                                    Integer.class,
+                                    f.branch(),
+                                    tomorrow))
+                    .isEqualTo(2);
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT count(*) FROM inventory_stock_transactions WHERE"
+                                            + " branch_product_id=?",
+                                    Integer.class,
+                                    f.product()))
+                    .isEqualTo(
+                            jdbc.queryForObject(
+                                    "SELECT count(*) FROM inventory_daily_allocations WHERE"
+                                            + " branch_product_id=?",
+                                    Integer.class,
+                                    f.product()));
+        } finally {
+            tx.executeWithoutResult(
+                    status -> {
+                        jdbc.queryForObject(
+                                "SELECT id FROM branches WHERE id=? FOR UPDATE",
+                                Long.class,
+                                f.branch());
+                        var details =
+                                jdbc.queryForMap(
+                                        "SELECT p.id,p.category_id,p.tax_category_id FROM products"
+                                                + " p JOIN branch_products bp ON bp.product_id=p.id"
+                                                + " WHERE bp.id=?",
+                                        f.product());
+                        jdbc.update(
+                                "DELETE FROM inventory_stock_transactions WHERE"
+                                        + " branch_product_id=?",
+                                f.product());
+                        jdbc.update(
+                                "DELETE FROM inventory_allocation_plan_audit WHERE"
+                                        + " branch_product_id=?",
+                                f.product());
+                        jdbc.update(
+                                "DELETE FROM inventory_daily_allocations WHERE branch_product_id=?",
+                                f.product());
+                        jdbc.update(
+                                "DELETE FROM rolling_inventory_templates WHERE branch_id=?",
+                                f.branch());
+                        jdbc.update(
+                                "DELETE FROM rolling_schedule_dates WHERE branch_id=?", f.branch());
+                        jdbc.update(
+                                "DELETE FROM rolling_branch_schedules WHERE branch_id=?",
+                                f.branch());
+                        jdbc.update("DELETE FROM pickup_slots WHERE branch_id=?", f.branch());
+                        jdbc.update("DELETE FROM branch_inventory_policies WHERE id=?", f.policy());
+                        jdbc.update("DELETE FROM branch_products WHERE id=?", f.product());
+                        jdbc.update("DELETE FROM products WHERE id=?", details.get("id"));
+                        jdbc.update(
+                                "DELETE FROM categories WHERE id=?", details.get("category_id"));
+                        jdbc.update(
+                                "DELETE FROM tax_categories WHERE id=?",
+                                details.get("tax_category_id"));
+                        jdbc.update("DELETE FROM branches WHERE id=?", f.branch());
+                    });
+        }
     }
 }
