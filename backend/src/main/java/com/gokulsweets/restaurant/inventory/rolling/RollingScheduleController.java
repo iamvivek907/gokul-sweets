@@ -69,19 +69,21 @@ public class RollingScheduleController {
             "hasAuthority('BRANCH_MANAGE') and hasAuthority('INVENTORY_MANAGE') and"
                     + " hasAuthority('APPROVAL_MANAGE')")
     public RollingScheduleService.Workspace reconcile(
-            @PathVariable long branchId, Authentication authentication) {
+            @PathVariable long branchId,
+            Authentication authentication,
+            @RequestParam(required = false) Long expectedVersion) {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(
-                        RollingScheduleController.class, "reconcile(long,Authentication)");
+                        RollingScheduleController.class, "reconcile(long,Authentication,Long)");
         try {
             staff.requireBranchAccess(branchId);
-            service.reconcile(branchId, "MANUAL", authentication.getName());
+            service.reconcile(branchId, "MANUAL", authentication.getName(), expectedVersion);
             return service.inspect(branchId);
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
                     RollingScheduleController.class,
-                    "reconcile(long,Authentication)");
+                    "reconcile(long,Authentication,Long)");
         }
     }
 }

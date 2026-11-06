@@ -11,20 +11,32 @@ readiness, customer reservations, private occasion appointments or legacy automa
 1. Select a branch and enter same-day opening/closing time, slot duration,
    orders per slot and 1–60 calendar days including today.
 2. Select selling weekdays. Closed weekdays are skipped within that calendar horizon.
-3. Select only existing inventory policies for that branch and configure their quantities.
-   Items without policies, bulk-only products, capacity-only/manual-control policies and unselected
-   policies are not automated. A previously selected policy that becomes unsupported stays visible
-   with an explanation and can be removed. Pausing retains existing templates without requiring
-   quantities to match subsequently changed policy limits or units; enabling revalidates supported
-   selections. Newly selecting unsupported policies is rejected by the API.
-4. Automatic approval is the default for new selections: confirm a guaranteed daily quantity once
-   to publish it without daily approval. Existing saved approval choices are preserved. Manual-review
-   mode remains an explicit option and creates drafts that require staff approval.
-   Physical readiness remains a separate staff action where the policy requires it.
-5. Save enabled settings. The automatic job runs once daily at 12:00 AM IST. Saving or adding
-   configuration does not start a job. For initial setup or changes after the daily run, use
-   Generate missing coverage now after saving, or wait for the next daily run. Both paths
-   reconcile the full maintained window and include newly eligible configured policies.
+3. Choose the quantity source. New setups default to **Automatic · use policy maximums**:
+   every eligible configured branch policy is included without individual selection. Existing
+   saved plans retain their quantity source; use **Use policy maximums** to change a manual plan.
+   Alternatively, choose individual dishes and quantities. Unsupported policies remain excluded.
+4. Review the dish count, pickup date preview and any shorter booking windows. The storefront
+   booking cap is returned by the backend; product and storefront caps can shorten inventory
+   coverage even when slots span more dates. The page explains these limits without editing them.
+   Dishes are paginated with search and included / excluded / shorter-window filters. Help icons
+   explain configurable fields, quantities, buffers, approval and readiness.
+5. Choose **Save & generate now** to save this setup and reconcile missing slots and daily stock
+   immediately. **Save automation settings** only saves; the worker uses it at the next midnight
+   IST run. Saving a paused setup does not generate stock. New manual selections default to
+   automatic approval; existing approval choices are preserved. Manual review creates drafts.
+   Physical readiness remains separate wherever required by a policy.
+
+The page separates the **saved setup** used by the worker from the **unsaved preview**. A saved
+manual plan with no selected dishes cannot generate inventory, even if an unsaved maximum-mode
+preview shows eligible dishes. The primary combined action avoids this empty-plan mistake.
+An empty plan or zero eligible dates is explained explicitly rather than presented as stock success.
+Saved coverage diagnostics and execution history are available in an expandable section below setup.
+
+The combined action saves first and sends the returned plan version with generation. A failed
+save never triggers generation. A failed generation preserves the successfully saved settings;
+retrying the unchanged setup does not save again. The backend checks the expected version while
+holding the branch lock, rejecting a stale reviewed setup before writing slots or allocations.
+Older clients may omit this optional version parameter. The existing worker cadence is unchanged.
 
 All quantities use policy units: GRAM quantities are grams, not kilograms.
 
@@ -90,8 +102,8 @@ Selections and quantity drafts are retained across pages and filters; saving sub
 whole selection. Invalid off-page quantities are revealed before a save is sent.
 Browsing and help remain available to read-only staff without enabling write actions.
 
-Generation activity is shown before the setup form, with saved selection counts and IST
-timestamps. Draft changes are explicitly separated from the settings used by the worker.
+Saved stock status and expandable generation activity follow the setup, with saved selection
+counts and IST timestamps. Draft changes are explicitly separated from the settings used by the worker.
 Run messages count active pickup dates, dates without future regular slots, existing
 allocations and skips due to unavailable policies, booking windows or insert checks.
 Empty selections and a range without usable slots receive specific next steps. These

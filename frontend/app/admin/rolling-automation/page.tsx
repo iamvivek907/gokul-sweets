@@ -12,8 +12,8 @@ type Plan={enabled:boolean;openingTime:string;closingTime:string;slotMinutes:num
 type Policy={id:number;name:string;unit:string;bookingDays:number;buffer:number;maximum:number|null;readyStockRequired:boolean;eligible:boolean;selectable:boolean;unavailableReason:string|null};
 type Run={id:number;trigger:string;actor:string;status:string;startedAt:string;finishedAt:string|null;durationMs:number;lockWaitMs:number;lockHeldMs:number;slotsCreated:number;allocationsCreated:number;summary:string};
 type Health={status:string;overdue:boolean;lastRunFailed:boolean;interrupted:boolean;missingSlots:number;missingAllocations:number;expectedAllocations:number;closedDates:number;includedPolicies:number;excludedPolicies:number;drafts:number;readinessPending:number;issues:{date:string;item:string;reason:string}[];message:string};
-type Workspace={plan:Plan|null;policies:Policy[];lastAttempt:string|null;lastSuccess:string|null;message:string|null;health?:Health;runs?:Run[]};
-const initial:Plan={enabled:false,openingTime:"10:00",closingTime:"21:00",slotMinutes:30,capacity:10,maintainDays:14,weekdays:127,version:-1,templates:[],usePolicyMaximum:false};
+type Workspace={plan:Plan|null;policies:Policy[];lastAttempt:string|null;lastSuccess:string|null;message:string|null;health?:Health;runs?:Run[];storefrontBookingDays?:number|null};
+const initial:Plan={enabled:false,openingTime:"10:00",closingTime:"21:00",slotMinutes:30,capacity:10,maintainDays:14,weekdays:127,version:-1,templates:[],usePolicyMaximum:true};
 const control="mt-2 block min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 py-2";
 const action="min-h-11 rounded-xl border border-stone-300 bg-white px-4 py-2 disabled:opacity-50";
 const days=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
@@ -21,7 +21,7 @@ const days=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunda
 type Help={description:string;guidance:string};
 const help:Record<string,Help>={
     branch:{description:"Each branch has its own saved automation plan and inventory policy selections.",guidance:"Choose the branch whose pickup dates and inventory you want to automate. Save or reload edits before switching. This plan does not configure another branch."},
-    enabled:{description:"The background worker uses only this branch’s enabled, saved plan. It runs once daily at 12:00 AM IST while the application is running. It does not run on startup or poll throughout the day.",guidance:"Enable and save after configuring hours, weekdays and policies. To apply new configuration before the next daily run, save and use Generate missing coverage now. The legacy inventory scheduler skips this branch while enabled; manual tools remain available. Pausing restores the legacy scheduler’s existing rules and preserves generated dates, allocations and bookings."},
+    enabled:{description:"The background worker uses only this branch’s enabled, saved plan. It runs once daily at 12:00 AM IST while the application is running. It does not run on startup or poll throughout the day.",guidance:"Enable and save after configuring hours, weekdays and policies. Use Save & generate now to apply new configuration and fill missing stock immediately. The legacy inventory scheduler skips this branch while enabled; manual tools remain available. Pausing restores the legacy scheduler’s existing rules and preserves generated dates, allocations and bookings."},
     start:{description:"The first newly generated standard pickup slot starts at this time in India Standard Time (IST).",guidance:"Enter the branch’s pickup opening time, for example 10:00. Start must be before end on the same day. Each check fills missing intervals. Existing manual, booked and disabled slots are preserved."},
     end:{description:"Every newly generated slot must finish by this IST time. Overnight schedules are not supported.",guidance:"For a 10:00 start, 21:00 end and 30-minute duration, the final slot is 20:30–21:00. An incomplete interval at the end is omitted. Changing this value affects missing intervals only; existing slots are not resized or removed."},
     duration:{description:"The worker divides the start-to-end interval into complete pickup slots of this many minutes.",guidance:"Enter 5–180 minutes. For example, 30 produces 10:00–10:30 and 10:30–11:00. Missing intervals are repaired on existing dates too. Overlapping manual or disabled slots are never replaced."},
@@ -50,6 +50,24 @@ function needsQuantity(template:Template,policy:Policy|undefined,enabled:boolean
     const q=template.quantity;
     return !Number.isFinite(q)||q<=0||q>99999999999.999||Math.abs(q*1000-Math.round(q*1000))>0.000001
         ||!!(enabled&&policy?.selectable&&(q<=policy.buffer||(policy.maximum!==null&&q>policy.maximum)||(policy.unit!=="GRAM"&&!Number.isInteger(q))));
+}
+
+
+function skipReason(policy:Policy){
+    if(policy.unavailableReason)return policy.unavailableReason;
+    if(policy.maximum===null)return "Set a maximum daily quantity in Product policies.";
+    if(policy.maximum<=policy.buffer)return "Maximum quantity must be greater than the safety buffer.";
+    if(policy.unit!=="GRAM"&&!Number.isInteger(policy.maximum))return "This unit needs a whole-number maximum quantity.";
+    return "This policy is not eligible for automatic daily stock.";
+}
+function indiaDate(){const parts=new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());const value=Object.fromEntries(parts.map(part=>[part.type,part.value]));return `${value.year}-${value.month}-${value.day}`;}
+function endDate(start:string,daysAhead:number){
+    if(!start)return "…";
+    const [year,month,day]=start.split("-").map(Number);
+    return new Intl.DateTimeFormat("en-IN",{timeZone:"UTC",day:"numeric",month:"short",year:"numeric"}).format(new Date(Date.UTC(year,month-1,day+Math.max(0,daysAhead))));
+}
+function StepHeading({step,title,description}:{step:number;title:string;description:string}){
+    return <div className="flex items-start gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#f8edf0] text-sm font-bold text-[#8f1838]" aria-hidden="true">{step}</span><div><h2 className="text-xl font-bold text-stone-900">{step}. {title}</h2><p className="mt-1 text-sm leading-6 text-stone-600">{description}</p></div></div>;
 }
 
 function CoveragePanel({health,runs,retryDisabled,onRetry}:{health:Health;runs:Run[];retryDisabled:boolean;onRetry:()=>void}){
@@ -87,6 +105,20 @@ export default function RollingAutomationPage(){
     const [error,setError]=useState("");
     const [notice,setNotice]=useState("");
     const [busy,setBusy]=useState(false);
+    const mutation=useRef(false);
+    const form=useRef<HTMLFormElement>(null);
+    const [policyListOpen,setPolicyListOpen]=useState(true);
+    const [previewDate,setPreviewDate]=useState("");
+    useEffect(()=>{
+        let timer:ReturnType<typeof setTimeout>;
+        function update(){
+            const date=indiaDate();setPreviewDate(date);clearTimeout(timer);
+            const next=Date.parse(`${date}T00:00:00+05:30`)+86400000;
+            timer=setTimeout(update,Math.max(1000,next-Date.now()+1000));
+        }
+        update();window.addEventListener("focus",update);
+        return()=>{clearTimeout(timer);window.removeEventListener("focus",update);};
+    },[]);
     const [policySearch,setPolicySearch]=useState("");
     const [policyFilter,setPolicyFilter]=useState("all");
     const [policyPage,setPolicyPage]=useState(1);
@@ -109,7 +141,7 @@ export default function RollingAutomationPage(){
         adminFetch(`/api/admin/branches/${branchId}/rolling-automation`,authorization,{signal:controller.signal}).then(async response=>{
             if(!response.ok)throw Error("Could not load this branch's automation.");
             const data=await response.json() as Workspace;
-            if(!controller.signal.aborted&&operation===requestVersion.current){setSnapshot({branchId,data});setDraft(data.plan??{...initial,templates:[]});setDirty(false);setError("");}
+            if(!controller.signal.aborted&&operation===requestVersion.current){setSnapshot({branchId,data});setDraft(data.plan??{...initial,templates:[]});setPolicyListOpen(!(data.plan?.usePolicyMaximum??(data.plan?false:true)));setDirty(false);setError("");}
         }).catch(reason=>{if(!controller.signal.aborted&&operation===requestVersion.current)setError(reason.message);})
             .finally(()=>{if(!controller.signal.aborted&&operation===requestVersion.current)setSettledLoad({branchId,reload});});
         return()=>controller.abort();
@@ -125,78 +157,89 @@ export default function RollingAutomationPage(){
         const query=policySearch.trim().toLocaleLowerCase();
         return (workspace?.policies??[]).filter(policy=>(!query||policy.name.toLocaleLowerCase().includes(query))
             &&(policyFilter==="all"||policyFilter==="selected"&&selectedIds.has(policy.id)
-                ||policyFilter==="attention"&&(draft.usePolicyMaximum?!usableMaximum(policy):invalidIds.has(policy.id)||selectedIds.has(policy.id)&&!policy.eligible)));
-    },[workspace?.policies,policySearch,policyFilter,selectedIds,invalidIds,draft.usePolicyMaximum]);
+                ||policyFilter==="attention"&&(draft.usePolicyMaximum?!usableMaximum(policy):invalidIds.has(policy.id)||selectedIds.has(policy.id)&&!policy.eligible)
+                ||policyFilter==="shorter"&&selectedIds.has(policy.id)&&policy.eligible&&Math.min(policy.bookingDays,workspace?.storefrontBookingDays??policy.bookingDays)<draft.maintainDays-1));
+    },[workspace?.policies,workspace?.storefrontBookingDays,policySearch,policyFilter,selectedIds,invalidIds,draft.usePolicyMaximum,draft.maintainDays]);
     const totalPages=Math.max(1,Math.ceil(filteredPolicies.length/pageSize));
     const currentPage=Math.min(policyPage,totalPages);
     const visiblePolicies=filteredPolicies.slice((currentPage-1)*pageSize,currentPage*pageSize);
     const skippedSelections=draft.usePolicyMaximum?(workspace?.policies.length??0)-maximumPolicies.length:draft.templates.filter(item=>!policyById.get(item.policyId)?.eligible).length;
     const savedSelectionCount=workspace?.plan?.usePolicyMaximum?maximumPolicies.length:workspace?.plan?.templates.length??0;
+    const savedReadyCount=workspace?.plan?.usePolicyMaximum?maximumPolicies.length:workspace?.plan?.templates.filter(item=>policyById.get(item.policyId)?.eligible&&!needsQuantity(item,policyById.get(item.policyId),true)).length??0;
     function change(patch:Partial<Plan>){setDraft(current=>({...current,...patch}));setDirty(true);setNotice("");}
     function changeTemplate(policyId:number,patch:Partial<Template>){
         change({templates:draft.templates.map(item=>item.policyId===policyId?{...item,...patch}:item)});
     }
-    async function submit(run:boolean){
-        if(!branchId||!authorization||!workspace||busy||loading||!canManage)return;
-        if(!run&&invalidIds.size){setError(`${invalidIds.size} selected dishes need a valid daily quantity. Review Needs attention, including selections on other pages.`);setPolicySearch("");setPolicyFilter("attention");setPolicyPage(1);return;}
-        const selectedBranch=branchId;
-        const operation=++requestVersion.current;
-        setBusy(true);setError("");setNotice("");
+    const draftDays=Number.isInteger(draft.maintainDays)&&draft.maintainDays>=1&&draft.maintainDays<=60?draft.maintainDays:1;
+    const readyPolicies=useMemo(()=>(workspace?.policies??[]).filter(policy=>selectedIds.has(policy.id)&&policy.eligible&&!invalidIds.has(policy.id)),[workspace?.policies,selectedIds,invalidIds]);
+    const shorterPolicies=readyPolicies.filter(policy=>Math.min(policy.bookingDays,workspace?.storefrontBookingDays??policy.bookingDays)<draftDays-1);
+    const globalShort=workspace?.storefrontBookingDays!=null&&workspace.storefrontBookingDays<draftDays-1;
+    const skipGroups=useMemo(()=>{
+        const grouped=new Map<string,number>();
+        for(const policy of workspace?.policies??[])if(!usableMaximum(policy)){const reason=skipReason(policy);grouped.set(reason,(grouped.get(reason)??0)+1);}
+        return [...grouped].sort((a,b)=>b[1]-a[1]);
+    },[workspace?.policies]);
+    function showPolicies(filter:string){setPolicyFilter(filter);setPolicyPage(1);setPolicyListOpen(true);}
+    async function submit(mode:"save"|"run"|"saveAndRun"){
+        if(!branchId||!authorization||!workspace||mutation.current||loading||!canManage)return;
+        if(mode==="run"&&dirty){setError("Save your changes before generating daily stock.");return;}
+        if(mode==="run"&&savedReadyCount===0){setError("The saved setup has no eligible dishes or quantities. Review step 2, then Save & generate now.");return;}
+        if(mode!=="run"){
+            if(invalidIds.size){setError(`${invalidIds.size} selected dishes need a valid daily quantity. Review Needs attention, including selections on other pages.`);setPolicySearch("");showPolicies("attention");return;}
+            if(draft.enabled&&form.current&&!form.current.reportValidity())return;
+            if(draft.enabled&&(!draft.weekdays||draft.openingTime>=draft.closingTime)){setError("Choose at least one selling weekday, with opening time before closing time.");return;}
+        }
+        const selectedBranch=branchId,operation=++requestVersion.current;
+        mutation.current=true;setBusy(true);setError("");setNotice("");
+        let savedNow=false,current=workspace;
+        async function read(response:Response){
+            if(!response.ok){const detail=await response.json().catch(()=>({}));throw Error(detail.detail||detail.message||"Could not complete the request. Reload and retry.");}
+            return await response.json() as Workspace;
+        }
         try{
-            const response=await adminFetch(`/api/admin/branches/${selectedBranch}/rolling-automation${run?"/reconcile":""}`,authorization,{
-                method:run?"POST":"PUT",headers:{"Content-Type":"application/json"},...(run?{}:{body:JSON.stringify(draft.usePolicyMaximum?{...draft,templates:workspace.plan?.templates??[]}:draft)})});
-            if(!response.ok){
-                const detail=await response.json().catch(()=>({}));
-                throw Error(detail.detail||detail.message||"Could not complete the request. Reload and retry.");
+            if(mode==="save"||(mode==="saveAndRun"&&(dirty||!workspace.plan))){
+                current=await read(await adminFetch(`/api/admin/branches/${selectedBranch}/rolling-automation`,authorization,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(draft.usePolicyMaximum?{...draft,templates:workspace.plan?.templates??[]}:draft)}));
+                if(operation!==requestVersion.current)return;
+                setSnapshot({branchId:selectedBranch,data:current});setDraft(current.plan??initial);setDirty(false);savedNow=true;
+                if(mode==="save"){setNotice("Schedule saved. The next daily run at 12:00 AM IST will use these settings. No stock was generated by this save.");return;}
             }
-            const data=await response.json() as Workspace;
+            if(!current.plan?.enabled||!Number.isInteger(current.plan.version)||current.plan.version<0)throw Error("The saved setup is not ready to run. Reload and review the branch settings.");
+            const data=await read(await adminFetch(`/api/admin/branches/${selectedBranch}/rolling-automation/reconcile?expectedVersion=${current.plan.version}`,authorization,{method:"POST"}));
             if(operation!==requestVersion.current)return;
             setSnapshot({branchId:selectedBranch,data});setDraft(data.plan??initial);setDirty(false);
-            setNotice(run?"Coverage check finished. Review the run result below.":"Schedule saved. The next daily run at 12:00 AM IST will use these settings, or generate missing coverage now.");
-        }catch(reason){if(operation===requestVersion.current)setError(reason instanceof Error?reason.message:"Could not save.");}
-        finally{setBusy(false);}
+            if(data.health?.includedPolicies===0){setError("No daily stock was created: the saved setup has no eligible dishes. Review step 2.");}
+            else if(data.health?.expectedAllocations===0){setError("No daily stock is expected for this window. Review pickup hours, disabled dates and booking limits in steps 1 and 2.");}
+            else if(data.health&&data.health.missingAllocations>0){setError(`The check finished, but ${data.health.missingAllocations} daily stock entries are still missing. Open saved stock status for the details.`);}
+            else{setNotice(data.health?"Saved setup checked. Eligible pickup dates have daily stock entries. Existing stock and bookings were kept.":"Stock check finished. Review the saved stock status below.");}
+        }catch(reason){if(operation===requestVersion.current)setError(`${savedNow?"Settings saved, but daily stock generation did not finish. ":""}${reason instanceof Error?reason.message:"Could not complete the request."}`);}
+        finally{mutation.current=false;setBusy(false);}
     }
-    return <main aria-busy={busy||loading} className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
-        <header><p className="text-sm font-semibold uppercase tracking-widest text-[#8f1838]">Separate automation</p>
-            <h1 className="mt-2 text-3xl font-bold">Automatic slots & inventory</h1>
-            <p className="mt-2 text-stone-600">Configure once per branch. The system fills missing pickup dates and allocations for your selected policies.</p>
+    return <main aria-busy={busy||loading} className="mx-auto max-w-7xl space-y-5 p-4 text-stone-800 sm:p-6">
+        <header className="rounded-3xl border border-[#ecdfe1] bg-gradient-to-br from-[#fff7ed] via-white to-[#f2f8f5] p-5 sm:p-7">
+            <p className="text-xs font-bold uppercase tracking-[.18em] text-[#8f1838]">Less daily admin work</p>
+            <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">Automatic slots & inventory</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">Set your pickup window once. Keep missing slots and daily stock prepared for future dates.</p>
+            <nav aria-label="Setup steps" className="mt-5 grid gap-2 sm:grid-cols-3">{[["1","Pickup window","#pickup-window"],["2","Dishes & quantities","#dish-setup"],["3","Review & start","#automation-review"]].map(([step,label,href])=><a key={step} href={href} className="flex min-h-11 items-center gap-2 rounded-xl border border-white bg-white/80 px-3 text-sm font-semibold"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#f8edf0] text-xs text-[#8f1838]">{step}</span>{label}</a>)}</nav>
         </header>
-        <aside className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm">
-            Your manual tools stay available. Enabling this flow gives it ownership of scheduled inventory for this branch, so the legacy inventory scheduler skips the branch. Turning it off allows the legacy scheduler to resume its existing rules. Neither action deletes slots, stock or bookings.
-        </aside>
-        <div className="flex flex-wrap items-end gap-3">
-            <div className="min-w-0 flex-1 font-semibold"><FieldLabel id="automation-branch" title="Branch" helpKey="branch"/><select id="automation-branch" className={control} value={branchId??""} disabled={busy||dirty||loading} onChange={event=>{requestVersion.current++;setBranchId(Number(event.target.value));setPolicySearch("");setPolicyFilter("all");setPolicyPage(1);setError("");setNotice("");}}>
-                {!branches.length&&<option value="">No accessible branches</option>}{branches.map(branch=><option key={branch.id} value={branch.id}>{branch.name}</option>)}
-            </select></div>
-            <button className={action} disabled={busy||loading||!branchId} onClick={()=>{requestVersion.current++;setReload(value=>value+1);setNotice("");setError("");}}>Reload saved settings</button>
+        <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-stone-200 bg-white p-4">
+            <div className="min-w-0 flex-1 font-semibold"><FieldLabel id="automation-branch" title="Branch" helpKey="branch"/><select id="automation-branch" className={control} value={branchId??""} disabled={busy||dirty||loading} onChange={event=>{requestVersion.current++;setBranchId(Number(event.target.value));setPolicySearch("");setPolicyFilter("all");setPolicyPage(1);setError("");setNotice("");}}>{!branches.length&&<option value="">No accessible branches</option>}{branches.map(branch=><option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></div>
+            <button type="button" className={action} disabled={busy||loading||!branchId} onClick={()=>{requestVersion.current++;setReload(value=>value+1);setNotice("");setError("");}}>Reload saved settings</button>
+            <p className="w-full text-xs text-stone-500">Save or reload before switching branches. Reload discards unsaved changes.</p>
         </div>
-        <p className="text-sm text-stone-600">Save or reload unsaved edits before switching branches. Reload discards your unsaved changes.</p>
-        {error&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-red-900">{error}</p>}
-        {notice&&<p role="status" className="rounded-xl bg-green-50 p-3 text-green-900">{notice}</p>}
+        {error&&<p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">{error}</p>}
+        {notice&&<p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">{notice}</p>}
         {loading&&<p role="status">Loading saved settings…</p>}
-        {workspace&&<section className="space-y-3 rounded-2xl border bg-white p-5">
-            <h2 className="text-xl font-bold">Generation activity</h2>
-            <p className="text-sm font-semibold text-[#8f1838]">{workspace.plan?.enabled?"Saved automation is on":"Saved automation is paused"} · {savedSelectionCount} {workspace.plan?.usePolicyMaximum?"currently eligible automatic policies":"saved dish selections"}</p>
-            {savedSelectionCount===0&&!workspace.plan?.usePolicyMaximum&&<p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">No dishes are selected in the saved plan. Pickup slots can be maintained, but no dish allocations will be generated until you select dishes, enter quantities and save.</p>}
-            {workspace.plan?.usePolicyMaximum&&savedSelectionCount===0&&<p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">No usable policy maximums yet. Configure online physical policies with maximum quantities greater than their buffers; the next daily run or manual check will include them automatically.</p>}
-            {dirty&&<p className="text-sm text-amber-900">Unsaved changes are not used by the scheduler. Save or reload before running a check.</p>}
-            <p className="text-sm">Last attempt: {runTime(workspace.lastAttempt)} · Last completed check: {runTime(workspace.lastSuccess)}</p>
-            {workspace.health&&<CoveragePanel health={workspace.health} runs={workspace.runs??[]} retryDisabled={busy||loading||dirty||!workspace.plan?.enabled||!canManage} onRetry={()=>void submit(true)}/>}
-            <p role="status" className="rounded-xl bg-stone-50 p-3 leading-relaxed">{workspace.message??"Save and enable a schedule. Coverage is generated at the next daily run (12:00 AM IST), or use Generate missing coverage now after saving."}</p>
-            <button type="button" className={action} disabled={busy||loading||dirty||!workspace.plan?.enabled||!canManage} onClick={()=>void submit(true)}>Generate missing coverage now</button>
-            <p className="text-sm text-stone-600">Uses saved settings to reconcile the entire maintained calendar window immediately, including newly configured policies. Save changes first. Automatic generation runs once daily at 12:00 AM IST; after later changes or a failed/missed daily run, use this action or wait for the next daily run. Safe to repeat: existing stock, bookings and disabled slots are preserved.</p>
-            <Link href="/admin/inventory" className="inline-flex min-h-11 items-center font-semibold underline">Review daily allocations and drafts</Link>
-        </section>}
-        {workspace&&<form className="space-y-6" noValidate={!draft.enabled} onSubmit={event=>{event.preventDefault();void submit(false);}}>
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#ead7df] bg-[#fff7f9] p-4">
-                <div><p className="font-semibold">{selectedIds.size} {draft.usePolicyMaximum?"policies automatically included":"dishes selected across all pages"}</p><p className="text-sm text-stone-600">{invalidIds.size} need a quantity fix · {skippedSelections} currently skipped by policy/availability</p></div>
-                <button type="submit" disabled={controlsDisabled} className="min-h-11 rounded-xl bg-[#8f1838] px-5 py-3 font-semibold text-white">{busy?"Saving…":"Save automation settings"}</button>
+        {workspace&&<>
+            <div className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-4 ${dirty?"border-amber-200 bg-amber-50":"border-stone-200 bg-stone-50"}`}>
+                <div><p className="text-sm font-bold">{dirty?"You have unsaved changes":!workspace.plan?"New setup · not saved yet":"Your setup is saved"}</p><p className="mt-1 text-sm text-stone-600">{workspace.plan?`Saved setup: ${workspace.plan.enabled?"on":"paused"} · ${savedSelectionCount} dishes · ${workspace.plan.usePolicyMaximum?"policy maximums":"individual selection"}.`:"Nothing has been saved for this branch yet."}</p></div>
+                <p className="max-w-sm text-sm font-semibold text-[#8f1838]">{dirty||!workspace.plan?`This preview has ${readyPolicies.length} dishes ready. Save & generate to apply it.`:savedSelectionCount===0?"No dishes are saved for daily stock yet. Start with step 2.":"Daily refresh: 12:00 AM IST. You can also generate now."}</p>
             </div>
-            <fieldset className="space-y-6">
-                <section className="space-y-4 rounded-2xl border bg-white p-5">
-                    <h2 className="text-xl font-bold">1. Choose when pickup is offered</h2>
-                    <div className="flex items-center justify-between gap-2"><label className="flex min-h-11 items-center gap-3 font-semibold"><input type="checkbox" disabled={controlsDisabled} checked={draft.enabled} onChange={event=>change({enabled:event.target.checked})}/>Enable rolling automation for this branch</label><AdminHelp title="Enable rolling automation" {...help.enabled}/></div>
-                    <p className="text-sm text-stone-600">Off until you explicitly enable and save. Automatic generation runs once daily at 12:00 AM IST. Saving does not generate immediately; after setup or later changes, use Generate missing coverage now if you do not want to wait for the next daily run.</p>
+            <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">
+                <form ref={form} id="automation-form" className="min-w-0 space-y-5" noValidate onSubmit={event=>{event.preventDefault();void submit("save");}}>
+                <section id="pickup-window" className="scroll-mt-28 space-y-5 rounded-3xl border border-stone-200 bg-white p-5 sm:p-6">
+                    <StepHeading step={1} title="Set your pickup window" description="Choose the hours and dates to keep prepared for online pickup."/>
+                    <div className="flex items-center justify-between gap-2"><label className="flex min-h-11 items-center gap-3 font-semibold"><input type="checkbox" disabled={controlsDisabled} aria-label="Enable daily setup for this branch" checked={draft.enabled} onChange={event=>change({enabled:event.target.checked})}/><span>Enable daily setup<span className="mt-1 block text-sm font-normal text-stone-500">Refresh missing pickup slots and daily stock at midnight IST.</span></span></label><AdminHelp title="Enable daily setup" {...help.enabled}/></div>
+
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div><FieldLabel id="automation-start" title="Start time · IST" helpKey="start"/><input id="automation-start" disabled={controlsDisabled} className={control} type="time" required value={draft.openingTime.slice(0,5)} onChange={event=>change({openingTime:event.target.value})}/><small className="mt-2 block text-stone-600">First slot begins at this time. Use the actual pickup opening time for this branch.</small></div>
                         <div><FieldLabel id="automation-end" title="End time · IST" helpKey="end"/><input id="automation-end" disabled={controlsDisabled} className={control} type="time" required value={draft.closingTime.slice(0,5)} onChange={event=>change({closingTime:event.target.value})}/><small className="mt-2 block text-stone-600">Last slot must finish by this time on the same day. Overnight schedules are not supported.</small></div>
@@ -205,24 +248,29 @@ export default function RollingAutomationPage(){
                         <div><FieldLabel id="automation-horizon" title="Calendar days to maintain" helpKey="horizon"/><input id="automation-horizon" disabled={controlsDisabled} className={control} type="number" min={1} max={60} required value={draft.maintainDays} onChange={event=>change({maintainDays:Number(event.target.value)})}/><small className="mt-2 block text-stone-600">Includes today. 14 means today plus the following 13 dates. Closed weekdays are skipped, not replaced with extra days.</small></div>
                     </div>
                     <fieldset><legend className="sr-only">Selling weekdays</legend><div className="flex items-center justify-between gap-2"><span className="font-semibold" aria-hidden="true">Selling weekdays</span><AdminHelp title="Selling weekdays" {...help.weekdays}/></div><div className="mt-2 flex flex-wrap gap-2">{days.map((day,index)=><label key={day} className="flex min-h-11 items-center gap-2 rounded-xl border px-3"><input type="checkbox" disabled={controlsDisabled} checked={Boolean(draft.weekdays&(1<<index))} onChange={()=>change({weekdays:draft.weekdays^(1<<index)})}/>{day}</label>)}</div><p className="mt-2 text-sm text-stone-600">Choose at least one day. Disabling a weekday does not remove already-generated slots or cancel bookings; use manual pickup scheduling for exceptions.</p></fieldset>
-                    <p className="rounded-xl bg-stone-50 p-3 text-sm">Every check repairs missing intervals within the saved hours, including partially generated dates. Existing slots keep their times, capacity, bookings and enabled state; overlapping manual or disabled slots are preserved. Disable an interval to pause it intentionally: deleting it allows automation to recreate it. Private bulk appointments remain separate.</p>
+                    <details className="rounded-xl bg-stone-50 px-4"><summary className="cursor-pointer py-3 text-sm font-semibold text-stone-600">How existing slots and manual changes are protected</summary><p className="pb-4 text-sm leading-6 text-stone-600">Missing intervals are filled. Existing times, bookings and disabled intervals are kept. Disable an interval to pause it intentionally; deleting it lets automation recreate it. Private occasion appointments stay separate.</p></details>
                 </section>
-                <section className="space-y-4 rounded-2xl border bg-white p-5">
-                    <h2 id="automation-policies-title" className="text-xl font-bold">2. Choose dishes to automate</h2>
+                <section id="dish-setup" className="scroll-mt-28 space-y-5 rounded-3xl border border-stone-200 bg-white p-5 sm:p-6">
+                    <div id="automation-policies-title"><StepHeading step={2} title="Choose how daily stock is set" description="Use your configured policy maximums, or choose individual dishes and quantities."/></div>
                     <div className="rounded-xl border border-[#ead7df] bg-[#fff7f9] p-4">
                         <FieldLabel id="automation-source" title="Inventory quantity source" helpKey="source"/>
-                        <select id="automation-source" className={control} disabled={controlsDisabled} value={draft.usePolicyMaximum?"maximum":"selected"} onChange={event=>{change({usePolicyMaximum:event.target.value==="maximum"});setPolicyPage(1);setPolicyFilter("all");setError("");}}>
-                            <option value="selected">Selected dishes · enter guaranteed quantities</option>
-                            <option value="maximum">Policy maximums · automatic quantities and approval</option>
+                        <select id="automation-source" className={control} disabled={controlsDisabled} value={draft.usePolicyMaximum?"maximum":"selected"} onChange={event=>{change({usePolicyMaximum:event.target.value==="maximum"});setPolicyPage(1);setPolicyFilter("all");setPolicyListOpen(event.target.value!=="maximum");setError("");}}>
+                            <option value="selected">Choose dishes and quantities myself</option>
+                            <option value="maximum">Automatic · use policy maximums (recommended)</option>
                         </select>
-                        <p className="mt-2 text-sm text-stone-600">{draft.usePolicyMaximum?"No individual selection or quantity entry needed. Each check uses current eligible policy maximums, including newly configured policies. Policies without a usable maximum are skipped. Saving this mode retains your last saved manual selections; unsaved manual quantity edits are not applied.":"Choose individual dishes and guaranteed quantities, or switch to Policy maximums for unattended policy-based allocation."}</p>
-                        {draft.usePolicyMaximum&&<p className="mt-2 text-sm font-semibold">Maximum 200 − buffer 50 = 150 planned after buffer, before other availability checks. The buffer is deducted once.</p>}
+                        <p className="mt-2 text-sm leading-6 text-stone-600">{draft.usePolicyMaximum?"Every eligible configured policy is included automatically. No one-by-one selection or daily quantity entry.":"Select dishes below and enter the daily quantity you can guarantee. For less manual setup, use policy maximums."}</p>
+                        {!draft.usePolicyMaximum&&<button type="button" disabled={controlsDisabled} className="mt-3 min-h-11 rounded-xl bg-[#143936] px-4 text-sm font-semibold text-white disabled:opacity-50" onClick={()=>{change({usePolicyMaximum:true});setPolicyListOpen(false);setPolicyFilter("all");}}>Use policy maximums</button>}
+                        {draft.usePolicyMaximum&&<p className="mt-3 rounded-lg bg-white p-3 text-sm text-[#143936]">Example: maximum 200 − buffer 50 = 150 planned before orders and other stock checks.</p>}
                     </div>
-                    <p className="text-sm text-stone-600">Only policies configured for this branch appear. Menu items without a policy, capacity-only policies and manual-control policies are excluded. Saved selections that become unsupported stay visible so you can remove them or pause safely. Quantities use the unit shown below: grams for GRAM policies, whole units otherwise. Policies, safety buffers and booking windows are not changed here.</p>
-                    {!workspace.policies.length&&<p>No inventory policies configured for this branch yet.</p>}
+                    <div className="grid grid-cols-2 gap-3"><button type="button" onClick={()=>showPolicies("selected")} className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-left"><strong className="block text-2xl text-emerald-900" data-testid="draft-ready-count">{readyPolicies.length}</strong><span className="text-sm text-emerald-900">dishes ready to automate</span></button><button type="button" onClick={()=>showPolicies(draft.usePolicyMaximum?"attention":"all")} className="rounded-2xl border border-stone-200 bg-stone-50 p-4 text-left"><strong className="block text-2xl text-stone-800">{draft.usePolicyMaximum?skippedSelections:workspace.policies.length-selectedIds.size}</strong><span className="text-sm text-stone-600">{draft.usePolicyMaximum?"not included · see why":"not selected · review dishes"}</span></button></div>
+                    {draft.usePolicyMaximum&&skipGroups.length>0&&<div className="space-y-1 text-sm text-stone-600">{skipGroups.slice(0,4).map(([reason,count])=><p key={reason}>{count} · {reason}</p>)}</div>}
+                    {shorterPolicies.length>0&&<div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"><strong>{shorterPolicies.length} dishes have shorter stock windows.</strong><p className="mt-1">They cannot fill every pickup date in this setup until their booking limits are extended.</p><button type="button" onClick={()=>showPolicies("shorter")} className="mt-2 min-h-11 font-semibold underline">Review shorter windows</button></div>}
+                    <details id="policy-list" open={policyListOpen} onToggle={event=>setPolicyListOpen(event.currentTarget.open)} className="rounded-2xl border border-stone-200 p-3 sm:p-4"><summary className="cursor-pointer py-2 font-semibold text-stone-800">Review dishes & quantities</summary>
+                    <div className="mt-3 space-y-4">
+                    {!workspace.policies.length&&<p>No configured inventory policies for this branch. <Link className="font-semibold underline" href="/admin/inventory/setup" target="_blank" rel="noopener noreferrer">Open Product policies</Link> to configure them first.</p>}
                     <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
                         <label className="min-w-0 text-sm font-semibold">Find a dish<input data-browse-control type="search" className={control} value={policySearch} placeholder="Search dish name…" onKeyDown={event=>{if(event.key==="Enter")event.preventDefault();}} onChange={event=>{setPolicySearch(event.target.value);setPolicyPage(1);}}/></label>
-                        <label className="text-sm font-semibold">Show<select data-browse-control className={control} value={policyFilter} onChange={event=>{setPolicyFilter(event.target.value);setPolicyPage(1);}}><option value="all">All dishes</option><option value="selected">{draft.usePolicyMaximum?"Included policies":"Selected dishes"}</option><option value="attention">{draft.usePolicyMaximum?"Skipped policies":"Needs attention"}</option></select></label>
+                        <label className="text-sm font-semibold">Show<select data-browse-control className={control} value={policyFilter} onChange={event=>{setPolicyFilter(event.target.value);setPolicyPage(1);}}><option value="all">All dishes</option><option value="selected">{draft.usePolicyMaximum?"Included policies":"Selected dishes"}</option><option value="attention">{draft.usePolicyMaximum?"Not included":"Needs attention"}</option><option value="shorter">Shorter booking windows</option></select></label>
                         <label className="text-sm font-semibold">Rows per page<select data-browse-control className={control} value={pageSize} onChange={event=>{setPageSize(Number(event.target.value));setPolicyPage(1);}}>{[10,25,50].map(size=><option key={size} value={size}>{size}</option>)}</select></label>
                     </div>
                     <p role="status" className="text-sm text-stone-600">{filteredPolicies.length?`Showing ${(currentPage-1)*pageSize+1}–${Math.min(currentPage*pageSize,filteredPolicies.length)} of ${filteredPolicies.length} dishes`:"No dishes match this view."} · {selectedIds.size} {draft.usePolicyMaximum?"automatically included":"selected across all pages"}. Changing page or search keeps your selections and quantities.</p>
@@ -234,7 +282,8 @@ export default function RollingAutomationPage(){
                             <p className="text-sm text-stone-600">Unit: {policy.unit} · Buffer: {policy.buffer} · Maximum: {policy.maximum??"Not set"} · Booking window: {policy.bookingDays} days ahead</p>
                             {invalidIds.has(policy.id)&&<p className="text-sm font-semibold text-red-800">Enter a positive daily quantity in the correct unit, above the buffer and within the maximum.</p>}
                             {policy.unavailableReason&&<p className="text-sm text-amber-900">{policy.unavailableReason}</p>}
-                            {draft.usePolicyMaximum&&<p className="text-sm">{usableMaximum(policy)?`Automatic approval: ${policy.maximum} ${policy.unit} · Planned after buffer: ${Number((policy.maximum!-policy.buffer).toFixed(3))} ${policy.unit}${policy.readyStockRequired?" · Physical readiness still required":""}`:policy.unavailableReason??"Skipped: configure a positive maximum greater than the safety buffer in the correct policy unit."}</p>}
+                            {draft.usePolicyMaximum&&<p className="text-sm">{usableMaximum(policy)?`Planned daily stock: ${policy.maximum} ${policy.unit} · After buffer: ${Number((policy.maximum!-policy.buffer).toFixed(3))} ${policy.unit}${policy.readyStockRequired?" · Physical readiness still required":""}`:skipReason(policy)}</p>}
+                            {selectedIds.has(policy.id)&&policy.eligible&&<p className={`text-sm ${Math.min(policy.bookingDays,workspace.storefrontBookingDays??policy.bookingDays)<draft.maintainDays-1?"font-semibold text-amber-900":"text-stone-500"}`}>Stock window preview: through {endDate(previewDate,Math.min(draftDays-1,policy.bookingDays,workspace.storefrontBookingDays??policy.bookingDays))} · {Math.min(draftDays,policy.bookingDays+1,(workspace.storefrontBookingDays??policy.bookingDays)+1)} calendar days including today.</p>}
                             {!draft.usePolicyMaximum&&template&&<div className="grid gap-4 sm:grid-cols-2">
                                 <div><FieldLabel id={`automation-quantity-${policy.id}`} title={`Guaranteed daily quantity · ${policy.unit}`} helpKey="quantity"/><input id={`automation-quantity-${policy.id}`} className={control} type="number" disabled={controlsDisabled||!policy.selectable} min={policy.unit==="GRAM"?0.001:1} step={policy.unit==="GRAM"?0.001:1} max={policy.maximum??undefined} required value={template.quantity||""} onChange={event=>changeTemplate(policy.id,{quantity:Number(event.target.value)})}/><small className="mt-2 block text-stone-600">Enter the quantity you can reliably provide. It must exceed the safety buffer and stay within the policy maximum.</small></div>
                                 <div><FieldLabel id={`automation-approval-${policy.id}`} title="Approval mode" helpKey="approval"/><select id={`automation-approval-${policy.id}`} className={control} disabled={controlsDisabled||!policy.selectable} value={template.autoApprove?"approved":"draft"} onChange={event=>changeTemplate(policy.id,{autoApprove:event.target.value==="approved"})}><option value="approved">Automatic approval · no daily approval needed</option><option value="draft">Manual review · create a daily draft</option></select><small className="mt-2 block text-stone-600">{policy.readyStockRequired?"Actual production must still be marked ready. Approval does not prove the food exists.":"Automatic approval publishes the guaranteed quantity without daily approval. Manual review requires staff approval each day."}</small></div>
@@ -247,12 +296,38 @@ export default function RollingAutomationPage(){
                         <span className="text-sm font-semibold">Page {currentPage} of {totalPages}</span>
                         <button type="button" className={action} disabled={currentPage>=totalPages} onClick={()=>setPolicyPage(currentPage+1)}>Next dishes</button>
                     </nav>
-                    <p className="text-sm text-stone-600">Allocations are created only on selected weekdays with active regular pickup slots, within the booking window of each policy and the storefront horizon. Offline dishes and bulk-only products are skipped. Existing allocations are never topped up, replaced or reset.</p>
-                    <Link href="/admin/inventory/setup" className="inline-flex min-h-11 items-center font-semibold underline">Open existing product policy setup</Link>
+                    </div></details>
+                    <p className="text-sm leading-6 text-stone-500">Only configured branch policies are used. Existing stock and orders are kept. Product and storefront booking limits still apply.</p>
+                    <Link href="/admin/inventory/setup" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm font-semibold text-[#8f1838] underline">Open Product policies in a new tab</Link>
                 </section>
-
-            </fieldset>
-        </form>}
-
+                    <a href="#automation-review" className="inline-flex min-h-11 items-center rounded-xl border border-[#ead7df] bg-white px-4 text-sm font-semibold text-[#8f1838]">Continue to review & start →</a>
+                </form>
+                <aside id="automation-review" aria-label="Review automation setup" className="scroll-mt-28 space-y-4 rounded-3xl border border-[#ead7df] bg-gradient-to-b from-[#fff8ed] to-white p-5 shadow-sm xl:sticky xl:top-28">
+                    <StepHeading step={3} title="Review & start" description="This preview uses the setup shown in steps 1 and 2."/>
+                    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${dirty?"bg-amber-100 text-amber-900":"bg-stone-100 text-stone-700"}`}>{dirty||!workspace.plan?"Unsaved preview":"Saved setup preview"}</span>
+                    <div className="rounded-2xl bg-white p-4"><p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Pickup window preview</p><p className="mt-2 text-lg font-bold">{endDate(previewDate,0)} – {endDate(previewDate,draftDays-1)}</p><p className="mt-1 text-sm text-stone-600">{draftDays} calendar days including today · selected weekdays only</p><p className="mt-2 text-sm">{draft.openingTime.slice(0,5)}–{draft.closingTime.slice(0,5)} IST · {draft.slotMinutes}-minute slots</p></div>
+                    <p className="text-sm"><strong>{readyPolicies.length} dishes</strong> ready for daily stock · {draft.usePolicyMaximum?"policy maximum quantities":"your selected quantities"}.</p>
+                    {globalShort&&<p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">The storefront allows only {workspace.storefrontBookingDays} days ahead. Stock generation is limited to {workspace.storefrontBookingDays!+1} calendar days, even though pickup slots span {draftDays} days. Extend the storefront limit to cover the whole window.</p>}
+                    {workspace.storefrontBookingDays==null&&<p className="text-xs text-stone-500">The storefront booking limit also applies. Reload after the latest backend deployment to see the exact limit.</p>}
+                    {shorterPolicies.length>0&&<p className="text-sm text-amber-950">{shorterPolicies.length} included dishes have shorter booking windows. Review step 2 before expecting stock on every date.</p>}
+                    {!draft.enabled&&<p className="text-sm font-semibold text-amber-950">Turn on daily setup in step 1 to generate stock.</p>}
+                    {readyPolicies.length===0&&<p className="text-sm font-semibold text-amber-950">Choose policy maximums or configure eligible dishes in step 2. There is no daily stock to generate yet.</p>}
+                    {invalidIds.size>0&&<button type="button" className="min-h-11 text-left text-sm font-semibold text-red-900 underline" onClick={()=>showPolicies("attention")}>Fix quantities for {invalidIds.size} selected dishes</button>}
+                    <button type="button" className="min-h-12 w-full rounded-2xl bg-[#8f1838] px-4 py-3 font-bold text-white shadow-sm disabled:opacity-40" disabled={controlsDisabled||!draft.enabled||!readyPolicies.length||invalidIds.size>0} onClick={()=>void submit("saveAndRun")}>{busy?"Applying setup…":"Save & generate now"}</button>
+                    <button type="submit" form="automation-form" disabled={controlsDisabled} className={`${action} w-full text-sm font-semibold`}>Save automation settings</button>
+                    <p className="text-xs leading-5 text-stone-500">Save & generate applies this setup and creates only missing records now. Save settings alone waits for the next daily run. Pausing takes effect when saved.</p>
+                    {!canManage&&<p className="text-xs text-stone-500">Read-only access: ask an authorized manager to save or generate.</p>}
+                    <details className="border-t border-stone-200 pt-2"><summary className="cursor-pointer py-2 text-sm font-semibold">Stock and manual changes</summary><p className="py-2 text-xs leading-5 text-stone-600">Existing quantities, bookings and disabled slots are kept. Buffers are withheld once. Dishes requiring physical readiness still need recorded ready stock. Manual inventory tools remain available.</p></details>
+                </aside>
+            </div>
+            <section aria-label="Saved stock status" className="space-y-3 rounded-3xl border border-stone-200 bg-white p-5">
+                <div className="flex flex-wrap justify-between gap-2"><h2 className="font-bold">Saved stock status</h2><span className="text-xs text-stone-500">Last check: {runTime(workspace.lastSuccess)}</span></div>
+                {!workspace.plan?<p className="text-sm text-stone-600">Choose your setup above, then Save & generate now.</p>:dirty?<p className="text-sm text-stone-600">This status belongs to your saved setup. Your unsaved preview above has not been applied.</p>:savedSelectionCount===0?<p className="text-sm text-amber-950">No dishes are saved for daily stock. Use policy maximums in step 2, then Save & generate now.</p>:workspace.health?.missingAllocations?<p className="text-sm text-amber-950">{workspace.health.missingAllocations} daily stock entries are missing. Generate now to fill eligible dates.</p>:<p className="text-sm text-stone-600">{workspace.health?.status==="COMPLETE"?"Expected pickup and stock records are present. Normal readiness and stock checks still apply.":"Review the details below if stock is still missing after generation."}</p>}
+                {workspace.health?.overdue&&<p role="alert" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-950">The saved setup’s daily refresh is overdue. Save & generate now to check the current setup.</p>}
+                {(workspace.health?.lastRunFailed||workspace.health?.interrupted)&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-900">The most recent run failed or was interrupted. Open run history for its result before retrying.</p>}
+                <details><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-[#8f1838]">Saved stock details & run history</summary><div className="mt-2 space-y-3">{workspace.health&&<CoveragePanel health={workspace.health} runs={workspace.runs??[]} retryDisabled={busy||loading||dirty||!workspace.plan?.enabled||!canManage||savedReadyCount===0} onRetry={()=>void submit("run")}/>}<details className="rounded-xl bg-stone-50 p-3"><summary className="cursor-pointer text-sm font-semibold">Technical execution summary</summary><p className="mt-2 break-words text-xs leading-5">{workspace.message??"No completed generation yet."}</p><p className="mt-2 text-xs">Last attempt: {runTime(workspace.lastAttempt)}</p></details><button type="button" className={action} disabled={busy||loading||dirty||!workspace.plan?.enabled||!canManage||savedReadyCount===0} onClick={()=>void submit("run")}>Generate missing coverage now</button></div></details>
+                <Link href="/admin/inventory" className="inline-flex min-h-11 items-center text-sm font-semibold text-[#8f1838] underline">Review daily stock in Inventory</Link>
+            </section>
+        </>}
     </main>;
 }
