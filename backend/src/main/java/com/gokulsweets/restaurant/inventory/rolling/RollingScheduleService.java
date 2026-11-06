@@ -45,6 +45,13 @@ public class RollingScheduleService {
     /** Existing regular interval whose time range must remain untouched during gap repair. */
     private record SlotInterval(LocalTime start, LocalTime end) {}
 
+    /** Recovery outcomes distinguish untouched stock from incompatible historical units. */
+    private enum ReadinessRecovery {
+        PUBLISHED,
+        PRESERVED,
+        UNIT_MISMATCH
+    }
+
     /** Explicit inventory template tied to an existing policy in this branch. */
     public record Template(long policyId, BigDecimal quantity, boolean autoApprove) {}
 
@@ -546,7 +553,10 @@ capacity,maintain_days,weekdays,use_policy_maximum,auto_ready,updated_by) VALUES
                             LocalDate today = now.toLocalDate();
                             int slots = 0, allocations = 0, retained = 0, readinessPublished = 0;
                             int activeDates = 0, noSlotDates = 0, existingAllocations = 0;
-                            int unavailable = 0, outsideWindow = 0, limited = 0;
+                            int unavailable = 0,
+                                    outsideWindow = 0,
+                                    limited = 0,
+                                    readinessUnitMismatches = 0;
                             var policyMap =
                                     config.policies().stream()
                                             .collect(
@@ -692,8 +702,11 @@ AND occasion_enquiry_id IS NULL AND (slot_date<>? OR start_time>?)
                                                 && policy.readyStockRequired()
                                                 && offset <= policy.bookingDays()
                                                 && offset <= features.getFutureOrderingDays()) {
-                                            if (publishUntouchedReadiness(policy, date))
+                                            var recovery = publishUntouchedReadiness(policy, date);
+                                            if (recovery == ReadinessRecovery.PUBLISHED)
                                                 readinessPublished++;
+                                            if (recovery == ReadinessRecovery.UNIT_MISMATCH)
+                                                readinessUnitMismatches++;
                                         }
                                         existingAllocations++;
                                         retained++;
@@ -781,7 +794,11 @@ ON CONFLICT(branch_product_id,service_date) DO NOTHING
                             message +=
                                     " Automatic readiness: "
                                             + readinessPublished
-                                            + " guaranteed allocations marked ready.";
+                                            + " guaranteed allocations marked ready. "
+                                            + readinessUnitMismatches
+                                            + " allocations skipped for inventory unit mismatch;"
+                                            + " review affected dates and dishes in coverage"
+                                            + " details.";
                             if (plan.usePolicyMaximum())
                                 message +=
                                         " Policy maximum mode: "
@@ -901,7 +918,7 @@ ON CONFLICT(branch_product_id,service_date) DO NOTHING
      * Repairs only a pristine approval made by this flow, never a staff or previously used
      * allocation.
      */
-    private boolean publishUntouchedReadiness(Policy policy, LocalDate date) {
+    private ReadinessRecovery publishUntouchedReadiness(Policy policy, LocalDate date) {
         final long started =
                 MethodTiming.start(
                         RollingScheduleService.class,
@@ -911,13 +928,15 @@ ON CONFLICT(branch_product_id,service_date) DO NOTHING
             // makes this row ineligible, or runs afterward and overrides this guarantee normally.
             var rows =
                     jdbc.queryForList(
-                            "SELECT id,approved_quantity,expected_ready_at FROM"
+                            "SELECT id,approved_quantity,expected_ready_at,inventory_unit FROM"
                                     + " inventory_daily_allocations WHERE branch_product_id=? AND"
                                     + " service_date=? FOR UPDATE",
                             policy.branchProductId(),
                             date);
-            if (rows.isEmpty()) return false;
+            if (rows.isEmpty()) return ReadinessRecovery.PRESERVED;
             var row = rows.getFirst();
+            if (!policy.unit().equals(row.get("inventory_unit")))
+                return ReadinessRecovery.UNIT_MISMATCH;
             long id = ((Number) row.get("id")).longValue();
             Boolean pristine =
                     jdbc.queryForObject(
@@ -932,14 +951,14 @@ FROM inventory_daily_allocations a WHERE id=?
 """,
                             Boolean.class,
                             id);
-            if (!Boolean.TRUE.equals(pristine)) return false;
+            if (!Boolean.TRUE.equals(pristine)) return ReadinessRecovery.PRESERVED;
             var expected = (java.sql.Timestamp) row.get("expected_ready_at");
             publishReadiness(
                     policy,
                     date,
                     (BigDecimal) row.get("approved_quantity"),
                     expected == null ? null : expected.toLocalDateTime());
-            return true;
+            return ReadinessRecovery.PUBLISHED;
         } finally {
             MethodTiming.finish(
                     started,

@@ -1514,4 +1514,114 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
         service.save(f.branch(), plan, "manager");
         assertThat(service.workspace(f.branch()).plan().autoReady()).isTrue();
     }
+
+    @Test
+    void unitChangesPreserveHistoricalStockAndDoNotRollBackCompatibleReadinessOrNewDates() {
+        var fractional = fixture();
+        var whole = fixture();
+        var compatible = fixture();
+        for (var item : List.of(whole, compatible))
+            jdbc.update(
+                    "UPDATE branch_products SET branch_id=? WHERE id=?",
+                    fractional.branch(),
+                    item.product());
+        for (var item : List.of(fractional, whole)) {
+            jdbc.update(
+                    "UPDATE products SET sale_mode='WEIGHT' WHERE id=(SELECT product_id FROM"
+                            + " branch_products WHERE id=?)",
+                    item.product());
+            jdbc.update(
+                    "UPDATE branch_inventory_policies SET"
+                        + " inventory_unit='GRAM',ready_stock_required=TRUE,maximum_daily_allocation=?"
+                        + " WHERE id=?",
+                    item == fractional ? new BigDecimal("100.500") : new BigDecimal("200"),
+                    item.policy());
+        }
+        jdbc.update(
+                "UPDATE branch_inventory_policies SET ready_stock_required=TRUE WHERE id=?",
+                compatible.policy());
+        service.save(fractional.branch(), readinessPlan(-1, false), "manager");
+        service.reconcile(fractional.branch());
+        var date = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(1);
+        var beforeFractional = allocation(fractional, date);
+        var beforeWhole = allocation(whole, date);
+        entityManager.clear();
+        for (var item : List.of(fractional, whole)) {
+            jdbc.update(
+                    "UPDATE products SET sale_mode='UNIT' WHERE id=(SELECT product_id FROM"
+                            + " branch_products WHERE id=?)",
+                    item.product());
+            jdbc.update(
+                    "UPDATE branch_inventory_policies SET"
+                            + " inventory_unit='PIECE',maximum_daily_allocation=100 WHERE id=?",
+                    item.policy());
+        }
+        var added = fixture();
+        jdbc.update(
+                "UPDATE branch_products SET branch_id=? WHERE id=?",
+                fractional.branch(),
+                added.product());
+        jdbc.update(
+                "UPDATE branch_inventory_policies SET ready_stock_required=TRUE WHERE id=?",
+                added.policy());
+        var base = readinessPlan(0, true);
+        service.save(
+                fractional.branch(),
+                new RollingScheduleService.Plan(
+                        true,
+                        base.openingTime(),
+                        base.closingTime(),
+                        base.slotMinutes(),
+                        base.capacity(),
+                        3,
+                        base.weekdays(),
+                        base.version(),
+                        base.templates(),
+                        true,
+                        true),
+                "manager");
+        assertThatCode(() -> service.reconcile(fractional.branch())).doesNotThrowAnyException();
+        assertThat(allocation(fractional, date)).isEqualTo(beforeFractional);
+        assertThat(allocation(whole, date)).isEqualTo(beforeWhole);
+        assertThat(allocation(compatible, date).get("status")).isEqualTo("READY");
+        assertThat(allocation(added, date).get("status")).isEqualTo("READY");
+        var newDate = allocation(fractional, date.plusDays(1));
+        assertThat(newDate.get("inventory_unit")).isEqualTo("PIECE");
+        assertThat(newDate.get("status")).isEqualTo("READY");
+        assertThat((BigDecimal) newDate.get("ready_quantity")).isEqualByComparingTo("100");
+        for (var before : List.of(beforeFractional, beforeWhole)) {
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT count(*) FROM inventory_stock_transactions WHERE"
+                                            + " allocation_id=? AND"
+                                            + " transaction_type='READY_STOCK_RECORDED'",
+                                    Integer.class,
+                                    before.get("id")))
+                    .isZero();
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT count(*) FROM inventory_allocation_plan_audit WHERE"
+                                            + " allocation_id=?",
+                                    Integer.class,
+                                    before.get("id")))
+                    .isEqualTo(1);
+        }
+        var workspace = service.inspect(fractional.branch());
+        assertThat(workspace.runs().getFirst().status()).isEqualTo("SUCCESS");
+        assertThat(workspace.message())
+                .containsPattern("[1-9][0-9]* allocations skipped for inventory unit mismatch");
+        assertThat(workspace.health().status()).isEqualTo("NEEDS_ATTENTION");
+        assertThat(workspace.health().issues())
+                .anySatisfy(
+                        issue -> {
+                            assertThat(issue.date()).isEqualTo(date);
+                            assertThat(issue.reason())
+                                    .contains(
+                                            "Stored inventory unit GRAM differs from policy unit"
+                                                    + " PIECE");
+                        });
+        service.reconcile(fractional.branch());
+        assertThat(allocation(fractional, date)).isEqualTo(beforeFractional);
+        assertThat(allocation(whole, date)).isEqualTo(beforeWhole);
+    }
 }

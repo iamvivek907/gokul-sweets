@@ -243,3 +243,10 @@ The provenance query was verified with normal PostgreSQL planner settings agains
 rows and 200,000 stock-history rows: all three history lookups changed from sequential scans
 to index-only scans, with the same eligibility result. These are isolated test results, not a
 production latency guarantee.
+
+
+Readiness recovery skips historical allocations whose stored inventory unit differs from the
+current policy unit, before calling the readiness service. It never converts or relabels existing
+quantities. The run summary counts skipped mismatches; coverage reports attention with bounded
+per-dish/date examples showing both units. Other compatible allocations and new dates continue
+normally, so one outdated gram/piece allocation cannot roll back the branch's generation.
