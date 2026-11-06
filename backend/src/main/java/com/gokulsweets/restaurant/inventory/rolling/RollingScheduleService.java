@@ -359,7 +359,7 @@ ORDER BY pr.name,p.id
                                 jdbc.update(
                                         """
 UPDATE rolling_branch_schedules SET enabled=?,opening_time=?,closing_time=?,slot_minutes=?,
-capacity=?,maintain_days=?,weekdays=?,use_policy_maximum=?,version=version+1,updated_by=?,updated_at=now()
+capacity=?,maintain_days=?,weekdays=?,use_policy_maximum=?,version=version+1,updated_by=?,updated_at=clock_timestamp()
 WHERE branch_id=? AND version=?
 """,
                                         plan.enabled(),
@@ -709,7 +709,8 @@ ON CONFLICT(branch_product_id,service_date) DO NOTHING
                                         + " and physical readiness remain separate where required.";
                             jdbc.update(
                                     "UPDATE rolling_branch_schedules SET"
-                                        + " last_success_at=now(),last_message=? WHERE branch_id=?",
+                                        + " last_success_at=clock_timestamp(),last_message=? WHERE"
+                                        + " branch_id=?",
                                     message,
                                     branchId);
                             completed[0] = true;

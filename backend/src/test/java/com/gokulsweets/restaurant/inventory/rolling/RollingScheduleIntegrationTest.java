@@ -1046,7 +1046,7 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
         assertThat(overdue.health(f.branch(), service.workspace(f.branch()), List.of()).overdue())
                 .isFalse();
         jdbc.update(
-                "UPDATE rolling_branch_schedules SET last_success_at=NULL,updated_at=? WHERE"
+                "UPDATE rolling_branch_schedules SET last_success_at=NULL,enabled_since_at=? WHERE"
                         + " branch_id=?",
                 java.sql.Timestamp.from(tomorrow.atTime(0, 15).atZone(zone).toInstant()),
                 f.branch());
@@ -1152,5 +1152,126 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
             jdbc.update("DELETE FROM pickup_slots WHERE branch_id=?", branch);
             jdbc.update("DELETE FROM branches WHERE id=?", branch);
         }
+    }
+
+    @Test
+    void editingExistingPlanPreservesActivationAndMissedRunAlert() {
+        var f = fixture();
+        service.save(f.branch(), maximumPlan(-1, 2), "manager");
+        var zone = ZoneId.of("Asia/Kolkata");
+        var today = LocalDate.now(clock.withZone(zone));
+        var original = java.sql.Timestamp.from(today.minusDays(1).atStartOfDay(zone).toInstant());
+        jdbc.update(
+                "UPDATE rolling_branch_schedules SET"
+                        + " enabled_since_at=?,updated_at=?,last_success_at=NULL WHERE branch_id=?",
+                original,
+                original,
+                f.branch());
+        var audit =
+                new RollingAutomationDiagnostics(
+                        jdbc,
+                        Clock.fixed(today.atTime(23, 59).atZone(zone).toInstant(), zone),
+                        features);
+        assertThat(audit.health(f.branch(), service.workspace(f.branch()), List.of()).overdue())
+                .isTrue();
+        service.save(f.branch(), maximumPlan(0, 2), "manager");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT enabled_since_at FROM rolling_branch_schedules WHERE"
+                                        + " branch_id=?",
+                                java.sql.Timestamp.class,
+                                f.branch()))
+                .isEqualTo(original);
+        assertThat(audit.health(f.branch(), service.workspace(f.branch()), List.of()).overdue())
+                .isTrue();
+        service.save(f.branch(), plan(f, 1, false), "manager");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT enabled_since_at FROM rolling_branch_schedules WHERE"
+                                        + " branch_id=?",
+                                java.sql.Timestamp.class,
+                                f.branch()))
+                .isEqualTo(original);
+        assertThat(audit.health(f.branch(), service.workspace(f.branch()), List.of()).overdue())
+                .isFalse();
+        service.save(f.branch(), maximumPlan(2, 2), "manager");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT enabled_since_at FROM rolling_branch_schedules WHERE"
+                                        + " branch_id=?",
+                                java.sql.Timestamp.class,
+                                f.branch()))
+                .isAfter(original);
+        assertThat(audit.health(f.branch(), service.workspace(f.branch()), List.of()).overdue())
+                .isFalse();
+    }
+
+    @Test
+    void completionAfterMidnightSatisfiesDueRunEvenWithLegacyTransactionTimestamp() {
+        var f = fixture();
+        service.save(f.branch(), maximumPlan(-1, 2), "manager");
+        var zone = ZoneId.of("Asia/Kolkata");
+        var today = LocalDate.now(clock.withZone(zone));
+        var midnight = today.atStartOfDay(zone).toInstant();
+        jdbc.update(
+                "UPDATE rolling_branch_schedules SET enabled_since_at=?,last_success_at=? WHERE"
+                        + " branch_id=?",
+                java.sql.Timestamp.from(midnight.minusSeconds(3600)),
+                java.sql.Timestamp.from(midnight.minusSeconds(5)),
+                f.branch());
+        var began =
+                new RollingAutomationDiagnostics(
+                        jdbc, Clock.fixed(midnight.minusSeconds(5), zone), features);
+        long id = began.start(f.branch(), "MANUAL", "manager");
+        var finished =
+                new RollingAutomationDiagnostics(
+                        jdbc, Clock.fixed(midnight.plusSeconds(60), zone), features);
+        finished.finish(
+                id,
+                f.branch(),
+                "SUCCESS",
+                65000,
+                60000,
+                5000,
+                2,
+                1,
+                "Coverage completed after midnight");
+        var audit =
+                new RollingAutomationDiagnostics(
+                        jdbc, Clock.fixed(midnight.plusSeconds(960), zone), features);
+        assertThat(
+                        audit.health(
+                                        f.branch(),
+                                        service.workspace(f.branch()),
+                                        finished.runs(f.branch()))
+                                .overdue())
+                .isFalse();
+        assertThat(
+                        jdbc.queryForObject(
+                                        "SELECT last_success_at FROM rolling_branch_schedules WHERE"
+                                                + " branch_id=?",
+                                        java.sql.Timestamp.class,
+                                        f.branch())
+                                .toInstant())
+                .isBefore(midnight);
+    }
+
+    @Test
+    void successfulRunRecordsWallClockCompletionInsteadOfTransactionStart() {
+        var f = fixture();
+        service.save(f.branch(), maximumPlan(-1, 2), "manager");
+        var began =
+                jdbc.queryForObject("SELECT current_timestamp", java.time.OffsetDateTime.class)
+                        .toInstant();
+        service.reconcile(f.branch(), "MANUAL", "manager");
+        entityManager.flush();
+        var completed =
+                jdbc.queryForObject(
+                                "SELECT last_success_at FROM rolling_branch_schedules WHERE"
+                                        + " branch_id=?",
+                                java.time.OffsetDateTime.class,
+                                f.branch())
+                        .toInstant();
+        assertThat(completed).isAfter(began);
     }
 }

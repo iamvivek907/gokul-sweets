@@ -312,8 +312,10 @@ public class RollingAutomationDiagnostics {
             var midnight = today.atStartOfDay(IST).toInstant();
             var timestamps =
                     jdbc.query(
-                            "SELECT updated_at,last_success_at FROM rolling_branch_schedules WHERE"
-                                    + " branch_id=?",
+                            "SELECT s.enabled_since_at,GREATEST(s.last_success_at,"
+                                    + " (SELECT max(r.finished_at) FROM rolling_automation_runs r"
+                                    + " WHERE r.branch_id=s.branch_id AND r.status='SUCCESS'))"
+                                    + " FROM rolling_branch_schedules s WHERE s.branch_id=?",
                             rs -> {
                                 if (!rs.next()) return new Instant[] {clock.instant(), null};
                                 var success = rs.getTimestamp(2);

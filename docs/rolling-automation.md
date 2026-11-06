@@ -151,9 +151,9 @@ intervals, elapsed times, unselected weekdays and product/storefront booking lim
 Draft approval and physical readiness are separate from missing setup records; complete coverage
 still requires normal stock, approval, readiness and service checks before customer ordering.
 
-A plan saved before today's midnight is overdue if no successful check has completed since
+A plan enabled before today's midnight is overdue if no successful check has completed since
 midnight, with a 15-minute grace period. A successful manual run satisfies that day's check.
-Plans saved later today are due at the following midnight. Failed and interrupted runs raise an
+Newly enabled plans are due at the following midnight. Ordinary edits preserve the activation anchor and do not clear overdue alerts. Failed and interrupted runs raise an
 inline admin alert. Authorized admins can retry saved settings; unsaved edits and read-only
 access disable retry. Paused plans do not raise overdue alerts.
 
@@ -169,3 +169,13 @@ its database work and lock waits. Existing allocations and bookings are preserve
 whether a branch needs smaller recoverable batches; this change does not introduce partial commits
 or repeated generation attempts. The schedule mutex permits run-audit foreign keys while continuing
 to serialize schedule writers and protect overlapping intervals.
+
+V154 records a separate enabled-since timestamp, preserved on ordinary saves and while paused, and reset only when
+automation is paused and enabled again. Existing enabled plans receive their last known saved
+timestamp as a one-time upgrade anchor. New successes use database wall-clock completion time;
+health also considers successful run-history completion timestamps, including older runs that
+started before midnight and finished afterward.
+
+The database activation trigger also handles flag changes from older application versions during
+deployment. Disabling preserves the last activation anchor for history; re-enabling records a new
+wall-clock timestamp. Never-enabled paused plans may have no activation anchor.
