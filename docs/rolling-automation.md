@@ -104,7 +104,7 @@ The worker reevaluates current, configured branch policies on every check; indiv
 selection and guaranteed quantity entry are not needed. New eligible policies are picked
 up automatically. Existing plans default to explicit selection until this mode is chosen.
 
-Only online, branch-available physical policies with a positive maximum greater than the
+Only online, branch-available physical policies whose dish and category are active, with a positive maximum greater than the
 safety buffer qualify. Missing maximums, maximums at/below the buffer, invalid piece units,
 manual/capacity policies and bulk-only dishes are skipped. The run report explains skips.
 The maximum is the gross approved quantity: maximum 200 and buffer 50 produces approved
@@ -137,3 +137,7 @@ limit, not evidence of physical stock. Policies requiring ready stock retain tha
 Missing slots and missing item/date allocations are recovered independently on every check.
 The daily run automatically advances the horizon. Manual runs reconcile the same full window
 without changing the next daily execution. Existing allocations are never topped up to replace sold or reserved quantity.
+
+Inactive dishes and inactive categories are skipped in both quantity modes and remain visible
+with a reason in admin. Reactivating them allows the next daily or manual run to create missing
+allocations within the maintained window. Existing allocations are not rewritten.

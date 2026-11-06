@@ -151,15 +151,17 @@ public class RollingScheduleService {
 SELECT p.id,pr.name,p.inventory_unit,p.booking_horizon_days,p.default_safety_buffer,
        p.maximum_daily_allocation,p.ready_stock_required,
        (p.online_enabled AND p.control_mode IN ('READY_STOCK','DAILY_PRODUCTION')
-         AND bp.available AND NOT bp.occasion_only),p.branch_product_id,
+         AND bp.available AND pr.active AND c.active AND NOT bp.occasion_only),p.branch_product_id,
        (p.control_mode IN ('READY_STOCK','DAILY_PRODUCTION') AND NOT bp.occasion_only),
        CASE WHEN bp.occasion_only THEN 'Bulk-only items are excluded from daily automation. Remove this saved selection.'
             WHEN p.control_mode='SLOT_CAPACITY' THEN 'Capacity-only policies do not support physical inventory automation. Remove this saved selection if selected.'
             WHEN p.control_mode='MANUAL' THEN 'Manual policies are managed through the manual inventory tools.'
             WHEN NOT p.online_enabled THEN 'Skipped while online inventory is disabled for this policy.'
-            WHEN NOT bp.available THEN 'Skipped while this dish is unavailable at the branch.' END
+            WHEN NOT bp.available THEN 'Skipped while this dish is unavailable at the branch.'
+            WHEN NOT pr.active THEN 'Skipped while this dish is inactive in the menu.'
+            WHEN NOT c.active THEN 'Skipped while this dish’s category is inactive in the menu.' END
 FROM branch_inventory_policies p JOIN branch_products bp ON bp.id=p.branch_product_id
-JOIN products pr ON pr.id=bp.product_id
+JOIN products pr ON pr.id=bp.product_id JOIN categories c ON c.id=pr.category_id
 WHERE bp.branch_id=? AND (NOT bp.occasion_only OR EXISTS (
     SELECT 1 FROM rolling_inventory_templates t WHERE t.branch_id=bp.branch_id AND t.policy_id=p.id))
 ORDER BY pr.name,p.id
@@ -565,7 +567,8 @@ forecast_quantity,safety_buffer_quantity,expected_ready_at,note,created_at,updat
 SELECT p.branch_product_id,?,'DRAFT',p.inventory_unit,?,p.default_safety_buffer,?,
 'Created by separate rolling automation',now(),now()
 FROM branch_inventory_policies p JOIN branch_products bp ON bp.id=p.branch_product_id
-WHERE p.id=? AND bp.branch_id=? AND bp.available AND p.online_enabled AND p.control_mode IN ('READY_STOCK','DAILY_PRODUCTION')
+JOIN products pr ON pr.id=bp.product_id JOIN categories c ON c.id=pr.category_id
+WHERE pr.active AND c.active AND p.id=? AND bp.branch_id=? AND bp.available AND p.online_enabled AND p.control_mode IN ('READY_STOCK','DAILY_PRODUCTION')
 AND NOT bp.occasion_only AND ? > p.default_safety_buffer
 AND (p.maximum_daily_allocation IS NULL OR ?<=p.maximum_daily_allocation)
 ON CONFLICT(branch_product_id,service_date) DO NOTHING

@@ -857,4 +857,122 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
                     });
         }
     }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
+    void skipsInactiveProductsAndCategoriesAndResumesWhenReactivated(boolean maximum) {
+        var active = fixture();
+        var inactiveProduct = fixture();
+        var inactiveCategory = fixture();
+        for (var item : List.of(inactiveProduct, inactiveCategory)) {
+            jdbc.update(
+                    "UPDATE branch_products SET branch_id=? WHERE id=?",
+                    active.branch(),
+                    item.product());
+        }
+        jdbc.update(
+                "UPDATE products SET active=FALSE WHERE id=(SELECT product_id FROM branch_products"
+                        + " WHERE id=?)",
+                inactiveProduct.product());
+        jdbc.update(
+                "UPDATE categories SET active=FALSE WHERE id=(SELECT p.category_id FROM products p"
+                        + " JOIN branch_products bp ON bp.product_id=p.id WHERE bp.id=?)",
+                inactiveCategory.product());
+        var templates =
+                List.of(active, inactiveProduct, inactiveCategory).stream()
+                        .map(
+                                item ->
+                                        new RollingScheduleService.Template(
+                                                item.policy(), BigDecimal.TEN, true))
+                        .toList();
+        service.save(
+                active.branch(),
+                new RollingScheduleService.Plan(
+                        true,
+                        LocalTime.of(10, 0),
+                        LocalTime.of(11, 0),
+                        30,
+                        5,
+                        2,
+                        127,
+                        -1,
+                        templates,
+                        maximum),
+                "manager");
+        var policies = service.workspace(active.branch()).policies();
+        assertThat(
+                        policies.stream()
+                                .filter(p -> p.id() == inactiveProduct.policy())
+                                .findFirst()
+                                .orElseThrow())
+                .satisfies(
+                        p -> {
+                            assertThat(p.eligible()).isFalse();
+                            assertThat(p.unavailableReason()).contains("dish is inactive");
+                        });
+        assertThat(
+                        policies.stream()
+                                .filter(p -> p.id() == inactiveCategory.policy())
+                                .findFirst()
+                                .orElseThrow())
+                .satisfies(
+                        p -> {
+                            assertThat(p.eligible()).isFalse();
+                            assertThat(p.unavailableReason()).contains("category is inactive");
+                        });
+        service.reconcile(active.branch());
+        entityManager.flush();
+        entityManager.clear();
+        LocalDate tomorrow = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(1);
+        var preserved =
+                jdbc.queryForMap(
+                        "SELECT * FROM inventory_daily_allocations WHERE branch_product_id=? AND"
+                                + " service_date=?",
+                        active.product(),
+                        tomorrow);
+        for (var item : List.of(inactiveProduct, inactiveCategory)) {
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT count(*) FROM inventory_daily_allocations WHERE"
+                                            + " branch_product_id=?",
+                                    Integer.class,
+                                    item.product()))
+                    .isZero();
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT count(*) FROM inventory_stock_transactions WHERE"
+                                            + " branch_product_id=?",
+                                    Integer.class,
+                                    item.product()))
+                    .isZero();
+        }
+        jdbc.update(
+                "UPDATE products SET active=TRUE WHERE id=(SELECT product_id FROM branch_products"
+                        + " WHERE id=?)",
+                inactiveProduct.product());
+        jdbc.update(
+                "UPDATE categories SET active=TRUE WHERE id=(SELECT p.category_id FROM products p"
+                        + " JOIN branch_products bp ON bp.product_id=p.id WHERE bp.id=?)",
+                inactiveCategory.product());
+        service.reconcile(active.branch());
+        entityManager.flush();
+        entityManager.clear();
+        for (var item : List.of(inactiveProduct, inactiveCategory)) {
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT approved_quantity FROM inventory_daily_allocations"
+                                            + " WHERE branch_product_id=? AND service_date=?",
+                                    BigDecimal.class,
+                                    item.product(),
+                                    tomorrow))
+                    .isEqualByComparingTo(maximum ? "100" : "10");
+        }
+        assertThat(
+                        jdbc.queryForMap(
+                                "SELECT * FROM inventory_daily_allocations WHERE"
+                                        + " branch_product_id=? AND service_date=?",
+                                active.product(),
+                                tomorrow))
+                .isEqualTo(preserved);
+    }
 }
