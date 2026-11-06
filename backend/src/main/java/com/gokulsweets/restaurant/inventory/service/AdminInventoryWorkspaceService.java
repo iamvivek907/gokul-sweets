@@ -157,8 +157,7 @@ public class AdminInventoryWorkspaceService {
         try {
             // Serialize the entire bulk request before acquiring policies in request order.
             // The rolling job and manual stock editor use this same branch mutex.
-            jdbc.queryForList(
-                    "SELECT id FROM branches WHERE id=? FOR NO KEY UPDATE", Long.class, branchId);
+            lockBranch(branchId);
             validateBranchProducts(branchId, request.branchProductIds());
             List<InventoryPolicyResponse> results =
                     request.branchProductIds().stream()
@@ -190,6 +189,7 @@ public class AdminInventoryWorkspaceService {
                         AdminInventoryWorkspaceService.class,
                         "approveAllocations(Long,AdminBulkAllocationRequest,String)");
         try {
+            lockBranch(branchId);
             List<Long> ids =
                     request.items().stream()
                             .map(AdminBulkAllocationItemRequest::branchProductId)
@@ -237,6 +237,7 @@ public class AdminInventoryWorkspaceService {
                         AdminInventoryWorkspaceService.class,
                         "updateReadiness(Long,AdminBulkReadinessRequest,String)");
         try {
+            lockBranch(branchId);
             List<Long> ids =
                     request.items().stream()
                             .map(AdminBulkReadinessItemRequest::branchProductId)
@@ -282,6 +283,7 @@ public class AdminInventoryWorkspaceService {
                         AdminInventoryWorkspaceService.class,
                         "completeSetup(Long,AdminCompleteInventoryRequest,String)");
         try {
+            lockBranch(branchId);
             List<Long> ids =
                     request.items().stream()
                             .map(AdminCompleteInventoryItemRequest::branchProductId)
@@ -568,6 +570,18 @@ public class AdminInventoryWorkspaceService {
                     __gokulMethodStartedNanos,
                     AdminInventoryWorkspaceService.class,
                     "matchesFilter(InventoryCatalogueItemResponse,InventoryCatalogueFilter)");
+        }
+    }
+
+    /** Takes the shared branch mutex before any child-row locks in a bulk write. */
+    private void lockBranch(Long branchId) {
+        final long started =
+                MethodTiming.start(AdminInventoryWorkspaceService.class, "lockBranch(Long)");
+        try {
+            jdbc.queryForList(
+                    "SELECT id FROM branches WHERE id=? FOR NO KEY UPDATE", Long.class, branchId);
+        } finally {
+            MethodTiming.finish(started, AdminInventoryWorkspaceService.class, "lockBranch(Long)");
         }
     }
 

@@ -266,3 +266,11 @@ opposite-order child-row deadlocks, including reverse-order bulk selections. Exi
 validation, audit and optimistic-version checks are retained. If the job changes an allocation
 before a waiting stock edit obtains the mutex, the edit still requires a reload after the normal
 version conflict rather than silently overwriting that change.
+
+
+All bulk inventory mutations share this branch mutex: policy updates, allocation approvals,
+readiness updates and complete setup. The mutex is taken before validating or locking selected
+child rows, so reverse-order requests cannot interleave their allocation locks with generation.
+Staff overrides committed first are preserved; explicit bulk actions submitted later apply after
+the job completes. Request order, duplicate/branch validation, audit records and transaction
+atomicity remain unchanged.
