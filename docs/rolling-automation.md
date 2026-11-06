@@ -4,7 +4,7 @@ Admin entry: Branch operations → Automatic slots & inventory.
 
 This is opt-in for each branch, with separate schedule and quantity-template tables.
 It does not update manual pickup settings, product policies, existing allocation quantities,
-readiness, customer reservations, private occasion appointments or legacy automation rules.
+staff-recorded readiness, customer reservations, private occasion appointments or legacy automation rules.
 
 ## Configure
 
@@ -24,7 +24,7 @@ readiness, customer reservations, private occasion appointments or legacy automa
    immediately. **Save automation settings** only saves; the worker uses it at the next midnight
    IST run. Saving a paused setup does not generate stock. New manual selections default to
    automatic approval; existing approval choices are preserved. Manual review creates drafts.
-   Physical readiness remains separate wherever required by a policy.
+   Automatic readiness defaults on for guaranteed automatic approvals; manual-review drafts and staff overrides remain separate.
 
 The page separates the **saved setup** used by the worker from the **unsaved preview**. A saved
 manual plan with no selected dishes cannot generate inventory, even if an unsaved maximum-mode
@@ -122,7 +122,7 @@ manual/capacity policies and bulk-only dishes are skipped. The run report explai
 The maximum is the gross approved quantity: maximum 200 and buffer 50 produces approved
 200, buffer 50 and 150 planned after buffer, before commitments/readiness/service checks.
 The buffer is never deducted twice. New rows use the audited automatic approval path.
-Physical readiness remains separate when required by the policy.
+Automatic readiness is recorded for guaranteed approvals when enabled. Turning it off retains staff readiness requirements.
 
 Saved manual selections are retained separately when switching modes. Unsaved manual
 quantity edits are not used or saved by maximum mode. Policy changes affect missing future
@@ -144,8 +144,10 @@ manual drafts, unavailable/closed status and reservations. Reconciliation does n
 because a policy maximum changes or a check is repeated. Ready-stock availability continues to
 use recorded ready stock capped by the approved quantity, less buffer and commitments.
 For an item/date without an allocation, maximum mode creates an approved allocation from the
-policy maximum; it does not invent ready stock or mark production ready. A maximum is a planning
-limit, not evidence of physical stock. Policies requiring ready stock retain that requirement.
+policy maximum. With automatic readiness on, a policy requiring ready stock is also marked READY
+with the guaranteed approved quantity through the audited readiness service. This is an explicit
+branch guarantee, not a measurement or production sensor. Turn automatic readiness off for stock
+that staff must physically count before accepting bookings.
 Missing slots and missing item/date allocations are recovered independently on every check.
 The daily run automatically advances the horizon. Manual runs reconcile the same full window
 without changing the next daily execution. Existing allocations are never topped up to replace sold or reserved quantity.
@@ -161,7 +163,7 @@ never generates stock while checking health and adds no background polling. Miss
 and item/date allocations appear separately, with up to 15 slot and 15 dish examples. Disabled
 intervals, elapsed times, unselected weekdays and product/storefront booking limits are respected.
 Draft approval and physical readiness are separate from missing setup records; complete coverage
-still requires normal stock, approval, readiness and service checks before customer ordering.
+still requires normal stock, approval, applicable readiness and service checks before customer ordering.
 
 A plan enabled before today's midnight is overdue if no successful check has completed since
 midnight, with a 15-minute grace period. A successful manual run satisfies that day's check.
@@ -204,3 +206,31 @@ cannot use either action. Automatic maximum mode continues to include eligible p
 Save/generation feedback appears beside the action and is brought into view, including failures
 and no-op explanations. Saving a paused plan confirms that this job will not run and explains
 that existing stock/bookings are preserved and legacy scheduling resumes its existing rules.
+
+## Guaranteed automatic readiness
+
+Automatically mark guaranteed stock ready defaults ON for rolling branch plans, including existing
+plans upgraded by V155. It is visible in setup and persisted independently of product policies.
+The branch must guarantee these quantities. Product policies, the manual allocation flow, service
+hours, booking limits and stock enforcement remain unchanged. An authorized admin can turn it off
+and save to retain manual readiness for subsequently generated stock; disabling never revokes
+already recorded readiness.
+
+New automatically approved allocations for ready-stock policies are immediately marked READY
+using their gross approved quantity. The existing readiness service records the audit and ledger;
+the buffer is withheld once by normal availability calculation. Manual-review templates remain
+DRAFT. Sold, held, committed or wasted quantity is never replenished by a repeat run.
+
+On a daily or manual run, an existing allocation is upgraded only when it is an untouched APPROVED
+row originally approved by SYSTEM_ROLLING_AUTOMATION, has zero initial readiness with no actual
+ready timestamp, no holds/commitments/wastage, exactly one automation approval audit and no other
+stock activity. The original approved quantity is used even if the policy maximum has increased.
+A locked row and provenance checks serialize this with staff writes. Explicit staff zero readings,
+manual approvals, readiness records, delays, closures and any previously used allocation are kept.
+The generation summary counts readiness publications separately from newly created allocations.
+
+After deployment, use Save & generate now to apply it immediately to eligible untouched existing
+allocations, or wait for the next midnight IST run. The schedule is still once daily, with no polling.
+Customer cart availability is integration-tested with ready-stock enforcement enabled. Recording
+guaranteed readiness is not a guarantee against sold-out quantities, staff closures or other normal
+ordering restrictions.

@@ -161,7 +161,7 @@ try{
   }
   if(viewOnly){
    await checkHelp("Guaranteed daily quantity · PIECE",/1,000 means 1 kg/);
-   await checkHelp("Approval mode",/staff must still record actual production readiness/);
+   await checkHelp("Approval mode",/With it turned off/);
    const controls=page.locator('form input:not([data-browse-control]), form select:not([data-browse-control]), form button[type="submit"]');
    assert.ok(await controls.count()>10);
    for(const control of await controls.all())assert.equal(await control.isDisabled(),true,"view-only configuration stays disabled");
@@ -180,7 +180,7 @@ try{
   await enabled.check();
   await page.getByRole("checkbox",{name:"Samosa",exact:true}).check();
   await checkHelp("Guaranteed daily quantity · PIECE",/1,000 means 1 kg/);
-  await checkHelp("Approval mode",/staff must still record actual production readiness/);
+  await checkHelp("Approval mode",/With it turned off/);
   assert.equal(saved,null,"policy help never submits the form");
   await page.getByRole("spinbutton",{name:/Guaranteed daily quantity/}).fill("80");
   await page.getByRole("combobox",{name:"Approval mode",exact:true}).selectOption("approved");
@@ -273,12 +273,12 @@ try{
   if(!readOnly){await page.getByRole("spinbutton",{name:"Calendar days to maintain",exact:true}).fill("15");assert.equal(await page.getByRole("button",{name:"Retry coverage now",exact:true}).isDisabled(),true,"unsaved settings cannot be used by retry");await page.getByRole("button",{name:"Reload saved settings",exact:true}).click();await page.getByRole("button",{name:"Retry coverage now",exact:true}).click();await page.getByRole("heading",{name:"Coverage complete",exact:true}).waitFor();assert.equal(runs,1);await page.getByText("Triggered by test-manager",{exact:false}).waitFor();}
   await context.close();console.log(`PASS: coverage alerts, bounded history and ${readOnly?"read-only safety":"manual recovery"} at ${width}px`);
  }
- for(const width of [390,1280]) for(const scenario of ["success","saveFail","runFail","conflict","newSetup","zeroResult"]){
+ for(const width of [390,1280]) for(const scenario of ["success","saveFail","runFail","conflict","newSetup","zeroResult","readinessOff","preservedReadiness"]){
   const context=await browser.newContext({viewport:{width,height:950},serviceWorkers:"block"});
   let plan=scenario==="newSetup"?null:{enabled:true,openingTime:"10:00",closingTime:"21:00",slotMinutes:30,capacity:10,maintainDays:14,weekdays:127,version:0,templates:[],usePolicyMaximum:false};
   const calls=[];let runCount=0;
   const policies=[{id:6,name:"Samosa",unit:"PIECE",bookingDays:14,buffer:2,maximum:100,readyStockRequired:false,eligible:true,selectable:true,unavailableReason:null},{id:7,name:"Rasmalai",unit:"PIECE",bookingDays:7,buffer:1,maximum:40,readyStockRequired:true,eligible:true,selectable:true,unavailableReason:null}];
-  function workspace(){return {plan,policies,storefrontBookingDays:scenario==="success"?5:24,lastAttempt:null,lastSuccess:null,message:null,health:{status:runCount?"COMPLETE":"NEEDS_ATTENTION",overdue:false,lastRunFailed:false,interrupted:false,missingSlots:runCount?0:2,missingAllocations:runCount?0:2,expectedAllocations:2,closedDates:0,includedPolicies:scenario==="zeroResult"&&runCount?0:plan?.usePolicyMaximum?2:0,excludedPolicies:0,drafts:0,readinessPending:0,issues:[],message:"Review saved setup"},runs:runCount?[{id:1,trigger:"MANUAL",actor:"owner",status:"SUCCESS",startedAt:new Date().toISOString(),finishedAt:new Date().toISOString(),durationMs:1000,lockWaitMs:0,lockHeldMs:900,slotsCreated:scenario==="zeroResult"?0:28,allocationsCreated:scenario==="zeroResult"?0:22,summary:"Stock prepared"}]:[]};}
+  function workspace(){return {plan,policies,storefrontBookingDays:scenario==="success"?5:24,lastAttempt:null,lastSuccess:null,message:null,health:{status:runCount?"COMPLETE":"NEEDS_ATTENTION",overdue:false,lastRunFailed:false,interrupted:false,missingSlots:runCount?0:2,missingAllocations:runCount?0:2,expectedAllocations:2,closedDates:0,includedPolicies:scenario==="zeroResult"&&runCount?0:plan?.usePolicyMaximum?2:0,excludedPolicies:0,drafts:0,readinessPending:scenario==="preservedReadiness"?4:0,issues:[],message:"Review saved setup"},runs:runCount?[{id:1,trigger:"MANUAL",actor:"owner",status:"SUCCESS",startedAt:new Date().toISOString(),finishedAt:new Date().toISOString(),durationMs:1000,lockWaitMs:0,lockHeldMs:900,slotsCreated:scenario==="zeroResult"?0:28,allocationsCreated:scenario==="zeroResult"?0:22,summary:"Stock prepared"}]:[]};}
   await context.route("**/api/**",async route=>{
    const req=route.request(),url=new URL(req.url()),path=url.pathname,headers={"Access-Control-Allow-Origin":base,"Access-Control-Allow-Credentials":"true","Access-Control-Allow-Headers":"content-type,x-staff-csrf","Access-Control-Allow-Methods":"GET,PUT,POST,OPTIONS","Access-Control-Expose-Headers":"X-Staff-CSRF","X-Staff-CSRF":"test-csrf"};
    if(req.method()==="OPTIONS")return route.fulfill({status:204,headers});
@@ -287,7 +287,7 @@ try{
    if(path.endsWith("/rolling-automation")&&req.method()==="PUT"){
     calls.push("save");assert.equal(req.headers()["x-staff-csrf"],"test-csrf");
     if(scenario==="saveFail")return route.fulfill({status:503,headers,json:{detail:"Saving is unavailable"}});
-    const body=req.postDataJSON();assert.equal(body.usePolicyMaximum,true);assert.equal(body.enabled,true);plan={...body,version:plan?plan.version+1:0};
+    const body=req.postDataJSON();assert.equal(body.usePolicyMaximum,true);assert.equal(body.enabled,true);assert.equal(body.autoReady,scenario!=="readinessOff","readiness defaults on and explicit opt-out is saved");plan={...body,version:plan?plan.version+1:0};
    }
    if(path.endsWith("/rolling-automation/reconcile")){
     calls.push("run");assert.equal(url.searchParams.get("expectedVersion"),String(plan.version),"generate uses exactly the confirmed saved version");
@@ -302,6 +302,13 @@ try{
   const source=page.getByRole("combobox",{name:"Inventory quantity source",exact:true});await source.waitFor();
   if(scenario==="newSetup"){assert.equal(await source.inputValue(),"maximum","new plans default to automatic quantities");await page.getByRole("checkbox",{name:"Enable daily setup for this branch",exact:true}).check();}
   else{await page.getByRole("button",{name:"Use policy maximums",exact:true}).click();}
+  const readiness=page.getByRole("checkbox",{name:/Automatically mark guaranteed stock ready/});
+  assert.equal(await readiness.isChecked(),true,"automatic readiness is enabled by default");
+  await page.getByRole("button",{name:"Help for Automatic readiness",exact:true}).click();
+  await page.getByRole("dialog").getByText(/Existing staff quantities/).waitFor();
+  await page.keyboard.press("Escape");
+  if(scenario==="readinessOff"){await readiness.uncheck();await page.getByText(/Automatic readiness is OFF/).waitFor();}
+  else await page.getByText(/Automatic readiness is ON/).waitFor();
   await page.getByTestId("draft-ready-count").filter({hasText:/^2$/}).waitFor();await page.getByText("You have unsaved changes",{exact:true}).waitFor();
   if(scenario==="success"){
    await page.getByText(/The storefront allows only 5 days ahead/).waitFor();
@@ -314,10 +321,12 @@ try{
   if(scenario==="saveFail"){await page.getByRole("alert").filter({hasText:"Saving is unavailable"}).waitFor();assert.deepEqual(calls,["save"],"failed save never generates");await page.getByText("You have unsaved changes",{exact:true}).waitFor();}
   else if(scenario==="conflict"){await page.getByRole("alert").filter({hasText:"saved setup changed"}).waitFor();assert.deepEqual(calls,["save","run"]);assert.equal(runCount,0,"stale setup never generates");}
   else if(scenario==="runFail"){await page.getByRole("alert").filter({hasText:"Settings saved, but daily stock generation did not finish"}).waitFor();await page.getByText("Your setup is saved",{exact:true}).waitFor();await apply.click();await page.getByRole("status").filter({hasText:"Saved setup checked. Eligible pickup dates have daily stock entries"}).waitFor();assert.deepEqual(calls,["save","run","run"],"retry after a saved setup does not resave");}
+  else if(scenario==="preservedReadiness"){await page.getByRole("alert").filter({hasText:"4 allocations still need readiness"}).waitFor();assert.deepEqual(calls,["save","run"]);}
   else if(scenario==="zeroResult"){await page.getByRole("alert").filter({hasText:"No daily stock was created"}).waitFor();assert.deepEqual(calls,["save","run"]);}
   else{await page.getByRole("status").filter({hasText:"Saved setup checked. Eligible pickup dates have daily stock entries"}).waitFor();assert.deepEqual(calls,["save","run"]);await page.getByText("Your setup is saved",{exact:true}).waitFor();}
   const feedback=page.getByTestId("action-feedback");
   assert.equal(await feedback.evaluate(element=>{const r=element.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;}),true,"action result stays within the viewport beside generation controls");
+  if(scenario==="readinessOff"){await page.getByRole("button",{name:"Reload saved settings",exact:true}).click();await page.getByText(/Automatic readiness is OFF/).waitFor();assert.equal(await readiness.isChecked(),false,"explicit readiness opt-out survives reload");}
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,"setup workflow fits viewport");
   await context.close();console.log(`PASS: setup-first ${scenario} at ${width}px`);
  }

@@ -2,6 +2,8 @@ package com.gokulsweets.restaurant.inventory.rolling;
 
 import com.gokulsweets.restaurant.config.EnhancementProperties;
 import com.gokulsweets.restaurant.inventory.dto.AdminAllocationApprovalRequest;
+import com.gokulsweets.restaurant.inventory.dto.AdminReadinessUpdateRequest;
+import com.gokulsweets.restaurant.inventory.enums.InventoryAllocationStatus;
 import com.gokulsweets.restaurant.inventory.service.AdminInventoryService;
 import com.gokulsweets.restaurant.observability.MethodTiming;
 
@@ -57,7 +59,38 @@ public class RollingScheduleService {
             int weekdays,
             long version,
             List<Template> templates,
-            boolean usePolicyMaximum) {
+            boolean usePolicyMaximum,
+            Boolean autoReady) {
+        public Plan {
+            autoReady = autoReady == null ? Boolean.TRUE : autoReady;
+        }
+
+        /** Existing Java callers retain their explicit readiness behaviour. */
+        public Plan(
+                boolean enabled,
+                LocalTime openingTime,
+                LocalTime closingTime,
+                int slotMinutes,
+                int capacity,
+                int maintainDays,
+                int weekdays,
+                long version,
+                List<Template> templates,
+                boolean usePolicyMaximum) {
+            this(
+                    enabled,
+                    openingTime,
+                    closingTime,
+                    slotMinutes,
+                    capacity,
+                    maintainDays,
+                    weekdays,
+                    version,
+                    templates,
+                    usePolicyMaximum,
+                    false);
+        }
+
         /** Existing callers retain explicit template mode. */
         public Plan(
                 boolean enabled,
@@ -193,7 +226,8 @@ public class RollingScheduleService {
                                                     rs.getInt("weekdays"),
                                                     rs.getLong("version"),
                                                     templates(branchId),
-                                                    rs.getBoolean("use_policy_maximum"))
+                                                    rs.getBoolean("use_policy_maximum"),
+                                                    rs.getBoolean("auto_ready"))
                                             : null,
                             branchId);
             var policies =
@@ -361,7 +395,7 @@ ORDER BY pr.name,p.id
                                 jdbc.update(
                                         """
 UPDATE rolling_branch_schedules SET enabled=?,opening_time=?,closing_time=?,slot_minutes=?,
-capacity=?,maintain_days=?,weekdays=?,use_policy_maximum=?,version=version+1,updated_by=?,updated_at=clock_timestamp()
+capacity=?,maintain_days=?,weekdays=?,use_policy_maximum=?,auto_ready=?,version=version+1,updated_by=?,updated_at=clock_timestamp()
 WHERE branch_id=? AND version=?
 """,
                                         plan.enabled(),
@@ -372,6 +406,7 @@ WHERE branch_id=? AND version=?
                                         plan.maintainDays(),
                                         plan.weekdays(),
                                         plan.usePolicyMaximum(),
+                                        plan.autoReady(),
                                         actor,
                                         branchId,
                                         plan.version());
@@ -380,7 +415,7 @@ WHERE branch_id=? AND version=?
                                     || jdbc.update(
                                                     """
 INSERT INTO rolling_branch_schedules(branch_id,enabled,opening_time,closing_time,slot_minutes,
-capacity,maintain_days,weekdays,use_policy_maximum,updated_by) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING
+capacity,maintain_days,weekdays,use_policy_maximum,auto_ready,updated_by) VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING
 """,
                                                     branchId,
                                                     plan.enabled(),
@@ -391,6 +426,7 @@ capacity,maintain_days,weekdays,use_policy_maximum,updated_by) VALUES(?,?,?,?,?,
                                                     plan.maintainDays(),
                                                     plan.weekdays(),
                                                     plan.usePolicyMaximum(),
+                                                    plan.autoReady(),
                                                     actor)
                                             == 0)
                                 throw new ResponseStatusException(
@@ -508,7 +544,7 @@ capacity,maintain_days,weekdays,use_policy_maximum,updated_by) VALUES(?,?,?,?,?,
                                     branchId);
                             LocalDateTime now = LocalDateTime.now(clock.withZone(IST));
                             LocalDate today = now.toLocalDate();
-                            int slots = 0, allocations = 0, retained = 0;
+                            int slots = 0, allocations = 0, retained = 0, readinessPublished = 0;
                             int activeDates = 0, noSlotDates = 0, existingAllocations = 0;
                             int unavailable = 0, outsideWindow = 0, limited = 0;
                             var policyMap =
@@ -621,6 +657,28 @@ AND occasion_enquiry_id IS NULL AND (slot_date<>? OR start_time>?)
                                                         Long.class,
                                                         branchId,
                                                         date));
+                                var readinessCandidates =
+                                        plan.autoReady()
+                                                ? new java.util.HashSet<>(
+                                                        jdbc.queryForList(
+                                                                "SELECT branch_product_id FROM"
+                                                                    + " inventory_daily_allocations"
+                                                                    + " WHERE service_date=? AND"
+                                                                    + " branch_product_id IN"
+                                                                    + " (SELECT id FROM"
+                                                                    + " branch_products WHERE"
+                                                                    + " branch_id=?) AND"
+                                                                    + " status='APPROVED' AND"
+                                                                    + " approved_by='SYSTEM_ROLLING_AUTOMATION'"
+                                                                    + " AND ready_quantity=0 AND"
+                                                                    + " actual_ready_at IS NULL AND"
+                                                                    + " held_quantity=0 AND"
+                                                                    + " committed_quantity=0 AND"
+                                                                    + " wasted_quantity=0",
+                                                                Long.class,
+                                                                date,
+                                                                branchId))
+                                                : java.util.Set.<Long>of();
                                 for (var template : effectiveTemplates) {
                                     var policy = policyMap.get(template.policyId());
                                     if (policy == null || !policy.eligible()) {
@@ -629,6 +687,14 @@ AND occasion_enquiry_id IS NULL AND (slot_date<>? OR start_time>?)
                                         continue;
                                     }
                                     if (existing.contains(policy.branchProductId())) {
+                                        if (readinessCandidates.contains(policy.branchProductId())
+                                                && template.autoApprove()
+                                                && policy.readyStockRequired()
+                                                && offset <= policy.bookingDays()
+                                                && offset <= features.getFutureOrderingDays()) {
+                                            if (publishUntouchedReadiness(policy, date))
+                                                readinessPublished++;
+                                        }
                                         existingAllocations++;
                                         retained++;
                                         continue;
@@ -678,6 +744,14 @@ ON CONFLICT(branch_product_id,service_date) DO NOTHING
                                                         "Guaranteed quantity from separate rolling"
                                                                 + " automation"),
                                                 "SYSTEM_ROLLING_AUTOMATION");
+                                        if (plan.autoReady() && policy.readyStockRequired()) {
+                                            publishReadiness(
+                                                    policy,
+                                                    date,
+                                                    template.quantity(),
+                                                    date.atTime(first));
+                                            readinessPublished++;
+                                        }
                                     }
                                     allocations++;
                                 }
@@ -704,6 +778,10 @@ ON CONFLICT(branch_product_id,service_date) DO NOTHING
                                             + " outside booking windows; "
                                             + limited
                                             + " policy-limit or concurrent-allocation checks.";
+                            message +=
+                                    " Automatic readiness: "
+                                            + readinessPublished
+                                            + " guaranteed allocations marked ready.";
                             if (plan.usePolicyMaximum())
                                 message +=
                                         " Policy maximum mode: "
@@ -726,8 +804,8 @@ ON CONFLICT(branch_product_id,service_date) DO NOTHING
                                             + " weekdays in this range. Review Pickup scheduling;"
                                             + " existing disabled or elapsed dates are preserved.";
                             message +=
-                                    " Existing allocations are never replenished. Draft approval"
-                                        + " and physical readiness remain separate where required.";
+                                    " Existing allocations are never replenished. Manual-review"
+                                        + " drafts and staff readiness overrides are preserved.";
                             jdbc.update(
                                     "UPDATE rolling_branch_schedules SET"
                                         + " last_success_at=clock_timestamp(),last_message=? WHERE"
@@ -789,6 +867,84 @@ ON CONFLICT(branch_product_id,service_date) DO NOTHING
                     __gokulMethodStartedNanos,
                     RollingScheduleService.class,
                     "reconcile(long,String,String,Long)");
+        }
+    }
+
+    /**
+     * Records the explicitly guaranteed quantity through the existing readiness audit and ledger.
+     */
+    private void publishReadiness(
+            Policy policy, LocalDate date, BigDecimal quantity, LocalDateTime expected) {
+        final long started =
+                MethodTiming.start(
+                        RollingScheduleService.class,
+                        "publishReadiness(Policy,LocalDate,BigDecimal,LocalDateTime)");
+        try {
+            inventory.updateReadiness(
+                    policy.branchProductId(),
+                    date,
+                    new AdminReadinessUpdateRequest(
+                            InventoryAllocationStatus.READY,
+                            quantity,
+                            expected,
+                            "Guaranteed ready quantity from separate rolling automation"),
+                    "SYSTEM_ROLLING_AUTOMATION");
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    RollingScheduleService.class,
+                    "publishReadiness(Policy,LocalDate,BigDecimal,LocalDateTime)");
+        }
+    }
+
+    /**
+     * Repairs only a pristine approval made by this flow, never a staff or previously used
+     * allocation.
+     */
+    private boolean publishUntouchedReadiness(Policy policy, LocalDate date) {
+        final long started =
+                MethodTiming.start(
+                        RollingScheduleService.class,
+                        "publishUntouchedReadiness(Policy,LocalDate)");
+        try {
+            // Lock first, then check provenance. A concurrent staff write either wins first and
+            // makes this row ineligible, or runs afterward and overrides this guarantee normally.
+            var rows =
+                    jdbc.queryForList(
+                            "SELECT id,approved_quantity,expected_ready_at FROM"
+                                    + " inventory_daily_allocations WHERE branch_product_id=? AND"
+                                    + " service_date=? FOR UPDATE",
+                            policy.branchProductId(),
+                            date);
+            if (rows.isEmpty()) return false;
+            var row = rows.getFirst();
+            long id = ((Number) row.get("id")).longValue();
+            Boolean pristine =
+                    jdbc.queryForObject(
+                            """
+SELECT status='APPROVED' AND approved_by='SYSTEM_ROLLING_AUTOMATION'
+AND ready_quantity=0 AND actual_ready_at IS NULL AND held_quantity=0
+AND committed_quantity=0 AND wasted_quantity=0 AND approved_quantity>safety_buffer_quantity
+AND (SELECT count(*) FROM inventory_allocation_plan_audit p WHERE p.allocation_id=a.id)=1
+AND EXISTS (SELECT 1 FROM inventory_allocation_plan_audit p WHERE p.allocation_id=a.id AND p.performed_by='SYSTEM_ROLLING_AUTOMATION')
+AND NOT EXISTS (SELECT 1 FROM inventory_stock_transactions t WHERE t.allocation_id=a.id AND (t.transaction_type<>'ALLOCATION_APPROVED' OR t.performed_by<>'SYSTEM_ROLLING_AUTOMATION'))
+FROM inventory_daily_allocations a WHERE id=?
+""",
+                            Boolean.class,
+                            id);
+            if (!Boolean.TRUE.equals(pristine)) return false;
+            var expected = (java.sql.Timestamp) row.get("expected_ready_at");
+            publishReadiness(
+                    policy,
+                    date,
+                    (BigDecimal) row.get("approved_quantity"),
+                    expected == null ? null : expected.toLocalDateTime());
+            return true;
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    RollingScheduleService.class,
+                    "publishUntouchedReadiness(Policy,LocalDate)");
         }
     }
 }

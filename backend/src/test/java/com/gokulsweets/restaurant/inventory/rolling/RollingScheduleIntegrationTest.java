@@ -28,6 +28,7 @@ class RollingScheduleIntegrationTest {
     @Autowired Clock clock;
     @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
     @Autowired EnhancementProperties features;
+    @Autowired tools.jackson.databind.ObjectMapper mapper;
     @Autowired com.gokulsweets.restaurant.menu.MenuPickupDiscoveryService discovery;
     @Autowired com.gokulsweets.restaurant.order.service.CartAvailabilityService cart;
     @Autowired com.gokulsweets.restaurant.order.service.SmartOrderingRules ordering;
@@ -1312,5 +1313,205 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
                 .isPositive();
         assertThat(service.inspect(f.branch()).storefrontBookingDays())
                 .isEqualTo(features.getFutureOrderingDays());
+    }
+
+    @Autowired com.gokulsweets.restaurant.inventory.service.AdminInventoryService inventory;
+
+    private RollingScheduleService.Plan readinessPlan(long version, boolean autoReady) {
+        var base = maximumPlan(version, 2);
+        return new RollingScheduleService.Plan(
+                base.enabled(),
+                base.openingTime(),
+                base.closingTime(),
+                base.slotMinutes(),
+                base.capacity(),
+                base.maintainDays(),
+                base.weekdays(),
+                base.version(),
+                base.templates(),
+                base.usePolicyMaximum(),
+                autoReady);
+    }
+
+    private java.util.Map<String, Object> allocation(Fixture f, LocalDate date) {
+        entityManager.flush();
+        return jdbc.queryForMap(
+                "SELECT * FROM inventory_daily_allocations WHERE branch_product_id=? AND"
+                        + " service_date=?",
+                f.product(),
+                date);
+    }
+
+    @Test
+    void automaticReadinessMakesReadyStockOrderableAndRepeatedRunsNeverRefillIt() {
+        var f = fixture();
+        jdbc.update(
+                "UPDATE branch_inventory_policies SET ready_stock_required=TRUE WHERE id=?",
+                f.policy());
+        service.save(f.branch(), readinessPlan(-1, true), "manager");
+        service.reconcile(f.branch());
+        var date = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(1);
+        var after = allocation(f, date);
+        assertThat(after.get("status")).isEqualTo("READY");
+        assertThat((BigDecimal) after.get("ready_quantity")).isEqualByComparingTo("100");
+        assertThat((BigDecimal) after.get("approved_quantity")).isEqualByComparingTo("100");
+        assertThat((BigDecimal) after.get("safety_buffer_quantity")).isEqualByComparingTo("2");
+        entityManager.clear();
+        boolean enforcement = inventoryProperties.isEnforcementEnabled();
+        boolean smart = features.isSmartAvailability();
+        try {
+            inventoryProperties.setEnforcementEnabled(true);
+            features.setSmartAvailability(true);
+            long product =
+                    jdbc.queryForObject(
+                            "SELECT product_id FROM branch_products WHERE id=?",
+                            Long.class,
+                            f.product());
+            var preview =
+                    cart.check(
+                            f.branch(),
+                            date,
+                            1,
+                            List.of(
+                                    new com.gokulsweets.restaurant.order.dto.CreateOrderItemRequest(
+                                            product, 1, null)));
+            assertThat(preview.dates().getFirst().available()).isTrue();
+        } finally {
+            inventoryProperties.setEnforcementEnabled(enforcement);
+            features.setSmartAvailability(smart);
+        }
+        jdbc.update(
+                "UPDATE inventory_daily_allocations SET committed_quantity=10,wasted_quantity=3"
+                        + " WHERE id=?",
+                after.get("id"));
+        var protectedStock = allocation(f, date);
+        for (int i = 0; i < 3; i++) service.reconcile(f.branch());
+        assertThat(allocation(f, date)).isEqualTo(protectedStock);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM inventory_stock_transactions WHERE"
+                                        + " allocation_id=? AND"
+                                        + " transaction_type='READY_STOCK_RECORDED'",
+                                Integer.class,
+                                after.get("id")))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void enablingReadinessUpgradesOnlyUntouchedLegacyAutomationUsingOriginalApprovedQuantity() {
+        var f = fixture();
+        jdbc.update(
+                "UPDATE branch_inventory_policies SET ready_stock_required=TRUE WHERE id=?",
+                f.policy());
+        service.save(f.branch(), readinessPlan(-1, false), "manager");
+        service.reconcile(f.branch());
+        var date = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(1);
+        assertThat(allocation(f, date).get("status")).isEqualTo("APPROVED");
+        entityManager.clear();
+        jdbc.update(
+                "UPDATE branch_inventory_policies SET maximum_daily_allocation=200 WHERE id=?",
+                f.policy());
+        service.save(f.branch(), readinessPlan(0, true), "manager");
+        service.reconcile(f.branch());
+        var after = allocation(f, date);
+        assertThat(after.get("status")).isEqualTo("READY");
+        assertThat((BigDecimal) after.get("ready_quantity")).isEqualByComparingTo("100");
+        assertThat((BigDecimal) after.get("approved_quantity")).isEqualByComparingTo("100");
+        service.reconcile(f.branch());
+        assertThat(allocation(f, date)).isEqualTo(after);
+    }
+
+    @Test
+    void readinessAutomationPreservesStaffCountsZeroReadingsAndManualApprovals() {
+        var f = fixture();
+        var zero = fixture();
+        var manual = fixture();
+        for (var item : List.of(zero, manual))
+            jdbc.update(
+                    "UPDATE branch_products SET branch_id=? WHERE id=?",
+                    f.branch(),
+                    item.product());
+        for (var item : List.of(f, zero, manual))
+            jdbc.update(
+                    "UPDATE branch_inventory_policies SET ready_stock_required=TRUE WHERE id=?",
+                    item.policy());
+        service.save(f.branch(), readinessPlan(-1, false), "manager");
+        service.reconcile(f.branch());
+        var date = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(1);
+        entityManager.flush();
+        inventory.updateReadiness(
+                f.product(),
+                date,
+                new com.gokulsweets.restaurant.inventory.dto.AdminReadinessUpdateRequest(
+                        com.gokulsweets.restaurant.inventory.enums.InventoryAllocationStatus.READY,
+                        new BigDecimal("30"),
+                        null,
+                        "Counted by staff"),
+                "staff");
+        inventory.updateReadiness(
+                zero.product(),
+                date,
+                new com.gokulsweets.restaurant.inventory.dto.AdminReadinessUpdateRequest(
+                        com.gokulsweets.restaurant.inventory.enums.InventoryAllocationStatus
+                                .DELAYED,
+                        BigDecimal.ZERO,
+                        null,
+                        "Explicit zero"),
+                "staff");
+        for (var item : List.of(zero, manual))
+            inventory.approveAllocation(
+                    item.product(),
+                    date,
+                    new com.gokulsweets.restaurant.inventory.dto.AdminAllocationApprovalRequest(
+                            new BigDecimal("100"), null, null, null, null, "Staff approval"),
+                    "staff");
+        var before = List.of(allocation(f, date), allocation(zero, date), allocation(manual, date));
+        entityManager.clear();
+        service.save(f.branch(), readinessPlan(0, true), "manager");
+        for (int i = 0; i < 2; i++) service.reconcile(f.branch());
+        assertThat(List.of(allocation(f, date), allocation(zero, date), allocation(manual, date)))
+                .isEqualTo(before);
+    }
+
+    @Test
+    void automaticReadinessDoesNotApproveManualReviewDrafts() {
+        var f = fixture();
+        jdbc.update(
+                "UPDATE branch_inventory_policies SET ready_stock_required=TRUE WHERE id=?",
+                f.policy());
+        var base = readinessPlan(-1, true);
+        service.save(
+                f.branch(),
+                new RollingScheduleService.Plan(
+                        true,
+                        base.openingTime(),
+                        base.closingTime(),
+                        30,
+                        5,
+                        2,
+                        127,
+                        -1,
+                        List.of(
+                                new RollingScheduleService.Template(
+                                        f.policy(), new BigDecimal("80"), false)),
+                        false,
+                        true),
+                "manager");
+        service.reconcile(f.branch());
+        var date = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(1);
+        assertThat(allocation(f, date).get("status")).isEqualTo("DRAFT");
+        assertThat((BigDecimal) allocation(f, date).get("ready_quantity")).isZero();
+    }
+
+    @Test
+    void omittedReadinessSettingDefaultsOnForTheAdminApi() throws Exception {
+        var plan =
+                mapper.readValue(
+                        "{\"enabled\":false,\"openingTime\":\"10:00\",\"closingTime\":\"11:00\",\"slotMinutes\":30,\"capacity\":5,\"maintainDays\":14,\"weekdays\":127,\"version\":-1,\"templates\":[],\"usePolicyMaximum\":true}",
+                        RollingScheduleService.Plan.class);
+        assertThat(plan.autoReady()).isTrue();
+        var f = fixture();
+        service.save(f.branch(), plan, "manager");
+        assertThat(service.workspace(f.branch()).plan().autoReady()).isTrue();
     }
 }
