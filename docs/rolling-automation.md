@@ -234,3 +234,12 @@ allocations, or wait for the next midnight IST run. The schedule is still once d
 Customer cart availability is integration-tested with ready-stock enforcement enabled. Recording
 guaranteed readiness is not a guarantee against sold-out quantities, staff closures or other normal
 ordering restrictions.
+
+V156 adds allocation-first covering indexes for readiness provenance checks in the allocation
+plan audit and stock transaction histories. Recovery can inspect just the matching allocation's
+history instead of scanning unrelated history for every candidate. Non-allocation transactions
+are excluded from the stock-history index. The staff-override checks and recovery rules are unchanged.
+The provenance query was verified with normal PostgreSQL planner settings against 100,000 audit
+rows and 200,000 stock-history rows: all three history lookups changed from sequential scans
+to index-only scans, with the same eligibility result. These are isolated test results, not a
+production latency guarantee.
