@@ -14,7 +14,7 @@ import {useCart} from "@/hooks/useCart";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {savePickupIntent, usePickupIntent} from "@/hooks/usePickupIntent";
-import {availabilityItems, checkCartAvailability, checkMenuAvailability, discoverPickupDates, menuPreviewDeadline, type CartAvailability} from "@/services/availabilityApi";
+import {availabilityItems, checkCartAvailability, checkMenuAvailability, discoverPickupDates, menuPreviewDeadline, retryMenuRead, type CartAvailability} from "@/services/availabilityApi";
 import CartSwitchDialog from "@/components/cart/CartSwitchDialog";
 import {clearPickupSlot, getPickupSlotSnapshot, savePickupSlot} from "@/lib/checkoutStorage";
 import {getCartSnapshot} from "@/lib/cartStorage";
@@ -45,6 +45,7 @@ export function useDateAvailability(products?: MenuProduct[]) {
     const menuPreview=!!products;
     const itemsJson = JSON.stringify(requested);
     const requestedScope=useRef<string|null>(null);
+    const recentMenuReads=useRef(new Map<string,CartAvailability>());
     const verifiedDefault=useRef<{branchId:number;date:string;itemsJson:string;menuRevision:unknown;data:CartAvailability}|null>(null);
     const [choosing,setChoosing] = useState(false);
     const [automaticResult,setAutomaticResult] = useState<{key:string; error?:string; empty?:boolean} | null>(null);
@@ -62,6 +63,12 @@ export function useDateAvailability(products?: MenuProduct[]) {
         if(warm&&warm.branchId===branch.id&&warm.date===requestDate&&warm.itemsJson===itemsJson&&warm.menuRevision===menuRevision){
             verifiedDefault.current=null;let active=true;queueMicrotask(()=>{if(active)setResult({key,scope,data:warm.data});});return()=>{active=false;};
         }
+        const cached=menuPreview?recentMenuReads.current.get(key):undefined;
+        if(cached&&performance.now() < Math.min((cached.receivedMonotonic??0)+8000,menuPreviewDeadline(cached)??Infinity)){
+            let active=true;
+            queueMicrotask(()=>{if(active)setResult({key,scope,data:cached});});
+            return()=>{active=false;};
+        }
         const controller = new AbortController();
         const release = refresh.acquire();
         const firstInScope=requestedScope.current!==scope;requestedScope.current=scope;
@@ -71,7 +78,12 @@ export function useDateAvailability(products?: MenuProduct[]) {
                 AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]),menuPreview)
                 .then(data => {
                     if (controller.signal.aborted) return;
-                    if (menuPreview) reportLoadingStage("MENU_PREVIEW", started);
+                    if (menuPreview){
+                        reportLoadingStage("MENU_PREVIEW", started);
+                        const reads=recentMenuReads.current;
+                        reads.delete(key);reads.set(key,data);
+                        if(reads.size>3)reads.delete(reads.keys().next().value!);
+                    }
                     setResult({key, scope, data});
 
                 })
@@ -131,9 +143,11 @@ export function useDateAvailability(products?: MenuProduct[]) {
         || selectedSlot.issues?.some(issue => cartIds.has(issue.productId)));
     const slotUnavailable = !!intent.selection && !!day && (!selectedSlot || selectedSlot.code === "PICKUP_WINDOW"
         || (intent.selection.pickupType === "PRIORITY" ? !selectedSlot.slot.priorityEnabled || selectedSlot.slot.priorityRemainingCapacity <= 0 : selectedSlot.slot.remainingCapacity <= 0));
-    const slotIssues = new Map(selectedSlot?.issues?.map(issue => [issue.productId, issue]));
-    const items = day?.items?.map(item => slotUnavailable ? {...item, available: false, code: selectedSlot?.code ?? "NO_SLOTS", reason: selectedSlot?.reason ?? "Choose another pickup time."}
-        : slotIssues.get(item.productId) ?? item);
+    const items = useMemo(()=>{
+        const slotIssues = new Map(selectedSlot?.issues?.map(issue => [issue.productId, issue]));
+        return day?.items?.map(item => slotUnavailable ? {...item, available: false, code: selectedSlot?.code ?? "NO_SLOTS", reason: selectedSlot?.reason ?? "Choose another pickup time."}
+            : slotIssues.get(item.productId) ?? item);
+    },[day,selectedSlot,slotUnavailable]);
     // Match the date-intent snapshot guard below: date-only changes must abort
     // the old verification and start a new one, even when slot/mode stay equal.
     const autoKey = JSON.stringify([branch?.id,today,features?.futureOrderingDays,itemsJson,intent.dateRaw,intent.pickupRaw,intent.modeRaw,revision,menuRevision,choosing,cart.isEmpty]);
@@ -154,7 +168,7 @@ export function useDateAvailability(products?: MenuProduct[]) {
         const release = refresh.acquire();
         const timer = window.setTimeout(() => {
             setAutomaticResult({key:autoKey});
-            void discoverPickupDates(branch.id,today,features.futureOrderingDays+1,signal)
+            void retryMenuRead(()=>discoverPickupDates(branch.id,today,features.futureOrderingDays+1,signal),signal)
                 .then(discovery=>findSoonestMenuPickup(discovery,JSON.parse(itemsJson).map((item:{productId:number})=>item.productId),today,features.futureOrderingDays,
                     async date=>{
                         const checked=await (actualCart.length?checkCartAvailability:checkMenuAvailability)(branch.id,date,1,actualCart.length?actualCart:JSON.parse(itemsJson),signal);

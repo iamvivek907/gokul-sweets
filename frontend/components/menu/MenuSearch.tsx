@@ -1,11 +1,13 @@
 "use client";
 import {
+  useCallback,
   useEffect,
   useId,
   useRef,
   useState,
   useSyncExternalStore,
 } from "react";
+import { flushSync } from "react-dom";
 import Image from "next/image";
 import MenuDiscoverySheet from "./MenuDiscoverySheet";
 import { T, useLanguage, useTranslation } from "@/lib/language";
@@ -36,6 +38,8 @@ const subscribe = (changed: () => void) => {
 };
 interface MenuSearchProps {
   detached?: boolean;
+  topOnTap?: boolean;
+  onSelectProduct?: (product:MenuProduct)=>void;
   onSubmit?: (value:string)=>void;
   onDismiss?: ()=>void;
   enhanced?: boolean;
@@ -48,6 +52,8 @@ interface MenuSearchProps {
 }
 export default function MenuSearch({
   detached = false,
+  topOnTap = false,
+  onSelectProduct,
   onSubmit,
   onDismiss,
   enhanced = false,
@@ -67,14 +73,19 @@ export default function MenuSearch({
     [active, setActive] = useState(-1);
   const [overlay,setOverlay]=useState(false),[draft,setDraft]=useState(value);
   const [searchTrigger,setSearchTrigger]=useState<HTMLElement|null>(null);
+  const restoreSearchFocus=useRef(true);
   const inputId=detached ? `menu-search-${listId}` : "gokul-menu-search";
+  const openSearch=useCallback((trigger:HTMLElement|null)=>{
+    restoreSearchFocus.current=true;
+    // Keep the native keyboard focus inside the original tap on iOS.
+    flushSync(()=>{setFocused(false);setSearchTrigger(trigger);setDraft(value);setOverlay(true);});
+  },[value]);
   useEffect(()=>{
-    if(detached){const frame=requestAnimationFrame(()=>document.getElementById(inputId)?.focus({preventScroll:true}));return()=>cancelAnimationFrame(frame);}
-    if(!premium)return;
-    const open=(event:Event)=>{setSearchTrigger((event as CustomEvent<HTMLElement>).detail??document.activeElement as HTMLElement|null);setDraft(value);setOverlay(true);};
+    if(detached||!premium)return;
+    const open=(event:Event)=>openSearch((event as CustomEvent<HTMLElement>).detail??document.activeElement as HTMLElement|null);
     window.addEventListener('gokul-menu-search-open',open);
     return()=>window.removeEventListener('gokul-menu-search-open',open);
-  },[detached,premium,value,inputId]);
+  },[detached,premium,openSearch]);
   const surface = useRef<HTMLDivElement>(null),
     pointerActive = useRef(false);
   const [hintIndex,setHintIndex]=useState(0);
@@ -161,8 +172,14 @@ export default function MenuSearch({
     } catch {}
   }
   function choose(text: string) {
-    onChange(text);
-    onSubmit?.(text);
+    const product=recent?undefined:products.find(item=>item.name===text);
+    if(product&&onSelectProduct){
+      surface.current?.querySelector("input")?.blur();
+      onSelectProduct(product);
+    }else{
+      onChange(text);
+      onSubmit?.(text);
+    }
     remember(text);
     setFocused(false);
     setActive(-1);
@@ -186,7 +203,7 @@ export default function MenuSearch({
   }, [value, branchId, products, enabled, detached]);
   return (
     <>
-    <div ref={surface} className={`menu-search relative w-full ${premium?"menu-search-premium":""}`}>
+    <div ref={surface} tabIndex={topOnTap&&!detached?-1:undefined} className={`menu-search relative w-full ${premium?"menu-search-premium":""}`}>
       {refined && (
         <label
           htmlFor={inputId}
@@ -231,7 +248,10 @@ export default function MenuSearch({
           autoComplete="off"
           maxLength={60}
           value={value}
+          enterKeyHint="search"
           onFocus={() => setFocused(true)}
+          onMouseDown={topOnTap&&!detached?event=>event.preventDefault():undefined}
+          onClick={topOnTap&&!detached?()=>openSearch(surface.current):undefined}
           onBlur={(event) => {
             if (
               !pointerActive.current &&
@@ -345,9 +365,12 @@ export default function MenuSearch({
         </div>
       )}
     </div>
-    {overlay&&<MenuDiscoverySheet returnFocusId="gokul-menu-header-search" restoreFocus={searchTrigger} title="Search the menu" className="menu-search-dialog" onClose={()=>setOverlay(false)}>
-      <p className="menu-search-hint"><T text="Find a dish without losing your place."/></p>
-      <MenuSearch detached enhanced={enhanced} refined={refined} premium={premium} value={draft} onChange={setDraft} products={products} branchId={branchId} onSubmit={submitOverlay} onDismiss={()=>setOverlay(false)}/>
+    {overlay&&<MenuDiscoverySheet returnFocusId={searchTrigger?.id} restoreFocus={searchTrigger} restoreFocusOnClose={restoreSearchFocus} initialFocusSelector="input[type=search]" fitVisualViewport title="Search the menu" className="menu-search-dialog" onClose={()=>setOverlay(false)}>
+      <MenuSearch detached enhanced={enhanced} refined={refined} premium={premium} value={draft} onChange={setDraft} products={products} branchId={branchId} onSubmit={submitOverlay} onDismiss={()=>setOverlay(false)} onSelectProduct={onSelectProduct?product=>{
+        restoreSearchFocus.current=false;
+        setOverlay(false);
+        onSelectProduct(product);
+      }:undefined}/>
       <button type="button" className="menu-search-show-results" onClick={()=>submitOverlay(draft)}><T text="Show results"/></button>
     </MenuDiscoverySheet>}
     </>

@@ -40,18 +40,19 @@ try{for(const width of [320,390,640]){for(const outcome of ["populated","empty",
  }
  await row.getByRole('button',{name:'Add Rasgulla to cart',exact:true}).click();await page.locator('.mobile-menu-pairing-skeleton').waitFor();
  const next=page.locator('#gokul-product-3'),pairingBefore=await documentY(next);releasePairings();
- if(outcome==='populated')await page.locator('.mobile-menu-pairings-inline').getByRole('button',{name:'Add Butter biscuits from pairings',exact:true}).waitFor();
- else if(outcome==='empty')await page.locator('.mobile-menu-pairings-inline').getByText('No optional additions right now.',{exact:true}).waitFor();
+ if(outcome==='populated')await page.locator('.mobile-menu-pairings-inline').getByRole('button',{name:'Add Gulab Jamun from pairings',exact:true}).waitFor();
+ else if(outcome==='empty')await page.locator('.mobile-menu-pairings-inline').getByRole('button',{name:'Add Gulab Jamun from pairings',exact:true}).waitFor();
  else await page.getByRole('button',{name:'Retry pairings',exact:true}).waitFor();
  await page.locator('.mobile-menu-pairing-skeleton').waitFor({state:'hidden'});await stable(next,pairingBefore,`late ${outcome} pairings`);
  if(outcome==='populated'){
+  assert.equal(await page.locator('.mobile-menu-pairings-inline').getByRole('heading',{name:'Butter biscuits',exact:true}).count(),0,'unrelated generic suggestions are omitted');
   for(const card of await page.locator('.mobile-menu-pairings-inline article').all()){
    const price=await card.locator('strong').boundingBox(),action=await card.locator('.menu-purchase-control,.menu-pairing-group-button').boundingBox();
    assert.ok(price.y+price.height<=action.y,'stable pairing cards keep prices above Add controls');
   }
  }
  if(outcome==='failed'){
-  pairingOutcome='populated';await page.getByRole('button',{name:'Retry pairings',exact:true}).click();await page.locator('.mobile-menu-pairings-inline').getByRole('button',{name:'Add Butter biscuits from pairings',exact:true}).waitFor();await stable(next,pairingBefore,'pairing retry');
+  pairingOutcome='populated';await page.getByRole('button',{name:'Retry pairings',exact:true}).click();await page.locator('.mobile-menu-pairings-inline').getByRole('button',{name:'Add Gulab Jamun from pairings',exact:true}).waitFor();await stable(next,pairingBefore,'pairing retry');
  }
  if(outcome!=='empty'){
   await page.getByRole('button',{name:'View optional additions',exact:true}).click();const additions=page.getByRole('dialog',{name:'Optional additions',exact:true});await additions.waitFor();await additions.getByRole('button',{name:'Close ×',exact:true}).click();await additions.waitFor({state:'hidden'});

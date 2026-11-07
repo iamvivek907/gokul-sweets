@@ -21,6 +21,7 @@ import MenuCampaignBanners from "./MenuCampaignBanners";
 import {useBranchMenuAppearance} from "@/hooks/useBranchMenuAppearance";
 import MenuCategorySection from "./MenuCategorySection";
 import MenuOffers from "./MenuOffers";
+import {OPEN_ORDERING_TOUR} from "@/lib/orderingTour";
 import FloatingMenuCategories from "./FloatingMenuCategories";
 const MobileMenuPickup=dynamic(()=>import("./MobileMenuPickup"));
 import MobileMenuSuggestions from "./MobileMenuSuggestions";
@@ -33,7 +34,7 @@ import {apiClient} from "@/services/apiClient";
 import {matchesMobileFilters,mobileMenuRows,type PortionGroup} from "@/lib/mobileMenu";
 import {progressiveBatches} from "@/lib/progressiveBatches";
 import {readMenuBrowse,writeMenuBrowse,browserMenuStorage,type MenuBrowseState} from "@/lib/menuBrowseState";
-import {matchesMenuSearch} from "@/lib/menuSearch";
+import {matchesMenuSearch,menuSearchRank,normalizeMenuSearch} from "@/lib/menuSearch";
 import MobileMenuFilters from "./MobileMenuFilters";
 import {T,useTranslation} from "@/lib/language";
 import {groupMenuProducts} from "@/lib/menuGroups";
@@ -119,7 +120,7 @@ export default function MenuScreen() {
     const groupedMenu=mobileFeatures?.contextualStorefrontV2===true&&(mobileFeatures.futuristicStorefrontV2===true||mobileFeatures.checkoutExperienceV2===true);
     const appearance = useBranchMenuAppearance(branch?.id ?? null);
     const branchMeals=useBranchMeals(groupedMenu?branch?.id:undefined);
-    const appearanceOrder = Object.fromEntries((appearance?.categories ?? []).map(c => [c.id, c.order]));
+    const appearanceOrder = useMemo(()=>Object.fromEntries((appearance?.categories ?? []).map(c => [c.id, c.order])),[appearance]);
 
     const {
         items,
@@ -793,6 +794,26 @@ export default function MenuScreen() {
         );
 
 
+    const menuOrderableIds = useMemo(() => pickupCheck.features?.smartAvailability
+        ? pickupChecking ? null : new Set(pickupCheck.items?.filter(item=>item.available).map(item=>item.productId))
+        : new Set(allProducts.filter(product=>product.available).map(product=>product.id)),
+    [pickupCheck.features?.smartAvailability,pickupCheck.items,pickupChecking,allProducts]);
+    const menuSections=useMemo(()=>{
+        const sections=phoneMenu&&retailBrowse?retailCollections(categories,filteredProducts):groupMenuProducts(categories,filteredProducts);
+        if(!groupedMenu)return sections.sort((a,b)=>(appearanceOrder[a.id]??10000)-(appearanceOrder[b.id]??10000));
+        const query=normalizeMenuSearch(search);
+        const searchRanks=new Map(filteredProducts.map(product=>[product.id,menuSearchRank(product.name,query)]));
+        const relevance=(product:MenuProduct)=>searchRanks.get(product.id)??0;
+        const orderRank=(product:MenuProduct)=>menuOrderableIds&&(!product.available||!menuOrderableIds.has(product.id))?1:0;
+        const ranked=sections.map(section=>{
+            section.products.sort((a,b)=>relevance(a)-relevance(b)||orderRank(a)-orderRank(b));
+            return {section,match:relevance(section.products[0]),blocked:!section.products.some(product=>orderRank(product)===0)};
+        });
+        // A precise search stays above a looser match, even when it needs another pickup.
+        return ranked.sort((a,b)=>a.match-b.match||Number(a.blocked)-Number(b.blocked)
+            || (appearanceOrder[a.section.id]??10000)-(appearanceOrder[b.section.id]??10000)).map(value=>value.section);
+    },[phoneMenu,retailBrowse,categories,filteredProducts,groupedMenu,appearanceOrder,search,menuOrderableIds]);
+
     useEffect(()=>{if(!branch||!new URLSearchParams(window.location.search).has("mealEdit"))return;queueMicrotask(()=>{setSearch("");setSelectedCategoryId(null);setMobileCategories([]);setMaximumPrice(null);setPortionsOnly(false);setBrowseCategory(null);setSavedOnly(false);const url=new URL(location.href);url.searchParams.delete("saved");url.searchParams.delete("category");history.replaceState(history.state,"",url);});},[branch]);
 
     const [browseScroll,setBrowseScroll]=useState<{branchId:number;id:number;revision:number}|null>(null);
@@ -824,6 +845,32 @@ export default function MenuScreen() {
         return()=>cancelAnimationFrame(frame);
     },[phoneMenu,browseScroll,branch?.id,filteredProducts]);
 
+    const [searchDestination,setSearchDestination]=useState<{branchId:number;productId:number}|null>(null);
+    function goToSearchDish(product:MenuProduct){
+        if(!branch)return;
+        clearFilters();
+        searchEditedBranch.current=branch.id;
+        setSearch(product.name);
+        setSearchDestination({branchId:branch.id,productId:product.id});
+    }
+    useEffect(()=>{
+        if(!searchDestination||searchDestination.branchId!==branch?.id)return;
+        let timer:ReturnType<typeof setTimeout>|undefined;
+        let target:HTMLElement|null=null;
+        const frame=requestAnimationFrame(()=>{
+            const anchor=document.getElementById(`gokul-product-${searchDestination.productId}`);
+            target=anchor?.closest<HTMLElement>("[data-menu-product-card]")??null;
+            if(!target)return;
+            const category=target.closest(".menu-category-disclosure");
+            if(category instanceof HTMLDetailsElement)category.open=true;
+            target.setAttribute("data-search-arrival","");
+            target.focus({preventScroll:true});
+            target.scrollIntoView({block:"center",behavior:"instant"});
+            timer=setTimeout(()=>target?.removeAttribute("data-search-arrival"),1700);
+        });
+        return()=>{cancelAnimationFrame(frame);clearTimeout(timer);target?.removeAttribute("data-search-arrival");};
+    },[searchDestination,branch?.id]);
+
     const hasActiveFilters =
         filterByPickup ||
         (groupedMenu&&savedOnly) ||
@@ -840,7 +887,7 @@ export default function MenuScreen() {
         onIncrease={guardedIncrease} onDecrease={decreaseQuantity} onAdd={handleAddToCart}/>;
     const [lastAdded,setLastAdded]=useState<number|null>(null);
     const pairingSeed=lastAdded??items.at(-1)?.product.id;
-    const pairing=phoneMenu&&mobileFeatures?.pickupAddOns&&branch&&items.some(i=>i.product.id===pairingSeed)&&!filterByPickup&&filteredProducts.some(p=>p.id===pairingSeed)?<div className="mobile-menu-pairing-slot"><MobileMenuSuggestions seedName={allProducts.find(p=>p.id===pairingSeed)?.name} branchId={branch.id} products={allProducts} groups={portionGroups} pickupItems={pickupCheck.items}/></div>:null;
+    const pairing=phoneMenu&&mobileFeatures?.pickupAddOns&&branch&&items.some(i=>i.product.id===pairingSeed)&&!filterByPickup&&filteredProducts.some(p=>p.id===pairingSeed)?<div className="mobile-menu-pairing-slot"><MobileMenuSuggestions seedProduct={allProducts.find(p=>p.id===pairingSeed)} pairings={appearance?.pairings} onPairingAdded={()=>setLastAdded(pairingSeed??null)} branchId={branch.id} products={allProducts} groups={portionGroups} pickupItems={pickupCheck.items}/></div>:null;
 
     const weightPickup = useRef("");
     function handleAddToCart(
@@ -1292,7 +1339,8 @@ export default function MenuScreen() {
                 {refreshError&&<aside className="menu-refresh-notice" role="status"><T text={refreshError}/><button type="button" onClick={retryMenu}><T text="Try again"/></button></aside>}
                 {groupedMenu&&!!appearance?.banners.length&&<div className="menu-leading-campaign"><MenuCampaignBanners {...campaignControls} banners={appearance.banners} categories={categories} onSelect={id => {jumpMenuCategory(id);setBrowseCategory({branchId:branch.id,id});}} compact={phoneMenu}/></div>}
                 <MenuToolbar enabled={phoneMenu}>
-                {mobileFeatures?.smartAvailability&&<MobileMenuPickup compactHeader={phoneMenu} key={branch.id} branchId={branch.id} products={allProducts} today={pickupCheck.today} days={mobileFeatures.futureOrderingDays??30} selection={pickupCheck.intent.selection} date={pickupCheck.intent.date} expired={pickupCheck.intent.expired} selectionUnavailable={pickupCheck.selectionUnavailable} noPickupMessage={pickupCheck.noPickupMessage} availabilityError={pickupCheck.automaticError??pickupCheck.error} onRetry={pickupCheck.retry} automatic={pickupCheck.intent.automatic} findingSoonest={pickupCheck.findingSoonest} onChoosingChange={pickupCheck.setChoosing}/>}
+                {!mobileFeatures?.smartAvailability&&(mobileFeatures?.futuristicStorefrontV2||mobileFeatures?.checkoutExperienceV2)&&<button type="button" className="menu-pickup-help ordering-tour-replay" aria-label={translate("How to order")} onClick={()=>window.dispatchEvent(new Event(OPEN_ORDERING_TOUR))}><span aria-hidden="true">?</span></button>}
+                {mobileFeatures?.smartAvailability&&<MobileMenuPickup showHelp={!!(mobileFeatures?.futuristicStorefrontV2||mobileFeatures?.checkoutExperienceV2)} compactHeader={phoneMenu} key={branch.id} branchId={branch.id} products={allProducts} today={pickupCheck.today} days={mobileFeatures.futureOrderingDays??30} selection={pickupCheck.intent.selection} date={pickupCheck.intent.date} expired={pickupCheck.intent.expired} selectionUnavailable={pickupCheck.selectionUnavailable} noPickupMessage={pickupCheck.noPickupMessage} availabilityError={pickupCheck.automaticError??pickupCheck.error} onRetry={pickupCheck.retry} automatic={pickupCheck.intent.automatic} findingSoonest={pickupCheck.findingSoonest} onChoosingChange={pickupCheck.setChoosing}/>}
 
                 <div
                     className="gokul-menu-tools
@@ -1307,7 +1355,8 @@ export default function MenuScreen() {
                     "
                 >
 
-                    <MenuSearch enhanced={groupedMenu} products={allProducts} branchId={branch.id}
+                    <MenuSearch key={branch.id} enhanced={groupedMenu} products={allProducts} branchId={branch.id} topOnTap={phoneMenu}
+                        onSelectProduct={groupedMenu?goToSearchDish:undefined}
                         premium={groupedMenu}
                         refined={pickupCheck.features?.contextualStorefrontV2 === true}
                         value={
@@ -1486,7 +1535,7 @@ export default function MenuScreen() {
 
                                 {phoneMenu&&retailBrowse&&<h3 className="menu-retail-collection-title"><T text="Everyday favourites"/></h3>}
                                 {pickupCheck.features?.contextualStorefrontV2 ? <div>
-                                    {(phoneMenu&&retailBrowse?retailCollections(categories,filteredProducts):groupMenuProducts(categories,filteredProducts)).sort((a,b)=>(appearanceOrder[a.id]??10000)-(appearanceOrder[b.id]??10000)).map((group,index)=><MenuCategorySection key={phoneMenu?`${group.id}:${activeBrowse?.id??"all"}:${retailBrowse?"retail":"menu"}`:group.id} id={group.id} name={group.name} displayName={phoneMenu&&activeBrowse&&menuFamily(activeBrowse.name)==="Sweets"&&group.id===activeBrowse.id?"Sweets you’ll love":undefined} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} description={group.description} collapsible={phoneMenu}>{groupedMenu&&index===0?<>{pickupGrid(splitMenuLead(group.products,portionGroups).lead)}{visibleMeals.length>0&&<MealCollection key={branch.id} branchId={branch.id} products={allProducts} meals={visibleMeals} smartAvailability={mobileFeatures?.smartAvailability===true} pickupItems={pickupCheck.items} pickupChecking={pickupChecking} pickupSelected={!!pickupCheck.intent.selection} pickupFailed={!!(pickupCheck.error||pickupCheck.automaticError)} onRetryPickup={pickupCheck.retry}/>} {pickupGrid(splitMenuLead(group.products,portionGroups).rest)}</>:pickupGrid(group.products)}</MenuCategorySection>)}
+                                    {menuSections.map((group,index)=><MenuCategorySection key={phoneMenu?`${group.id}:${activeBrowse?.id??"all"}:${retailBrowse?"retail":"menu"}`:group.id} id={group.id} name={group.name} displayName={phoneMenu&&activeBrowse&&menuFamily(activeBrowse.name)==="Sweets"&&group.id===activeBrowse.id?"Sweets you’ll love":undefined} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} description={group.description} collapsible={phoneMenu}>{groupedMenu&&index===0?<>{pickupGrid(splitMenuLead(group.products,portionGroups).lead)}{visibleMeals.length>0&&<MealCollection key={branch.id} branchId={branch.id} products={allProducts} meals={visibleMeals} smartAvailability={mobileFeatures?.smartAvailability===true} pickupItems={pickupCheck.items} pickupChecking={pickupChecking} pickupSelected={!!pickupCheck.intent.selection} pickupFailed={!!(pickupCheck.error||pickupCheck.automaticError)} onRetryPickup={pickupCheck.retry}/>} {pickupGrid(splitMenuLead(group.products,portionGroups).rest)}</>:pickupGrid(group.products)}</MenuCategorySection>)}
                                 </div> : (
                                 <ProductGrid
                                     pairingSeed={pairingSeed}

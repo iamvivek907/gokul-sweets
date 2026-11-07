@@ -101,10 +101,23 @@ public class MenuAppearanceController {
      *
      * @param banners the banners
      * @param categories the categories
+     * @param pairings published dish recommendations in display order
      */
     public record Config(
             @NotNull @Size(max = 12) List<@Valid Banner> banners,
-            @NotNull @Size(max = 200) List<@Valid Category> categories) {}
+            @NotNull @Size(max = 200) List<@Valid Category> categories,
+            @Size(max = 100) List<@NotNull @Valid Pairing> pairings) {
+        public Config {
+            pairings = pairings == null ? List.of() : pairings;
+        }
+
+        public Config(List<Banner> banners, List<Category> categories) {
+            this(banners, categories, List.of());
+        }
+    }
+
+    /** One branch catalogue dish to suggest after a specific dish is added. */
+    public record Pairing(@Positive long seedProductId, @Positive long suggestedProductId) {}
 
     /**
      * Immutable input data contract.
@@ -290,7 +303,8 @@ public class MenuAppearanceController {
                                                             || now.isBefore(b.endAt())))
                             .sorted(Comparator.comparingInt(Banner::order))
                             .toList(),
-                    c.categories());
+                    c.categories(),
+                    c.pairings());
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos, MenuAppearanceController.class, "live(long)");
@@ -366,6 +380,34 @@ public class MenuAppearanceController {
                     throw new IllegalArgumentException("Duplicate category.");
                 category(branch, c.id());
                 managed(c.imageUrl());
+            }
+            var pairings = input.config().pairings();
+            if (!pairings.isEmpty()) {
+                Set<Pairing> unique = new HashSet<>();
+                Set<Long> productIds = new HashSet<>();
+                for (var pairing : pairings) {
+                    if (pairing.seedProductId() == pairing.suggestedProductId()
+                            || !unique.add(pairing))
+                        throw new IllegalArgumentException(
+                                "Choose two distinct dishes and avoid duplicate pairings.");
+                    productIds.add(pairing.seedProductId());
+                    productIds.add(pairing.suggestedProductId());
+                }
+                var marks = String.join(",", Collections.nCopies(productIds.size(), "?"));
+                var args = new ArrayList<Object>();
+                args.add(branch);
+                args.addAll(productIds);
+                var found =
+                        jdbc.queryForObject(
+                                "SELECT count(DISTINCT product_id) FROM branch_products WHERE"
+                                        + " branch_id=? AND product_id IN ("
+                                        + marks
+                                        + ")",
+                                Long.class,
+                                args.toArray());
+                if (found == null || found != productIds.size())
+                    throw new IllegalArgumentException(
+                            "Choose pairing dishes from this branch menu.");
             }
             jdbc.update(
                     "INSERT INTO branch_menu_appearance(branch_id) VALUES (?) ON CONFLICT DO"

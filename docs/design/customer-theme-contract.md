@@ -1,3 +1,11 @@
+## Menu search, availability and pairing guidance
+
+The premium phone search field opens a lavender search panel near the top, sized to the visible viewport above the keyboard. Cancel restores the browsing position. Selecting a dish opens its category and focuses its card; selecting a recent query still searches by text. Keep dish names, portions, cart and pickup unchanged.
+
+Show confirmed orderable dishes first within a category and move categories with no orderable dishes later. Exact search matches take precedence. The advisory menu preview retries transient transport failures once and briefly reuses an identical recent result; checkout still checks the current cart. Network failures never become sold-out or stock-readiness statuses.
+
+Branch managers can save and publish dish pairings in Menu appearance. Prefer those choices when verified for the pickup, followed by relevant suggestions. Hide the rail when there is no match and keep the ordering guide behind a help icon next to pickup.
+
 ## Compact menu offers and pickup reminder
 
 On the modern phone menu, the Offers shortcut sits beside Filters and previews a current saving when one is known. Its sheet shows the terms, eligibility and retry state. Spend-to-unlock progress stays in checkout; the menu cart dock shows the cart. Keep the shortcut dimensions stable when offers load or expire.

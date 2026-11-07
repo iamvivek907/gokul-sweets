@@ -1,6 +1,6 @@
 import {getCartSnapshot,parseCart} from "@/lib/cartStorage";
 import {mealClaim} from "@/lib/cartMeals";
-import {apiClient} from "@/services/apiClient";
+import {apiClient,ApiError} from "@/services/apiClient";
 import type {CartItem,CartState} from "@/types/cart";
 import type {PickupSlot} from "@/types/pickup";
 
@@ -85,6 +85,26 @@ export function discoverPickupDates(branchId:number,startDate:string,days:number
     return apiClient<CartAvailability>(`/api/branches/${branchId}/pickup-discovery?startDate=${encodeURIComponent(startDate)}&days=${days}`,{signal});
 }
 
+/** Retry a transient advisory failure once; never delay a superseded branch or pickup. */
+export async function retryMenuRead<T>(read:()=>Promise<T>,signal?:AbortSignal):Promise<T>{
+    try{return await read();}
+    catch(error){
+        signal?.throwIfAborted();
+        const transient=error instanceof TypeError
+            || typeof ApiError==="function"&&error instanceof ApiError&&[408,429,500,502,503,504].includes(error.status);
+        if(!transient)throw error;
+        const retryAfter=typeof ApiError==="function"&&error instanceof ApiError?error.retryAfterMs:null;
+        if(retryAfter!==null&&retryAfter>1500)throw error;
+        await new Promise<void>((resolve,reject)=>{
+            const abort=()=>{clearTimeout(timer);reject(signal?.reason);};
+            const timer=setTimeout(()=>{signal?.removeEventListener("abort",abort);resolve();},Math.max(180,retryAfter??0));
+            signal?.addEventListener("abort",abort,{once:true});
+        });
+        signal?.throwIfAborted();
+        return read();
+    }
+}
+
 /** Check the full menu without exceeding the endpoint's 100-item request limit.
  * At most two batches run together; publish only a complete successful preview.
  * Cart checks continue to use a single authoritative request.
@@ -99,7 +119,7 @@ export async function checkMenuAvailability(
         const batches = [items.slice(offset, offset + 100), items.slice(offset + 100, offset + 200)].filter(batch => batch.length);
         const complete = await Promise.all(batches.map(async batch => {
             signal?.throwIfAborted();
-            return checkCartAvailability(branchId, startDate, days, batch, signal, true);
+            return retryMenuRead(()=>checkCartAvailability(branchId, startDate, days, batch, signal, true),signal);
         }));
         responses.push(...complete);
     }

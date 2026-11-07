@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict'),test=require('node:test'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
-function fixture(respond){const calls=[],box={exports:{},require:()=>({apiClient:async(path,options)=>{const body=JSON.parse(options.body);calls.push({path,body,signal:options.signal});return respond(body,calls.length);}})};vm.runInNewContext(ts.transpileModule(fs.readFileSync('services/availabilityApi.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,box);return {...box.exports,calls};}
+function fixture(respond){const calls=[],box={exports:{},TypeError,setTimeout,clearTimeout,require:()=>({apiClient:async(path,options)=>{const body=JSON.parse(options.body);calls.push({path,body,signal:options.signal});return respond(body,calls.length);}})};vm.runInNewContext(ts.transpileModule(fs.readFileSync('services/availabilityApi.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,box);return {...box.exports,calls};}
 const items=Array.from({length:215},(_,i)=>({productId:i+1,quantity:i===0?7:1,weightGrams:null}));
 const response=body=>({fulfilmentType:'PICKUP',today:'2026-10-07',maximumDate:'2026-10-10',dates:[{date:body.startDate,available:true,items:body.items.map(p=>({productId:p.productId,available:true})),slots:[{slot:{id:1,remainingCapacity:10},normalAvailable:true,priorityAvailable:false,issues:[]}]}]});
 test('full catalogue uses bounded two-request waves and preserves actual cart quantities',async()=>{const f=fixture(response);const data=await f.checkMenuAvailability(1,'2026-10-08',1,items);assert.deepEqual(f.calls.map(c=>c.body.items.length),[100,100,15]);assert.equal(f.calls[0].body.items[0].quantity,7);assert.ok(f.calls.every(c=>c.path.endsWith('?menuPreview=true&compact=true&versioned=true')));assert.deepEqual(Array.from(data.dates[0].items,p=>p.productId),items.map(p=>p.productId));});
@@ -32,3 +32,10 @@ test('merged batches retain the earliest server-relative deadline as a matched t
 test('aborting while a batch fails leaves every rejection observed',async()=>{const controller=new AbortController();const f=fixture(()=>{controller.abort();throw Error('network failed')});await assert.rejects(f.checkMenuAvailability(1,'2026-10-22',1,items,controller.signal));assert.equal(f.calls.length,1)});
 
 test('meal recipe claims never leak into split stock reads; all amounts are preserved',async()=>{const f=fixture(response);const input=items.map((item,index)=>index===0?{...item,mealSelections:[{mealId:1,optionIds:['later-batch']}]}:item);await f.checkMenuAvailability(1,'2026-10-08',1,input);assert.equal(f.calls.length,3);assert.equal(f.calls[0].body.items[0].quantity,7);assert.ok(f.calls.every(call=>call.body.items.every(item=>!('mealSelections' in item))));assert.equal(input[0].mealSelections.length,1,'pricing input remains intact');});
+
+test('a transient batch retry reuses the successful batch and publishes a complete response',async()=>{
+ const f=fixture((body,n)=>{if(n===2)throw new TypeError('temporary network failure');return response(body)});
+ const data=await f.checkMenuAvailability(1,'2026-10-08',1,items);
+ assert.deepEqual(f.calls.map(call=>call.body.items[0].productId),[1,101,101,201]);
+ assert.equal(data.dates[0].items.length,215);
+});

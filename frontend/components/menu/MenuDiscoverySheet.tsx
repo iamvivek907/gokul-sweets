@@ -1,11 +1,11 @@
 "use client";
-import {useLayoutEffect,useId,useRef,type ReactNode} from "react";
+import {useLayoutEffect,useId,useRef,type ReactNode,type RefObject} from "react";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import styles from "./MenuDiscoverySheet.module.css";
 import {useMenuSheetDismiss} from "@/hooks/useMenuSheetDismiss";
 import {T,useTranslation} from "@/lib/language";
 
-export default function MenuDiscoverySheet({title,children,onClose,onDismissStart,className,returnFocusId,restoreFocus,tactile=false,footer,closeLabel="Close",hideClose=false}:{title:string;children:ReactNode;onClose:()=>void;onDismissStart?:()=>void;className?:string;returnFocusId?:string;restoreFocus?:HTMLElement|null;tactile?:boolean;footer?:ReactNode|((close:()=>void)=>ReactNode);closeLabel?:string;hideClose?:boolean}){
+export default function MenuDiscoverySheet({title,children,onClose,onDismissStart,className,returnFocusId,restoreFocus,initialFocusSelector,restoreFocusOnClose,fitVisualViewport=false,tactile=false,footer,closeLabel="Close",hideClose=false}:{title:string;children:ReactNode;onClose:()=>void;onDismissStart?:()=>void;className?:string;returnFocusId?:string;restoreFocus?:HTMLElement|null;initialFocusSelector?:string;restoreFocusOnClose?:RefObject<boolean>;fitVisualViewport?:boolean;tactile?:boolean;footer?:ReactNode|((close:()=>void)=>ReactNode);closeLabel?:string;hideClose?:boolean}){
  const translate=useTranslation(),features=useStorefrontFeatures();
  const polished=tactile&&!!(features?.futuristicStorefrontV2||features?.checkoutExperienceV2);
  const dialog=useRef<HTMLDialogElement>(null),titleId=useId();
@@ -16,10 +16,25 @@ export default function MenuDiscoverySheet({title,children,onClose,onDismissStar
   const body=document.body,root=document.documentElement,y=window.scrollY,x=window.scrollX;
   const saved={position:body.style.position,top:body.style.top,left:body.style.left,width:body.style.width,overflow:body.style.overflow,rootOverflow:root.style.overflow};
   body.style.position="fixed";body.style.top=`-${y}px`;body.style.left=`-${x}px`;body.style.width="100%";body.style.overflow="hidden";root.style.overflow="hidden";
+  const viewport=fitVisualViewport?window.visualViewport:null;
+  const fit=()=>{
+   if(!viewport)return;
+   surface?.style.setProperty("--menu-viewport-top",`${viewport.offsetTop}px`);
+   surface?.style.setProperty("--menu-viewport-height",`${viewport.height}px`);
+  };
+  fit();
+  viewport?.addEventListener("resize",fit);
+  viewport?.addEventListener("scroll",fit);
   surface?.showModal();
+  if(initialFocusSelector)surface?.querySelector<HTMLElement>(initialFocusSelector)?.focus({preventScroll:true});
   return()=>{
+   viewport?.removeEventListener("resize",fit);viewport?.removeEventListener("scroll",fit);
    surface?.close();Object.assign(body.style,{position:saved.position,top:saved.top,left:saved.left,width:saved.width,overflow:saved.overflow});root.style.overflow=saved.rootOverflow;
-   window.scrollTo({left:x,top:y,behavior:"instant"});const resolveTarget=()=>restoreFocus&&returnFocusId?document.getElementById(returnFocusId):previous?.isConnected?previous:returnFocusId?document.getElementById(returnFocusId):null;resolveTarget()?.focus({preventScroll:true});
+   window.scrollTo({left:x,top:y,behavior:"instant"});
+   // This ref is an explicit close-time decision made by the caller.
+   // eslint-disable-next-line react-hooks/exhaustive-deps
+   if(restoreFocusOnClose?.current===false)return;
+   const resolveTarget=()=>restoreFocus&&returnFocusId?document.getElementById(returnFocusId):previous?.isConnected?previous:returnFocusId?document.getElementById(returnFocusId):null;resolveTarget()?.focus({preventScroll:true});
    // Header observers can briefly make the trigger inert during scroll unlock.
    // Resolve it again after the header settles; never move the viewport to focus it.
    {
@@ -33,9 +48,9 @@ export default function MenuDiscoverySheet({title,children,onClose,onDismissStar
     requestAnimationFrame(restore);
    }
   };
- },[returnFocusId,restoreFocus]);
+ },[returnFocusId,restoreFocus,initialFocusSelector,restoreFocusOnClose,fitVisualViewport]);
  const content=<>
-  <header><h2 id={titleId}><T text={title}/></h2>{!polished&&!hideClose&&<button type="button" aria-label={closeLabel==="Close"?undefined:translate(closeLabel)} onClick={()=>tactile?dismiss(true):closeImmediately()} autoFocus><T text="Close"/> ×</button>}</header>
+  <header><h2 id={titleId}><T text={title}/></h2>{!polished&&!hideClose&&<button type="button" aria-label={closeLabel==="Close"?undefined:translate(closeLabel)} onClick={()=>tactile?dismiss(true):closeImmediately()} autoFocus={!initialFocusSelector}><T text="Close"/> ×</button>}</header>
   <div tabIndex={polished?0:undefined} className={`mobile-menu-suggestion-body ${polished?styles.scrollBody:""}`}>{children}</div>
   {footer&&<footer className={styles.footer}>{typeof footer==="function"?footer(()=>tactile?dismiss():closeImmediately()):footer}</footer>}
  </>;

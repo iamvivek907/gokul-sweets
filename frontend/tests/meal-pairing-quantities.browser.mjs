@@ -20,6 +20,7 @@ try{for(const width of [320,390,640]){
   else if(path==='/api/menu/portion-groups')json={version:1,groups};
   else if(path==='/api/storefront/customer-identity')json={enabled:true};else if(path==='/api/customer/identity/me')json={authenticated:true,name:'Test customer',phone:null};
   else if(path.endsWith('/availability')){const gate=stockGate;if(gate)await gate;if(delay)await new Promise(r=>setTimeout(r,1500));json={today:date,maximumDate:date,dates:[{date,available:true,items:products.map(p=>({productId:p.id,available:p.id!==6&&!(p.id===1&&blockRasgulla),code:p.id===6?'NO_INVENTORY':p.id===1&&blockRasgulla?'QUANTITY_TOO_LARGE':null})),slots:[{slot,normalAvailable:true,priorityAvailable:false,issues:[]}]}]};}
+  else if(path==='/api/menu/appearance')json={banners:[],categories:[],pairings:[7,4,3].map(suggestedProductId=>({seedProductId:1,suggestedProductId}))};
   else if(path==='/api/menu/pickup-addons')json=[snacks[0],dairy[1],dairy[0],sweets[1]].map(product=>({product,weightGrams:product.saleMode==='WEIGHT'?250:null,portionPrice:product.saleMode==='WEIGHT'?125:product.price,portionTotal:product.saleMode==='WEIGHT'?125:product.price,reason:'Something extra',slotVerified:true,includesTax:true}));else if(path==='/api/menu/pickup-addons/check'){checkedItems=route.request().postDataJSON().items;json={orderable:!denyAddition};}
   await route.fulfill({json,headers}).catch(()=>{});
  });
