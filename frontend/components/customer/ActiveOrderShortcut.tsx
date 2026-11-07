@@ -3,12 +3,12 @@ import {useEffect,useRef,useState,useSyncExternalStore} from "react";
 import Link from "next/link";
 import CustomerIcon from "./CustomerIcon";
 import {getActiveOrder,getServerActiveOrder,subscribeActiveOrder} from "@/lib/activeOrderStore";
-import {getOrderStatusPresentation,formatOrderTime} from "@/lib/orderTracking";
+import {getOrderStatusPresentation} from "@/lib/orderTracking";
 import {checkOperationalBranch} from "@/lib/branchOperationalCache";
 import {T,useLanguage} from "@/lib/language";
 import type {Branch} from "@/types/branch";
 import type {CustomerOrderSummaryResponse} from "@/types/order";
-import {groupUpcomingOrders,orderWindow,reminderDay,reminderTime} from "@/lib/orderReminder";
+import {groupUpcomingOrders,reminderDay,reminderTime} from "@/lib/orderReminder";
 import {claimOrderIntroduction,dismissOrderReminder,reminderDismissed,reminderServerDismissed,subscribeOrderReminder} from "@/lib/orderReminderSession";
 import MenuDiscoverySheet from "@/components/menu/MenuDiscoverySheet";
 function OrderActions({order}:{order:CustomerOrderSummaryResponse}){
@@ -52,20 +52,17 @@ function OrderReminder(){
   ?locale==="hi"?`${count} आगामी ऑर्डर`:`${count} ${allPickup?"pickups":"orders"}`
   :order.orderStatus==="PENDING_PAYMENT"?locale==="hi"?"भुगतान बाकी है":"Payment pending"
   :locale==="hi"?allPickup?"आपका पिकअप":"आपकी डिलीवरी":allPickup?"Your pickup":"Your delivery";
- const {date,start}=orderWindow(order);
- const compact=orders.length>1?title:order.orderStatus==="PENDING_PAYMENT"?title:
-  `${date?reminderDay(date,locale):""}${start?` · ${formatOrderTime(start)}`:""}`||title;
  function dismiss(){setOpen(false);dismissOrderReminder();}
  return <>
   <aside className="active-order-edge" data-expanded={introduced||undefined} data-stale={stale||undefined} aria-label="Active order">
    <button type="button" className="active-order-edge-trigger" aria-haspopup="dialog" aria-expanded={open}
-    aria-label={`${title} · ${reminderTime(order,locale)} · ${orders.length>1?`${branches} ${locale==='hi'?'शाखाएँ':'branches'}`:order.branchName}`}
+    aria-label={`${title} · ${stale?(locale==="hi"?"ताज़ा स्थिति देखें":"Open for latest status"):reminderTime(order,locale)} · ${orders.length>1?`${branches} ${locale==='hi'?'शाखाएँ':'branches'}`:order.branchName}`}
     onPointerDown={event=>{swiped.current=false;gesture.current={x:event.clientX,y:event.clientY};try{event.currentTarget.setPointerCapture(event.pointerId);}catch{/* Synthetic or cancelled pointer. */}}}
     onPointerCancel={()=>{gesture.current=null;}}
     onPointerUp={event=>{const point=gesture.current;gesture.current=null;if(point&&event.clientX-point.x>40&&Math.abs(event.clientY-point.y)<30){swiped.current=true;dismiss();}}}
     onClick={event=>{if(swiped.current){swiped.current=false;return;}setIntroduced(false);setTrigger(event.currentTarget);setExpanded(order.orderNumber);setOpen(true);}}>
     <CustomerIcon kind="receipt"/>
-    <span className="active-order-edge-compact">{stale?<T text="Open for latest status"/>:compact}</span>
+    <span className="active-order-edge-compact" aria-hidden="true">{stale?"•":count}</span>
     <span className="active-order-edge-copy"><strong>{title}</strong><small>{stale?<T text="Open for latest status"/>:reminderTime(order,locale)}</small><small>{orders.length>1?(locale==='hi'?`${branches}${more?'+':''} शाखाओं में`:`Across ${branches}${more?'+':''} ${branches===1&&!more?'branch':'branches'}`):order.branchName}</small></span>
     <span className="active-order-edge-chevron" aria-hidden="true">›</span>
    </button>

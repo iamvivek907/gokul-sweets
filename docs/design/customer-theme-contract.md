@@ -1,3 +1,9 @@
+## Compact menu offers and pickup reminder
+
+On the modern phone menu, the Offers shortcut sits beside Filters and previews a current saving when one is known. Its sheet shows the terms, eligibility and retry state. Spend-to-unlock progress stays in checkout; the menu cart dock shows the cart. Keep the shortcut dimensions stable when offers load or expire.
+
+Keep the active order tab at the right edge. After the brief introduction, show a receipt icon and a count in a 44px control with a descriptive accessible name. The existing upcoming-orders sheet, dismissal and refresh behavior stay the same.
+
 ## November 3 colourful brand loading
 
 The approved launch uses a deep burgundy gradient, ivory existing wordmark, muted gold food illustrations and a soft saffron glow. Pre-hydration boot shares its palette. Page loaders use cream/peach/saffron gradients with decorative inline SVG corner art; compact section loaders stay transparent. Existing logos, navigation, truthful stage-specific payment copy, eight-second delayed-response guidance and reduced-motion safeguards remain. No additional network assets, progress percentages, launch repeats, artificial waiting or changed checkout logic.

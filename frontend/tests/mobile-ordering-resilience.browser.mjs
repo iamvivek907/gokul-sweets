@@ -52,7 +52,7 @@ try{for(const [width,enabled,constrained] of [[390,true,false],[390,true,true]])
  if(!constrained)await pairing.getByText('Your completed-order favourite',{exact:true}).waitFor();assert.ok(constrained?historyCalls===0:historyCalls>=1,'constrained phones skip optional history downloads');
  await page.waitForTimeout(350); // Let the sheet's focus/scroll transition settle before comparing geometry.
  const suggestionAction=await pairing.getByRole('button',{name:'Add Special tea',exact:true}).boundingBox();const following=await page.locator('#gokul-product-2').boundingBox();const cartAction=await page.locator('.gokul-floating-cart a').boundingBox();
- assert.ok(previewCalls>0);assert.equal(await pairing.getByText(/Unlock/).count(),0,'pairings are usable while offer verification is pending');releasePreview();await page.locator('.mobile-cart-offer-target').getByText(/Unlock/).waitFor();
+ assert.ok(previewCalls>0);assert.equal(await pairing.getByText(/Unlock/).count(),0,'pairings are usable while offer verification is pending');releasePreview();await page.locator('#menu-offers-open').getByText(/off/).waitFor();
  const settledAction=await pairing.getByRole('button',{name:'Add Special tea',exact:true}).boundingBox();
  assert.ok(Math.abs(settledAction.y-suggestionAction.y)<=1&&Math.abs(settledAction.x-suggestionAction.x)<=1,'late offer cannot move a suggestion Add control in either direction');
  assert.ok(Math.abs((await page.locator('#gokul-product-2').boundingBox()).y-following.y)<=1,'late offer cannot move the following product');

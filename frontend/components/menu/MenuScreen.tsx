@@ -45,7 +45,6 @@ import NewBranchItems from "@/components/menu/NewBranchItems";
 import {useDateAvailability} from "@/components/menu/PickupContext";
 
 import {
-    useCallback,
     useEffect,
     useMemo,
     useRef,
@@ -87,7 +86,6 @@ import {
     useCart
 } from "@/hooks/useCart";
 
-import type {AvailableRebateResponse} from "@/types/rebate";
 import type {
     MenuCategory,
     MenuProduct
@@ -840,9 +838,6 @@ export default function MenuScreen() {
         pickupChecking={pickupChecking} pickupStatusMessage={pickupStatusMessage} dateAware={!!pickupCheck.features?.smartAvailability} products={products}
         ratingSummaries={ratingSummaries} ratingsLoading={ratingsLoading} quantities={productQuantities} weights={productWeights}
         onIncrease={guardedIncrease} onDecrease={decreaseQuantity} onAdd={handleAddToCart}/>;
-    const [menuOffer,setMenuOffer]=useState<{key:string;target:AvailableRebateResponse|null}|null>(null);
-    const offerContext=JSON.stringify([branch?.id,items,pickupCheck.intent.selection]);
-    const onMenuTarget=useCallback((target:AvailableRebateResponse|null)=>setMenuOffer({key:offerContext,target}),[offerContext]);
     const [lastAdded,setLastAdded]=useState<number|null>(null);
     const pairingSeed=lastAdded??items.at(-1)?.product.id;
     const pairing=phoneMenu&&mobileFeatures?.pickupAddOns&&branch&&items.some(i=>i.product.id===pairingSeed)&&!filterByPickup&&filteredProducts.some(p=>p.id===pairingSeed)?<div className="mobile-menu-pairing-slot"><MobileMenuSuggestions seedName={allProducts.find(p=>p.id===pairingSeed)?.name} branchId={branch.id} products={allProducts} groups={portionGroups} pickupItems={pickupCheck.items}/></div>:null;
@@ -1327,18 +1322,15 @@ export default function MenuScreen() {
 
                     {groupedMenu&&!phoneMenu&&<button type="button" className="menu-saved-filter" aria-pressed={savedOnly} onClick={()=>changeSavedFilter(!savedOnly)}><T text="Saved"/></button>}
                     {groupedMenu&&savedOnly&&<SavedDishesHelp/>}
-                    {!isLoading
-                        &&
-                        !error
-                        &&
-                        categories.length > 0
+                    {((!isLoading && !error && categories.length > 0)
+                        || (phoneMenu && mobileFeatures?.pickupAddOns))
                         && (
                             <div
                                 className={phoneMenu ? "mobile-menu-category-entry" : "mt-4"}
                             >
 
                                 {!phoneMenu&&pickupFilter&&<label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={availableOnly} onChange={event=>setAvailableOnly(event.target.checked)}/><T text="Available at selected pickup time"/></label>}
-                                {phoneMenu?<MobileMenuFilters pickupFilter={pickupFilter} mealAction={visibleMeals.length?<MealShortcut onClick={()=>{if(!filterByPickup)clearFilters();requestAnimationFrame(()=>{const target=document.getElementById("menu-meals");const disclosure=target?.closest("details");if(disclosure)disclosure.open=true;target?.scrollIntoView({block:"start",behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"instant":"smooth"});target?.focus({preventScroll:true});});}}/>:undefined} allSelected={!savedOnly} endAction={<button className="menu-saved-filter" type="button" aria-pressed={savedOnly} onClick={()=>changeSavedFilter(!savedOnly)}><T text="Saved"/></button>} activeId={activeBrowseId} onBrowse={browseMenu} offersAvailable={!!mobileFeatures?.pickupAddOns} categories={categories} selected={mobileCategories??(effectiveCategoryId===null?[]:[effectiveCategoryId])} onCategories={ids=>{setBrowseCategory(null);setBrowseScroll(null);setMobileCategories(ids);}} maximum={maximumPrice} onMaximum={setMaximumPrice} portions={portionsOnly} onPortions={setPortionsOnly} onResetSearch={()=>{if(search)setSearch("");}}/>:<CategoryTabs
+                                {phoneMenu?<MobileMenuFilters pickupFilter={pickupFilter} mealAction={visibleMeals.length?<MealShortcut onClick={()=>{if(!filterByPickup)clearFilters();requestAnimationFrame(()=>{const target=document.getElementById("menu-meals");const disclosure=target?.closest("details");if(disclosure)disclosure.open=true;target?.scrollIntoView({block:"start",behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"instant":"smooth"});target?.focus({preventScroll:true});});}}/>:undefined} allSelected={!savedOnly} endAction={<button className="menu-saved-filter" type="button" aria-pressed={savedOnly} onClick={()=>changeSavedFilter(!savedOnly)}><T text="Saved"/></button>} activeId={activeBrowseId} onBrowse={browseMenu} offerAction={mobileFeatures?.pickupAddOns?<MenuOffers key={branch.id} branchId={branch.id}/>:undefined} categories={categories} selected={mobileCategories??(effectiveCategoryId===null?[]:[effectiveCategoryId])} onCategories={ids=>{setBrowseCategory(null);setBrowseScroll(null);setMobileCategories(ids);}} maximum={maximumPrice} onMaximum={setMaximumPrice} portions={portionsOnly} onPortions={setPortionsOnly} onResetSearch={()=>{if(search)setSearch("");}}/>:<CategoryTabs
                                     categories={
                                         categories
                                     }
@@ -1359,7 +1351,6 @@ export default function MenuScreen() {
                 {!phoneMenu && !groupedMenu && <BranchMenuAppearance {...campaignControls} config={appearance} categories={categories} onSelect={id=>jumpMenuCategory(id)}/>}
 
 
-                {phoneMenu&&mobileFeatures?.pickupAddOns&&<MenuOffers branchId={branch.id} onTarget={onMenuTarget}/>}
 
                 <div
                     id="gokul-menu-items"
@@ -1674,7 +1665,6 @@ export default function MenuScreen() {
 
             {(mobileFeatures?.futuristicStorefrontV2===true||mobileFeatures?.checkoutExperienceV2===true)&&mobileFeatures?.contextualStorefrontV2===true&&!error&&categories.length>0&&<FloatingMenuCategories key={branch.id} categories={categories} selectedId={phoneMenu?(mobileCategories?.length===1?mobileCategories[0]:undefined):(effectiveCategoryId??undefined)} hasCart={itemCount>0} onSelect={jumpMenuCategory}/>}
             <FloatingCartButton
-                offerEnabled={phoneMenu&&!!mobileFeatures?.pickupAddOns} offerTarget={phoneMenu&&menuOffer?.key===offerContext?menuOffer.target:null}
                 itemCount={
                     itemCount
                 }

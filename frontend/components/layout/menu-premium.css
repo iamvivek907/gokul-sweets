@@ -41,9 +41,6 @@
 .future-storefront[data-premium-menu=true] .menu-browse-chips{display:flex;gap:8px;padding:10px 0 0;overflow:auto;scrollbar-width:none}
 .future-storefront[data-premium-menu=true] .menu-browse-chips button{display:flex;align-items:center;justify-content:center;gap:6px;flex:none;border:1px solid #e4e0e5;border-radius:24px;min-height:44px;padding:8px 14px;background:#fff;font-size:12px;font-weight:700}
 .future-storefront[data-premium-menu=true] .menu-browse-chips button[aria-pressed=true]{background:var(--menu-maroon);border-color:var(--menu-maroon);color:white}
-.future-storefront[data-premium-menu=true] .menu-offers{margin:8px 0!important;min-height:0!important}
-.future-storefront[data-premium-menu=true] .menu-offers>button{min-height:48px!important;height:auto!important;padding:7px 10px;border-radius:12px;background:#f6f1fa!important;border-color:#eae2f0;box-shadow:none}
-.future-storefront[data-premium-menu=true] .menu-offers>button strong{font-size:12px}.future-storefront[data-premium-menu=true] .menu-offers>button small{font-size:10px;line-height:14px}
 .future-storefront[data-premium-menu=true] #gokul-menu-items{margin-top:14px}
 .future-storefront[data-premium-menu=true] .menu-editorial-feature{position:relative;display:flex;justify-content:space-between;align-items:center;isolation:isolate;overflow:hidden;min-height:148px;margin:0 0 12px!important;padding:18px!important;border:0;border-radius:20px;background:linear-gradient(115deg,#ffe1d2,#ffcab9)!important}
 .future-storefront[data-premium-menu=true] .menu-editorial-feature--mint{background:linear-gradient(115deg,#e1f3e8,#c6e7d8)!important}
@@ -102,7 +99,6 @@
 .future-storefront[data-premium-menu=true] .gokul-floating-cart>a{min-height:52px;border-radius:14px;padding:8px 14px;background:#087f55!important;box-shadow:0 4px 15px #164c3620}
 .future-storefront[data-premium-menu=true] .gokul-floating-cart>a>div:first-child>div:first-child{width:30px;height:30px;color:#087f55}.future-storefront[data-premium-menu=true] .gokul-floating-cart>a>div:first-child>div:last-child{display:flex;flex-direction:row;align-items:center;gap:10px}
 .future-storefront[data-premium-menu=true] .gokul-floating-cart>a>div:first-child>div:last-child>p:last-child{font-size:13px}.future-storefront[data-premium-menu=true] .gokul-floating-cart>a>div:last-of-type{display:flex;align-items:center;gap:10px;font-size:14px}
-.future-storefront[data-premium-menu=true] .mobile-cart-offer-slot{min-height:0;height:auto;margin-bottom:4px}.future-storefront[data-premium-menu=true] .mobile-cart-offer-target{min-height:40px!important;height:auto!important;padding:6px 10px;border-radius:10px;background:#f1edfb!important;border:1px solid #e3d9f2;box-shadow:none}.future-storefront[data-premium-menu=true] .mobile-cart-offer-icon{display:none}.future-storefront[data-premium-menu=true] .mobile-cart-offer-target strong,.future-storefront[data-premium-menu=true] .mobile-cart-offer-target small{font-size:11px;line-height:14px}
 .future-storefront[data-premium-menu=true] .menu-cart-announcement{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden;clip-path:inset(50%);padding:0!important}
 .future-storefront[data-premium-menu=true] .gokul-menu-items-spacer{height:130px}
 .future-storefront[data-premium-menu=true] .mobile-items-picker{display:none}
@@ -128,10 +124,6 @@
 .future-storefront[data-premium-menu=true] .mobile-header-branch-name{display:none}
 .future-storefront[data-premium-menu=true] .customer-header-actions :is(.customer-notification-bell,.customer-account-link){color:#8f1838!important}
 /* Reserve the offer strip before its first response and through refresh/failure. */
-.future-storefront[data-premium-menu=true] .menu-offers>button{height:64px!important;min-height:64px!important;overflow:hidden}
-.future-storefront[data-premium-menu=true] .menu-offers>button>span:nth-child(2){min-width:0}
-.future-storefront[data-premium-menu=true] .menu-offers>button strong{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.future-storefront[data-premium-menu=true] .menu-offers>button small{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 
 .future-storefront[data-premium-menu=true] .menu-editorial-feature h2{position:relative;max-width:60%}
 }

@@ -29,9 +29,8 @@ try{for(const width of [320,390,640]){for(const outcome of ["populated","empty",
  const row=page.locator('#gokul-product-1');
  const offerBefore=await documentY(row);assert.equal(await page.locator('#menu-offers-open').isVisible(),true);
  releaseOffers();
- if(outcome==='populated')await page.locator('#menu-offers-open').getByText(/₹20(?:\.00)? off above ₹200(?:\.00)?/).waitFor();
- else if(outcome==='failed')await page.locator('#menu-offers-open').getByText('Offers could not be checked. Try again.',{exact:true}).waitFor();
- else await page.locator('#menu-offers-open').getByText('Add items to discover eligible savings',{exact:true}).waitFor();
+ if(outcome==='populated')await page.locator('#menu-offers-open').getByText(/₹20(?:\.00)? off/).waitFor();
+ else assert.equal(await page.locator('#menu-offers-open small').count(),0,'empty or failed catalogue makes no savings claim');
  await stable(row,offerBefore,`late ${outcome} offer`);
  for(const family of ['Sweets','Snacks']){
   await page.getByRole('button',{name:`Browse ${family}`,exact:true}).click();
