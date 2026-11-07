@@ -56,7 +56,7 @@ try{
   await page.keyboard.press('ArrowDown');const active=await input.getAttribute('aria-activedescendant');assert.ok(active);assert.equal(await page.locator(`[id="${active}"]`).getAttribute('aria-selected'),'true');const chosen=await page.locator(`[id="${active}"]`).getAttribute('aria-label');await page.keyboard.press('Enter');
   assert.equal(await input.inputValue(),chosen);
   const clear=page.getByRole('button',{name:'Clear search',exact:true});const rect=await clear.boundingBox();assert.ok(rect.width>=44&&rect.height>=44);
-  await clear.click();assert.equal(await input.inputValue(),'');assert.equal(await input.evaluate(n=>n===document.activeElement),true,'clear retains keyboard focus');
+  await clear.click();assert.equal(await input.inputValue(),'');await page.clock.runFor(64);assert.equal(await input.evaluate(n=>n===document.activeElement),true,'clear retains keyboard focus');
   await page.locator('#gokul-product-3').waitFor();
   await input.fill('zzzzzzzzz');await page.getByText('No matching items',{exact:true}).waitFor();assert.equal(await page.getByRole('listbox',{name:'Menu suggestions',exact:true}).count(),0);
   await clear.click();assert.equal(await input.inputValue(),'');assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),cart);assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-branch')),selectedBranch);
