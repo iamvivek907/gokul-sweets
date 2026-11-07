@@ -17,3 +17,20 @@ test('another server price change requires renewed confirmation',async()=>{const
 for(const change of ['quantity','cart'])test('changed '+change+' invalidates old confirmation',async()=>{const f=fixture({price:120});await f.run();if(change==='quantity')f.env.quantity=2;else f.changeCart();await f.run();assert.equal(f.writes,0);assert.equal(f.closed,false);await f.run();assert.equal(f.writes,1);});
 test('meal edits preserve the original until price confirmation',async()=>{const f=fixture({price:120,edit:true}),before=f.raw;await f.run();assert.equal(f.raw,before);await f.run();const cart=JSON.parse(f.raw);assert.equal(cart.meals.length,1);assert.equal(cart.meals[0].instanceId,'old');assert.equal(cart.meals[0].total,166.6);});
 for(const options of [{fail:true},{abort:true}])test('failed/cancelled quote leaves cart unchanged '+JSON.stringify(options),async()=>{const f=fixture(options),before=f.raw;await f.run();assert.equal(f.raw,before);assert.equal(f.writes,0);assert.equal(f.closed,false);assert.equal(f.env.priceReview,null);});
+test('a draft stock check cannot authorize different quantities returned by the meal quote',async()=>{
+ const f=fixture(),pickup={date:'2026-11-08',slot:{branchId:1,id:7},pickupType:'NORMAL'},checks=[];
+ Object.assign(f.env,{
+  smartAvailability:true,getPickupSlotSnapshot:()=>JSON.stringify(pickup),parsePickupSlot:JSON.parse,pickupIsFresh:()=>true,
+  draftMealPickupDemand:meals.draftMealPickupDemand,mealPickupDemand:meals.mealPickupDemand,
+  checkCartAvailability:async(_branch,date,_days,items)=>{
+   const quantity=items.find(item=>item.productId===1).quantity;
+   checks.push(quantity);
+   return {dates:[{date,slots:[{slot:pickup.slot,normalAvailable:quantity===1}]}]};
+  },
+ });
+ const quote=f.env.apiClient;
+ f.env.apiClient=async()=>{const priced=await quote();priced.components[0].quantity=2;return priced;};
+ await f.run();
+ assert.deepEqual(checks,[1,2]);
+ assert.equal(f.writes,0,'only the canonical basket can authorize an Add');
+});

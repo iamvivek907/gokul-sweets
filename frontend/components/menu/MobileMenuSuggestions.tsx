@@ -61,7 +61,7 @@ export default function MobileMenuSuggestions({branchId,products,groups=[],picku
   const c=new AbortController();
   const slotQuery=smartAvailability&&selected?`&pickupSlotId=${selected.slot.id}&pickupType=${selected.pickupType}`:"";
   void apiClient<Suggestion[]>(`/api/menu/pickup-addons?branchId=${branchId}${slotQuery}`,{method:"POST",body:request,credentials:"include",signal:AbortSignal.any([c.signal,AbortSignal.timeout(8000)])})
-   .then(items=>{if(!c.signal.aborted)setBranchResult({key,items:Array.isArray(items)?items:[]});})
+   .then(items=>{if(!c.signal.aborted)setBranchResult({key,items:Array.isArray(items)?items.filter(item=>Number.isSafeInteger(item?.product?.id)&&typeof item.reason==="string"&&Number.isFinite(item.portionTotal)&&(item.weightGrams===null||Number.isSafeInteger(item.weightGrams)&&item.weightGrams>0)):[]});})
    .catch(()=>{if(!c.signal.aborted)setBranchResult({key,items:[],failed:true});});
   return()=>c.abort();
  },[key,branchId,request,serviceDate,cart.branchId,cart.items.length,selected,smartAvailability,features?.pickupAddOns]);
@@ -110,7 +110,7 @@ export default function MobileMenuSuggestions({branchId,products,groups=[],picku
      .slice(0,3).map(p=>quote(p,sweets?"Complete your sweet box":"From the same menu section"));
    const priority=(id:number)=>{const index=configured.indexOf(id);return index<0?configured.length:index;};
    const rank=(items:Suggestion[])=>[...items].sort((a,b)=>priority(a.product.id)-priority(b.product.id));
-   const counts=new Map<number,number>();for(const visit of visits){if(visit.branchId!==branchId||visit.paymentStatus!=="PAID"||!["PICKED_UP","DELIVERED"].includes(visit.orderStatus))continue;for(const item of visit.items)counts.set(item.productId,(counts.get(item.productId)??0)+1);}
+   const counts=new Map<number,number>();for(const visit of visits){if(visit.branchId!==branchId||visit.paymentStatus!=="PAID"||!["PICKED_UP","DELIVERED"].includes(visit.orderStatus))continue;for(const item of visit.items)if(Number.isSafeInteger(item?.productId))counts.set(item.productId,(counts.get(item.productId)??0)+1);}
    const candidates=products.filter(p=>valid(p)&&(related(p)||companionDrink(p))&&counts.has(p.id)).sort((a,b)=>counts.get(b.id)!-counts.get(a.id)!||a.id-b.id).slice(0,2).map(product=>{const weightGrams=product.saleMode==="WEIGHT"?product.minimumWeightGrams??250:null;const price=Math.round(product.price*(weightGrams===null?1:weightGrams/1000)*100)/100;return {product,weightGrams,portionPrice:price,portionTotal:price,includesTax:false,reason:"Your completed-order favourite"};});
    // Slot checks below already include dated inventory. Without them, batch-check favourites
    // independently of the smart-availability flag; optional failures hide unverified candidates.
@@ -158,7 +158,6 @@ export default function MobileMenuSuggestions({branchId,products,groups=[],picku
  // Rows remain visible for continuity, but a fresh shared check must confirm
  // the current basket and pickup before Add or Increase can be used.
  const pairingVerified=current?.key===key;
- const pendingBasket=smartAvailability&&!!selected&&basketPickup==="unknown";
  const additionsBlocked=!pairingVerified||basketPickup==="blocked"||smartAvailability&&(!selected||basketPickup!=="ready");
  const live=new Map(products.map(p=>[p.id,p]));
  const groupFor=(id:number)=>groups.find(g=>g.choices.some(c=>c.productId===id));
@@ -175,30 +174,34 @@ export default function MobileMenuSuggestions({branchId,products,groups=[],picku
   const liveCart=parseCart(before);
   if(additionsBlocked||liveCart.branchId!==branchId||pickup!==intent.pickupRaw
      ||JSON.stringify({serviceDate,items:availabilityItems(liveCart.items,liveCart)})!==request){
-   setMessage("Checking availability for your updated cart…");return;
+   return;
   }
   locked.current=true;setBusy(s.product.id);setMessage("");
   const controller=new AbortController();addition.current=controller;
   const signal=AbortSignal.any([controller.signal,AbortSignal.timeout(15000)]);
   try{
    const combined=JSON.parse(request);const existing=combined.items.find((i:{productId:number})=>i.productId===s.product.id);if(existing){if(s.weightGrams===null)existing.quantity+=1;else existing.weightGrams+=s.weightGrams;}else combined.items.push({productId:s.product.id,quantity:s.weightGrams===null?1:null,weightGrams:s.weightGrams});
-   const check=await apiClient<{orderable:boolean}>(`/api/menu/pickup-addons/check?branchId=${branchId}`,{method:"POST",credentials:"include",body:JSON.stringify(combined),signal});
-   if(signal.aborted||!mounted.current)return;
-   if(!check.orderable)throw new Error("This addition no longer fits your pickup. Choose another time.");
-   if(selected&&!pickupIsFresh(selected,new Date()))throw new Error("Change pickup time to add this item. Your cart is saved.");
-   if(smartAvailability&&selected){const availability=await checkCartAvailability(branchId,selected.date,1,combined.items,signal);const slot=availability.dates.find(d=>d.date===selected.date)?.slots.find(s=>s.slot.id===selected.slot.id);if(!pickupIsFresh(selected,new Date())||!slot||!(selected.pickupType==="PRIORITY"?slot.priorityAvailable:slot.normalAvailable))throw new Error("Change pickup time to add this item. Your cart is saved.");}
+   if(smartAvailability&&selected){
+    if(!pickupIsFresh(selected,new Date()))throw new Error("Change pickup time to add this item. Your cart is saved.");
+    // The exact pickup check already covers date, stock, preparation and capacity.
+    const availability=await checkCartAvailability(branchId,selected.date,1,combined.items,signal);
+    const slot=availability.dates.find(d=>d.date===selected.date)?.slots.find(s=>s.slot.id===selected.slot.id);
+    if(!pickupIsFresh(selected,new Date())||!slot||!(selected.pickupType==="PRIORITY"?slot.priorityAvailable:slot.normalAvailable))throw new Error("This addition no longer fits your pickup. Choose another time.");
+   }else{
+    const check=await apiClient<{orderable:boolean}>(`/api/menu/pickup-addons/check?branchId=${branchId}`,{method:"POST",credentials:"include",body:JSON.stringify(combined),signal});
+    if(!check.orderable)throw new Error("This addition no longer fits your pickup. Choose another time.");
+   }
    if(signal.aborted||!mounted.current)return;
    if(before!==getCartSnapshot()||branch!==getStoredBranchSnapshot()||pickup!==getPickupSlotSnapshot())throw new Error("Your cart or pickup changed. Review it before adding.");
    // Stock checks need total demand; addItem edits only the standalone portion.
    const nextExtraWeight=s.weightGrams===null?undefined:(standaloneCartItems(parseCart(before)).find(i=>i.product.id===s.product.id)?.weightGrams??0)+s.weightGrams;
    const product=latestProducts.current.find(p=>p.id===s.product.id);if(!product?.available||cart.addItem(product,branchId,nextExtraWeight)!=="added")throw new Error("Review this item’s availability before adding.");
    onPairingAdded?.();
-   setAnnouncement(`${s.product.name} added. Your updated savings will be checked at checkout.`);
+   setAnnouncement(`${s.product.name} added.`);
   }catch(error){if(mounted.current&&!controller.signal.aborted)setMessage(error instanceof Error?error.message:"We couldn’t check this addition. Your cart is saved. Try again.");}
   finally{if(addition.current===controller)addition.current=null;locked.current=false;if(mounted.current)setBusy(null);}
  }
- const rechecking=!!current&&basketPickup!=="blocked"&&(!pairingVerified||pendingBasket);
- const status=message||(basketPickup==="failed"?"Retry pickup availability to add extras.":rechecking?"Checking availability for your updated cart…":"");
+ const status=message||(basketPickup==="failed"?"Retry pickup availability to add extras.":"");
  const failed=!suggestions.length&&branchResult?.key===key&&branchResult.failed===true;
 
  if((current||basketPickup==="blocked")&&!suggestions.length&&!failed&&!message&&!announcement&&!open&&!variant)return null;

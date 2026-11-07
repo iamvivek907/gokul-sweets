@@ -39,3 +39,9 @@ test('a transient batch retry reuses the successful batch and publishes a comple
  assert.deepEqual(f.calls.map(call=>call.body.items[0].productId),[1,101,101,201]);
  assert.equal(data.dates[0].items.length,215);
 });
+
+test('malformed availability stops the preview before unusable slot data can reach the menu',async()=>{
+ const f=fixture((body,n)=>{const data=response(body);if(n===2)data.dates[0].slots=[null];return data;});
+ await assert.rejects(f.checkMenuAvailability(1,'2026-10-08',1,items),/We couldn’t check pickup availability/);
+ assert.equal(f.calls.length,2);
+});

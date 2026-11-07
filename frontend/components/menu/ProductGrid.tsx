@@ -1,5 +1,5 @@
 "use client";
-import {Fragment} from "react";
+import {Fragment,useMemo} from "react";
 import type {ReactNode} from "react";
 import {T} from "@/lib/language";
 
@@ -81,6 +81,7 @@ export default function ProductGrid({
     dateAware
 }: ProductGridProps) {
 
+    const pickupById=useMemo(()=>new Map(pickupItems?.map(item=>[item.productId,item])),[pickupItems]);
     if (
         products.length === 0
     ) {
@@ -138,11 +139,11 @@ export default function ProductGrid({
             {/* Every size remains a link destination at the shared card's position. */}
             {Array.from(new Set(row.products.map(option=>option.id))).filter(id=>id!==product.id).map(id=><span key={id} id={`gokul-product-${id}`} aria-hidden="true" className="pointer-events-none absolute left-0 top-0 h-px w-px scroll-mt-24"/>)}
             <MobilePortionCard compact={compactGroups} group={row.group} products={row.products} quantities={quantities} onAdd={onAdd} onIncrease={onIncrease} onDecrease={onDecrease} ratings={ratingSummaries} loading={ratingsLoading} pickupItems={pickupItems} dateAware={dateAware} pickupChecking={pickupChecking} pickupStatusMessage={pickupStatusMessage}/></div>{pairing&&row.products.some(p=>p.id===pairingSeed)&&<div className="menu-grid-pairing">{pairing}</div>}</Fragment>;
-        const pickup = pickupItems?.find(item => item.productId === product.id);
+        const pickup = pickupById.get(product.id);
         const unavailable = !!dateAware && (pickupChecking || pickup?.available !== true);
         return (
             <Fragment key={product.id}><div id={`gokul-product-${product.id}`} data-menu-product-card tabIndex={-1} className="relative min-w-0 scroll-mt-24">
-                {dateAware && (pickup || pickupChecking) && !(refined && unavailable) && (
+                {dateAware && !pickupChecking && pickup && !(refined && unavailable) && (
                     <span className={`menu-availability-chip ${unavailable ? "menu-availability-chip--unavailable" : pickupChecking && !pickup ? "menu-availability-chip--checking" : ""}`}>
                         <span aria-hidden="true">{unavailable ? "!" : pickupChecking && !pickup ? "◌" : "✓"}</span>
                         {unavailable ? "Date unavailable" : pickupChecking && !pickup ? "Checking date" : "Date preview"}
@@ -163,7 +164,7 @@ export default function ProductGrid({
                     onDecrease={onDecrease}
                     onAdd={onAdd}
                 />
-                {unavailable && !refined && (
+                {unavailable && !refined && (!pickupChecking||pickupStatusMessage) && (
                     <p role="status" className="menu-availability-note">
                         <T text={pickupChecking ? pickupStatusMessage ?? "Checking pickup" : describePickupAvailability(pickup, false)}/>{!pickupChecking&&pickup?.available===false&&<button type="button" className="pickup-attention-action" onClick={()=>window.dispatchEvent(new Event("gokul-pickup-attention"))}><T text="Change pickup date"/></button>}
                     </p>

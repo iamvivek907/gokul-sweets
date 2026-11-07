@@ -722,12 +722,11 @@ export default function MenuScreen() {
     },[branch,restoredBrowse]);
     const [portionSnapshot,setPortionSnapshot]=useState<{branchId:number;groups:PortionGroup[]}|null>(null);
     const portionGroups=useMemo(()=>portionSnapshot?.branchId===branch?.id?portionSnapshot?.groups??[]:[],[portionSnapshot,branch?.id]);
-    useEffect(()=>{if(!groupedMenu||!branch)return;const controller=new AbortController();void apiClient<{groups:PortionGroup[]}>(`/api/menu/portion-groups?branchId=${branch.id}`,{signal:controller.signal}).then(value=>{if(!controller.signal.aborted)setPortionSnapshot({branchId:branch.id,groups:value.groups??[]});}).catch(()=>{});return()=>controller.abort();},[groupedMenu,branch]);
+    useEffect(()=>{if(!groupedMenu||!branch)return;const controller=new AbortController();void apiClient<{groups:PortionGroup[]}>(`/api/menu/portion-groups?branchId=${branch.id}`,{signal:controller.signal}).then(value=>{if(!controller.signal.aborted)setPortionSnapshot({branchId:branch.id,groups:Array.isArray(value?.groups)?value.groups.filter(group=>typeof group?.key==="string"&&typeof group.title==="string"&&Array.isArray(group.choices)&&group.choices.every(choice=>Number.isSafeInteger(choice?.productId)&&typeof choice.label==="string")):[]});}).catch(()=>{});return()=>controller.abort();},[groupedMenu,branch]);
     const pickupCheck = useDateAvailability(allProducts);
     const pickupChecking = !!pickupCheck.features?.smartAvailability && (pickupCheck.pickupRequired || pickupCheck.findingSoonest || !pickupCheck.items || !!pickupCheck.error || !!pickupCheck.automaticError);
     const pickupStatusMessage = pickupCheck.error || pickupCheck.automaticError ? "Pickup check failed. Please retry."
-        : pickupCheck.findingSoonest ? "Finding soonest pickup…"
-        : pickupCheck.pickupRequired ? "Choose pickup time to add" : "Checking pickup";
+        : pickupCheck.pickupRequired&&!pickupCheck.findingSoonest ? "Choose pickup time to add" : "";
     const pickupAllows = (id:number) => !pickupCheck.features?.smartAvailability || !!pickupCheck.intent.selection && pickupCheck.intent.pickupRaw === getPickupSlotSnapshot() && pickupIsFresh(pickupCheck.intent.selection,new Date()) && !pickupCheck.findingSoonest && !pickupChecking && pickupCheck.items?.find(item=>item.productId===id)?.available === true;
     const [availableOnly,setAvailableOnly]=useState(false);
     const filterByPickup = availableOnly && pickupCheck.features?.smartAvailability === true;
@@ -879,7 +878,10 @@ export default function MenuScreen() {
         ||
         (phoneMenu ? (!!(mobileCategories??(effectiveCategoryId===null?[]:[effectiveCategoryId])).length || maximumPrice!==null || portionsOnly) : effectiveCategoryId !== null);
 
-    const guardedIncrease = (id:number) => {if(pickupAllows(id))increaseQuantity(id);};
+    const guardedIncrease = (id:number) => {
+        try {if(pickupAllows(id))increaseQuantity(id);}
+        catch {setCartNotice("Couldn’t update your cart. Try again.");}
+    };
     const [mealShelfHost,setMealShelfHost]=useState<HTMLDivElement|null>(null);
     const pickupGrid = (products:MenuProduct[],afterLeadingRows?:ReactNode) => <ProductGrid afterLeadingRows={afterLeadingRows} pairingSeed={pairingSeed} pairing={retailBrowse?null:pairing}
         portionGroups={groupedMenu?portionGroups:undefined} catalogProducts={catalogForResults} compactGroups={phoneMenu}
@@ -914,7 +916,12 @@ export default function MenuScreen() {
     }
 
 
-    function commitAddToCart(
+    function commitAddToCart(product:MenuProduct,weightGrams?:number) {
+        try {writeMenuCart(product,weightGrams);}
+        catch {setCartNotice("Couldn’t update your cart. Try again.");}
+    }
+
+    function writeMenuCart(
         product: MenuProduct,
         weightGrams?: number
     ) {
@@ -938,11 +945,11 @@ export default function MenuScreen() {
         });
 
         if (weightGrams && pickupCheck.features?.smartAvailability && weightPickup.current!==getPickupSlotSnapshot()) {setCartNotice("Pickup changed. Review the displayed time before adding.");return;}
-        const liveProduct=categories.flatMap(category=>category.products).find(item=>item.id===product.id);
+        const liveProduct=allProducts.find(item=>item.id===product.id);
         if(!liveProduct?.available || !pickupAllows(product.id)){setWeightProduct(null);setCartNotice(liveProduct?.serviceAvailability?.message??"This item is currently unavailable.");return;}
         const result =
             addItem(
-                product,
+                liveProduct,
                 branch.id,
                 weightGrams
             );
@@ -983,7 +990,7 @@ export default function MenuScreen() {
 
 
             replaceCartForBranch(
-                product,
+                liveProduct,
                 branch.id,
                 weightGrams
             );
@@ -1349,7 +1356,7 @@ export default function MenuScreen() {
                 {groupedMenu&&!!appearance?.banners.length&&<div className="menu-leading-campaign"><MenuCampaignBanners {...campaignControls} banners={appearance.banners} categories={categories} onSelect={id => {jumpMenuCategory(id);setBrowseCategory({branchId:branch.id,id});}} compact={phoneMenu}/></div>}
                 <MenuToolbar enabled={phoneMenu}>
                 {!mobileFeatures?.smartAvailability&&(mobileFeatures?.futuristicStorefrontV2||mobileFeatures?.checkoutExperienceV2)&&<button type="button" className="menu-pickup-help ordering-tour-replay" aria-label={translate("How to order")} onClick={()=>window.dispatchEvent(new Event(OPEN_ORDERING_TOUR))}><span aria-hidden="true">?</span></button>}
-                {mobileFeatures?.smartAvailability&&<MobileMenuPickup showHelp={!!(mobileFeatures?.futuristicStorefrontV2||mobileFeatures?.checkoutExperienceV2)} compactHeader={phoneMenu} key={branch.id} branchId={branch.id} products={allProducts} today={pickupCheck.today} days={mobileFeatures.futureOrderingDays??30} selection={pickupCheck.intent.selection} date={pickupCheck.intent.date} expired={pickupCheck.intent.expired} selectionUnavailable={pickupCheck.selectionUnavailable} noPickupMessage={pickupCheck.noPickupMessage} availabilityError={pickupCheck.automaticError??pickupCheck.error} onRetry={pickupCheck.retry} automatic={pickupCheck.intent.automatic} findingSoonest={pickupCheck.findingSoonest} onChoosingChange={pickupCheck.setChoosing}/>}
+                {mobileFeatures?.smartAvailability&&<MobileMenuPickup showHelp={!!(mobileFeatures?.futuristicStorefrontV2||mobileFeatures?.checkoutExperienceV2)} compactHeader={phoneMenu} key={branch.id} branchId={branch.id} products={allProducts} today={pickupCheck.today} days={mobileFeatures.futureOrderingDays??30} selection={pickupCheck.intent.selection} date={pickupCheck.intent.date} expired={pickupCheck.intent.expired} selectionUnavailable={pickupCheck.selectionUnavailable} noPickupMessage={pickupCheck.noPickupMessage} availabilityError={pickupCheck.automaticError??pickupCheck.error} onRetry={pickupCheck.retry} automatic={pickupCheck.intent.automatic} onChoosingChange={pickupCheck.setChoosing}/>}
 
                 <div
                     className="gokul-menu-tools

@@ -82,6 +82,7 @@ try{
  holdBasket=true;
  const seedIncrease=page.getByRole('button',{name:'Add one more Sweet 1',exact:true});
  await seedIncrease.click();await basketStarted;
+ assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items.find(item=>item.product.id===1).quantity),2,'ordinary Add updates the cart while the network refresh is still held');
  assert.equal(await addPairing.isDisabled(),true,'the previous result cannot enable Add after the basket changes');
  assert.equal(addChecks,0,'no add request is sent during the recheck');
  holdBasket=false;releaseBasket();
