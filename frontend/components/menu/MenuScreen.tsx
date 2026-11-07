@@ -16,7 +16,6 @@ import RetailSweetRail from "./RetailSweetRail";
 import MenuExperience from "./MenuExperience";
 import SavedDishesHelp from "./SavedDishesHelp";
 import {useMenuFavourites} from "@/hooks/useMenuFavourites";
-import {splitMenuLead} from "@/lib/mobileMenu";
 import MenuCampaignBanners from "./MenuCampaignBanners";
 import {useBranchMenuAppearance} from "@/hooks/useBranchMenuAppearance";
 import MenuCategorySection from "./MenuCategorySection";
@@ -46,6 +45,7 @@ import NewBranchItems from "@/components/menu/NewBranchItems";
 import {useDateAvailability} from "@/components/menu/PickupContext";
 
 import {
+    type ReactNode,
     useEffect,
     useMemo,
     useRef,
@@ -879,7 +879,7 @@ export default function MenuScreen() {
         (phoneMenu ? (!!(mobileCategories??(effectiveCategoryId===null?[]:[effectiveCategoryId])).length || maximumPrice!==null || portionsOnly) : effectiveCategoryId !== null);
 
     const guardedIncrease = (id:number) => {if(pickupAllows(id))increaseQuantity(id);};
-    const pickupGrid = (products:MenuProduct[]) => <ProductGrid pairingSeed={pairingSeed} pairing={retailBrowse?null:pairing}
+    const pickupGrid = (products:MenuProduct[],afterLeadingRows?:ReactNode) => <ProductGrid afterLeadingRows={afterLeadingRows} pairingSeed={pairingSeed} pairing={retailBrowse?null:pairing}
         portionGroups={groupedMenu?portionGroups:undefined} catalogProducts={catalogForResults} compactGroups={phoneMenu}
         refined={pickupCheck.features?.contextualStorefrontV2 === true} pickupItems={pickupCheck.items}
         pickupChecking={pickupChecking} pickupStatusMessage={pickupStatusMessage} dateAware={!!pickupCheck.features?.smartAvailability} products={products}
@@ -887,7 +887,13 @@ export default function MenuScreen() {
         onIncrease={guardedIncrease} onDecrease={decreaseQuantity} onAdd={handleAddToCart}/>;
     const [lastAdded,setLastAdded]=useState<number|null>(null);
     const pairingSeed=lastAdded??items.at(-1)?.product.id;
-    const pairing=phoneMenu&&mobileFeatures?.pickupAddOns&&branch&&items.some(i=>i.product.id===pairingSeed)&&!filterByPickup&&filteredProducts.some(p=>p.id===pairingSeed)?<div className="mobile-menu-pairing-slot"><MobileMenuSuggestions seedProduct={allProducts.find(p=>p.id===pairingSeed)} pairings={appearance?.pairings} onPairingAdded={()=>setLastAdded(pairingSeed??null)} branchId={branch.id} products={allProducts} groups={portionGroups} pickupItems={pickupCheck.items}/></div>:null;
+    const basketPickup = useMemo(()=>{
+        if(!pickupCheck.features?.smartAvailability||!pickupCheck.intent.selection)return "unknown";
+        const decisions=new Map(pickupCheck.items?.map(item=>[item.productId,item.available]));
+        if(pickupCheck.selectionUnavailable||items.some(item=>decisions.get(item.product.id)===false))return "blocked";
+        return pickupCheck.data&&!pickupChecking&&items.every(item=>decisions.get(item.product.id)===true)?"ready":"unknown";
+    },[pickupCheck.features?.smartAvailability,pickupCheck.intent.selection,pickupCheck.items,pickupCheck.selectionUnavailable,pickupCheck.data,pickupChecking,items]);
+    const pairing=phoneMenu&&mobileFeatures?.pickupAddOns&&branch&&items.some(i=>i.product.id===pairingSeed)&&!filterByPickup&&filteredProducts.some(p=>p.id===pairingSeed)?<div className="mobile-menu-pairing-slot"><MobileMenuSuggestions seedProduct={allProducts.find(p=>p.id===pairingSeed)} pairings={appearance?.pairings} onPairingAdded={()=>setLastAdded(pairingSeed??null)} branchId={branch.id} products={allProducts} groups={portionGroups} pickupItems={pickupCheck.items} basketPickup={basketPickup}/></div>:null;
 
     const weightPickup = useRef("");
     function handleAddToCart(
@@ -1535,7 +1541,7 @@ export default function MenuScreen() {
 
                                 {phoneMenu&&retailBrowse&&<h3 className="menu-retail-collection-title"><T text="Everyday favourites"/></h3>}
                                 {pickupCheck.features?.contextualStorefrontV2 ? <div>
-                                    {menuSections.map((group,index)=><MenuCategorySection key={phoneMenu?`${group.id}:${activeBrowse?.id??"all"}:${retailBrowse?"retail":"menu"}`:group.id} id={group.id} name={group.name} displayName={phoneMenu&&activeBrowse&&menuFamily(activeBrowse.name)==="Sweets"&&group.id===activeBrowse.id?"Sweets you’ll love":undefined} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} description={group.description} collapsible={phoneMenu}>{groupedMenu&&index===0?<>{pickupGrid(splitMenuLead(group.products,portionGroups).lead)}{visibleMeals.length>0&&<MealCollection key={branch.id} branchId={branch.id} products={allProducts} meals={visibleMeals} smartAvailability={mobileFeatures?.smartAvailability===true} pickupItems={pickupCheck.items} pickupChecking={pickupChecking} pickupSelected={!!pickupCheck.intent.selection} pickupFailed={!!(pickupCheck.error||pickupCheck.automaticError)} onRetryPickup={pickupCheck.retry}/>} {pickupGrid(splitMenuLead(group.products,portionGroups).rest)}</>:pickupGrid(group.products)}</MenuCategorySection>)}
+                                    {menuSections.map((group,index)=><MenuCategorySection key={phoneMenu?`${group.id}:${activeBrowse?.id??"all"}:${retailBrowse?"retail":"menu"}`:group.id} id={group.id} name={group.name} displayName={phoneMenu&&activeBrowse&&menuFamily(activeBrowse.name)==="Sweets"&&group.id===activeBrowse.id?"Sweets you’ll love":undefined} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} description={group.description} collapsible={phoneMenu}>{pickupGrid(group.products,groupedMenu&&index===0&&visibleMeals.length>0?<MealCollection key={branch.id} branchId={branch.id} products={allProducts} meals={visibleMeals} smartAvailability={mobileFeatures?.smartAvailability===true} pickupItems={pickupCheck.items} pickupChecking={pickupChecking} pickupSelected={!!pickupCheck.intent.selection} pickupFailed={!!(pickupCheck.error||pickupCheck.automaticError)} onRetryPickup={pickupCheck.retry}/>:undefined)}</MenuCategorySection>)}
                                 </div> : (
                                 <ProductGrid
                                     pairingSeed={pairingSeed}

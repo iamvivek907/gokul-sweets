@@ -23,6 +23,7 @@ import type {
 interface ProductGridProps {
     pairingSeed?:number;
     pairing?:ReactNode;
+    afterLeadingRows?:ReactNode;
     portionGroups?: PortionGroup[];
     compactGroups?: boolean;
     catalogProducts?: MenuProduct[];
@@ -61,6 +62,7 @@ interface ProductGridProps {
 export default function ProductGrid({
     pairingSeed,
     pairing,
+    afterLeadingRows,
     portionGroups,
     compactGroups=true,
     catalogProducts,
@@ -128,48 +130,52 @@ export default function ProductGrid({
     }
 
 
+    // A shelf can move between rows without moving a card to a different React parent.
+    // Keep every card and the shelf in the same keyed list so open sheets survive reordering.
+    const rows = mobileMenuRows(products,portionGroups??[],catalogProducts??products).map(row => {
+        const product=row.product;
+        if(row.group&&row.products)return <Fragment key={row.group.key}><div id={`gokul-product-${product.id}`} data-menu-product-card tabIndex={-1} className="relative min-w-0 scroll-mt-24">
+            {/* Every size remains a link destination at the shared card's position. */}
+            {Array.from(new Set(row.products.map(option=>option.id))).filter(id=>id!==product.id).map(id=><span key={id} id={`gokul-product-${id}`} aria-hidden="true" className="pointer-events-none absolute left-0 top-0 h-px w-px scroll-mt-24"/>)}
+            <MobilePortionCard compact={compactGroups} group={row.group} products={row.products} quantities={quantities} onAdd={onAdd} onIncrease={onIncrease} onDecrease={onDecrease} ratings={ratingSummaries} loading={ratingsLoading} pickupItems={pickupItems} dateAware={dateAware} pickupChecking={pickupChecking} pickupStatusMessage={pickupStatusMessage}/></div>{pairing&&row.products.some(p=>p.id===pairingSeed)&&<div className="menu-grid-pairing">{pairing}</div>}</Fragment>;
+        const pickup = pickupItems?.find(item => item.productId === product.id);
+        const unavailable = !!dateAware && (pickupChecking || pickup?.available !== true);
+        return (
+            <Fragment key={product.id}><div id={`gokul-product-${product.id}`} data-menu-product-card tabIndex={-1} className="relative min-w-0 scroll-mt-24">
+                {dateAware && (pickup || pickupChecking) && !(refined && unavailable) && (
+                    <span className={`menu-availability-chip ${unavailable ? "menu-availability-chip--unavailable" : pickupChecking && !pickup ? "menu-availability-chip--checking" : ""}`}>
+                        <span aria-hidden="true">{unavailable ? "!" : pickupChecking && !pickup ? "◌" : "✓"}</span>
+                        {unavailable ? "Date unavailable" : pickupChecking && !pickup ? "Checking date" : "Date preview"}
+                    </span>
+                )}
+                <ProductCard
+                    premium={portionGroups!==undefined&&compactGroups}
+                    refined={refined}
+                    unavailableForPickup={unavailable}
+                    pickupMessage={pickupChecking ? pickupStatusMessage ?? "Checking pickup" : describePickupAvailability(pickup, false)}
+                    pickupChecking={pickupChecking}
+                    product={product}
+                    ratingSummary={ratingSummaries[product.id] ?? null}
+                    ratingLoading={ratingsLoading}
+                    quantity={quantities[product.id] ?? 0}
+                    weightGrams={weights[product.id] ?? null}
+                    onIncrease={onIncrease}
+                    onDecrease={onDecrease}
+                    onAdd={onAdd}
+                />
+                {unavailable && !refined && (
+                    <p role="status" className="menu-availability-note">
+                        <T text={pickupChecking ? pickupStatusMessage ?? "Checking pickup" : describePickupAvailability(pickup, false)}/>{!pickupChecking&&pickup?.available===false&&<button type="button" className="pickup-attention-action" onClick={()=>window.dispatchEvent(new Event("gokul-pickup-attention"))}><T text="Change pickup date"/></button>}
+                    </p>
+                )}
+            </div>{pairing&&product.id===pairingSeed&&<div className="menu-grid-pairing">{pairing}</div>}</Fragment>
+        );
+    });
+    if(afterLeadingRows)rows.splice(4,0,<Fragment key="menu-meal-shelf"><div className="col-span-full min-w-0">{afterLeadingRows}</div></Fragment>);
     return (
         <div className={dateAware ? styles.products : undefined}>
             <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 ${refined ? "gokul-menu-product-grid" : ""}`}>
-                {mobileMenuRows(products,portionGroups??[],catalogProducts??products).map(row => {
-                    const product=row.product;
-                    if(row.group&&row.products)return <Fragment key={row.group.key}><div id={`gokul-product-${product.id}`} data-menu-product-card tabIndex={-1} className="relative min-w-0 scroll-mt-24">
-                        {/* Every size remains a link destination at the shared card's position. */}
-                        {Array.from(new Set(row.products.map(option=>option.id))).filter(id=>id!==product.id).map(id=><span key={id} id={`gokul-product-${id}`} aria-hidden="true" className="pointer-events-none absolute left-0 top-0 h-px w-px scroll-mt-24"/>)}
-                        <MobilePortionCard compact={compactGroups} group={row.group} products={row.products} quantities={quantities} onAdd={onAdd} onIncrease={onIncrease} onDecrease={onDecrease} ratings={ratingSummaries} loading={ratingsLoading} pickupItems={pickupItems} dateAware={dateAware} pickupChecking={pickupChecking} pickupStatusMessage={pickupStatusMessage}/></div>{pairing&&row.products.some(p=>p.id===pairingSeed)&&<div className="menu-grid-pairing">{pairing}</div>}</Fragment>;
-                    const pickup = pickupItems?.find(item => item.productId === product.id);
-                    const unavailable = !!dateAware && (pickupChecking || pickup?.available !== true);
-                    return (
-                        <Fragment key={product.id}><div id={`gokul-product-${product.id}`} data-menu-product-card tabIndex={-1} className="relative min-w-0 scroll-mt-24">
-                            {dateAware && (pickup || pickupChecking) && !(refined && unavailable) && (
-                                <span className={`menu-availability-chip ${unavailable ? "menu-availability-chip--unavailable" : pickupChecking && !pickup ? "menu-availability-chip--checking" : ""}`}>
-                                    <span aria-hidden="true">{unavailable ? "!" : pickupChecking && !pickup ? "◌" : "✓"}</span>
-                                    {unavailable ? "Date unavailable" : pickupChecking && !pickup ? "Checking date" : "Date preview"}
-                                </span>
-                            )}
-                            <ProductCard
-                                premium={portionGroups!==undefined&&compactGroups}
-                                refined={refined}
-                                unavailableForPickup={unavailable}
-                                pickupMessage={pickupChecking ? pickupStatusMessage ?? "Checking pickup" : describePickupAvailability(pickup, false)}
-                                pickupChecking={pickupChecking}
-                                product={product}
-                                ratingSummary={ratingSummaries[product.id] ?? null}
-                                ratingLoading={ratingsLoading}
-                                quantity={quantities[product.id] ?? 0}
-                                weightGrams={weights[product.id] ?? null}
-                                onIncrease={onIncrease}
-                                onDecrease={onDecrease}
-                                onAdd={onAdd}
-                            />
-                            {unavailable && !refined && (
-                                <p role="status" className="menu-availability-note">
-                                    <T text={pickupChecking ? pickupStatusMessage ?? "Checking pickup" : describePickupAvailability(pickup, false)}/>{!pickupChecking&&pickup?.available===false&&<button type="button" className="pickup-attention-action" onClick={()=>window.dispatchEvent(new Event("gokul-pickup-attention"))}><T text="Change pickup date"/></button>}
-                                </p>
-                            )}
-                        </div>{pairing&&product.id===pairingSeed&&<div className="menu-grid-pairing">{pairing}</div>}</Fragment>
-                    );
-                })}
+                {rows}
             </div>
         </div>
     );

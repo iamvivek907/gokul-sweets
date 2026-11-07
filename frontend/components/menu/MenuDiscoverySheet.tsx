@@ -1,11 +1,12 @@
 "use client";
 import {useLayoutEffect,useId,useRef,type ReactNode,type RefObject} from "react";
+import {createPortal} from "react-dom";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import styles from "./MenuDiscoverySheet.module.css";
 import {useMenuSheetDismiss} from "@/hooks/useMenuSheetDismiss";
 import {T,useTranslation} from "@/lib/language";
 
-export default function MenuDiscoverySheet({title,children,onClose,onDismissStart,className,returnFocusId,restoreFocus,initialFocusSelector,restoreFocusOnClose,fitVisualViewport=false,tactile=false,footer,closeLabel="Close",hideClose=false}:{title:string;children:ReactNode;onClose:()=>void;onDismissStart?:()=>void;className?:string;returnFocusId?:string;restoreFocus?:HTMLElement|null;initialFocusSelector?:string;restoreFocusOnClose?:RefObject<boolean>;fitVisualViewport?:boolean;tactile?:boolean;footer?:ReactNode|((close:()=>void)=>ReactNode);closeLabel?:string;hideClose?:boolean}){
+export default function MenuDiscoverySheet({title,children,onClose,onDismissStart,className,returnFocusId,restoreFocus,initialFocusSelector,restoreFocusOnClose,fitVisualViewport=false,stableMenuLayer=false,tactile=false,footer,closeLabel="Close",hideClose=false}:{title:string;children:ReactNode;onClose:()=>void;onDismissStart?:()=>void;className?:string;returnFocusId?:string;restoreFocus?:HTMLElement|null;initialFocusSelector?:string;restoreFocusOnClose?:RefObject<boolean>;fitVisualViewport?:boolean;stableMenuLayer?:boolean;tactile?:boolean;footer?:ReactNode|((close:()=>void)=>ReactNode);closeLabel?:string;hideClose?:boolean}){
  const translate=useTranslation(),features=useStorefrontFeatures();
  const polished=tactile&&!!(features?.futuristicStorefrontV2||features?.checkoutExperienceV2);
  const dialog=useRef<HTMLDialogElement>(null),titleId=useId();
@@ -54,8 +55,14 @@ export default function MenuDiscoverySheet({title,children,onClose,onDismissStar
   <div tabIndex={polished?0:undefined} className={`mobile-menu-suggestion-body ${polished?styles.scrollBody:""}`}>{children}</div>
   {footer&&<footer className={styles.footer}>{typeof footer==="function"?footer(()=>tactile?dismiss():closeImmediately()):footer}</footer>}
  </>;
- return <dialog ref={dialog} className={`mobile-menu-suggestion-dialog ${styles.dialog} ${tactile?styles.motion:""} ${polished?styles.polished:""} ${className??""}`} aria-labelledby={titleId} onCancel={event=>{event.preventDefault();if(tactile)dismiss();else closeImmediately();}} onClick={event=>{const box=event.currentTarget.getBoundingClientRect();if(event.target===event.currentTarget&&(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom)){if(tactile)dismiss();else closeImmediately();}}}>
+ const sheet=<dialog ref={dialog} className={`mobile-menu-suggestion-dialog ${styles.dialog} ${tactile?styles.motion:""} ${polished?styles.polished:""} ${className??""}`} aria-labelledby={titleId} onCancel={event=>{event.preventDefault();if(tactile)dismiss();else closeImmediately();}} onClick={event=>{const box=event.currentTarget.getBoundingClientRect();if(event.target===event.currentTarget&&(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom)){if(tactile)dismiss();else closeImmediately();}}}>
   {polished&&!hideClose&&<button type="button" className={styles.floatingClose} aria-label={translate(closeLabel)} onClick={()=>dismiss(true)} autoFocus><span aria-hidden="true">×</span></button>}
   {polished?<div className={styles.frame}>{content}</div>:content}
  </dialog>;
+ // A native modal leaves the top layer if a keyed card moves its DOM subtree.
+ // Keep menu-owned dialogs under the same themed shell but outside sortable rows.
+ const host=stableMenuLayer&&typeof document!=="undefined"
+  ?document.querySelector<HTMLElement>('.app-container[data-customer-route="/menu"]')
+  :null;
+ return host?createPortal(sheet,host):sheet;
 }

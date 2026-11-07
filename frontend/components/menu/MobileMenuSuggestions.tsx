@@ -32,7 +32,7 @@ import type {MenuProduct} from "@/types/menu";
 type Visit={branchId:number;orderStatus:string;paymentStatus:string;items:{productId:number}[]};
 type Suggestion={slotVerified?:boolean;includesTax?:boolean;product:MenuProduct;weightGrams:number|null;portionPrice:number;portionTotal:number;reason:string};
 const money=(value:number)=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",minimumFractionDigits:0,maximumFractionDigits:2}).format(value);
-export default function MobileMenuSuggestions({branchId,products,groups=[],pickupItems,seedProduct,pairings,onPairingAdded}:{onPairingAdded?:()=>void;seedProduct?:MenuProduct;pairings?:MenuPairing[];branchId:number;products:MenuProduct[];groups?:PortionGroup[];pickupItems?:ItemAvailability[]}){
+export default function MobileMenuSuggestions({branchId,products,groups=[],pickupItems,seedProduct,pairings,onPairingAdded,basketPickup="unknown"}:{basketPickup?:"ready"|"blocked"|"unknown";onPairingAdded?:()=>void;seedProduct?:MenuProduct;pairings?:MenuPairing[];branchId:number;products:MenuProduct[];groups?:PortionGroup[];pickupItems?:ItemAvailability[]}){
  const features=useStorefrontFeatures(),smartAvailability=features?.smartAvailability===true;
  const cart=useCart(),intent=usePickupIntent(branchId),locked=useRef(false);
  const mounted=useRef(false),addition=useRef<AbortController|null>(null),latestProducts=useRef(products);
@@ -104,8 +104,8 @@ export default function MobileMenuSuggestions({branchId,products,groups=[],picku
     return {product,weightGrams,portionPrice:price,portionTotal:price,includesTax:false,reason};
    };
    // The menu's shared preview already checked one portion of every candidate for this pickup.
-   const orderable=new Set(smartAvailability&&selected?pickupItems?.filter(item=>item.available).map(item=>item.productId):[]);
-   const configuredRows=configured.flatMap(id=>{const product=products.find(p=>p.id===id&&valid(p));return product?[quote(product,"Suggested by this branch")]:[];}).slice(0,5);
+   const orderable=new Set(smartAvailability&&selected&&basketPickup==="ready"?pickupItems?.filter(item=>item.available).map(item=>item.productId):[]);
+   const configuredRows=configured.flatMap(id=>{const product=products.find(p=>p.id===id&&valid(p));return product?[quote(product,"Suggested by this branch")]:[];});
    const fallback=products.filter(p=>valid(p)&&related(p)&&orderable.has(p.id)&&!configured.includes(p.id))
      .slice(0,3).map(p=>quote(p,sweets?"Complete your sweet box":"From the same menu section"));
    const priority=(id:number)=>{const index=configured.indexOf(id);return index<0?configured.length:index;};
@@ -114,12 +114,21 @@ export default function MobileMenuSuggestions({branchId,products,groups=[],picku
    const candidates=products.filter(p=>valid(p)&&(related(p)||companionDrink(p))&&counts.has(p.id)).sort((a,b)=>counts.get(b.id)!-counts.get(a.id)!||a.id-b.id).slice(0,2).map(product=>{const weightGrams=product.saleMode==="WEIGHT"?product.minimumWeightGrams??250:null;const price=Math.round(product.price*(weightGrams===null?1:weightGrams/1000)*100)/100;return {product,weightGrams,portionPrice:price,portionTotal:price,includesTax:false,reason:"Your completed-order favourite"};});
    // Slot checks below already include dated inventory. Without them, batch-check favourites
    // independently of the smart-availability flag; optional failures hide unverified candidates.
-   const inventoryVerified=(candidates:Suggestion[])=>candidates.length
-    ? checkInventory(branchId,{serviceDate:serviceDate!,items:candidates.map(s=>({productId:s.product.id,quantity:s.weightGrams===null?1:null,weightGrams:s.weightGrams}))},AbortSignal.any([c.signal,AbortSignal.timeout(8000)]))
-       .then(value=>candidates.filter(s=>value.enforcementEnabled===false||value.items.some(item=>item.productId===s.product.id&&item.orderable))).catch(()=>[])
-    : Promise.resolve([]);
+   const inventoryVerified=(candidates:Suggestion[],verifyBasket=false)=>{
+    if(!candidates.length)return Promise.resolve([]);
+    const basket=verifyBasket?availabilityItems(cart.items).map(({productId,quantity,weightGrams})=>({productId,quantity,weightGrams})):[];
+    const items=[...basket,...candidates.map(s=>({productId:s.product.id,quantity:s.weightGrams===null?1:null,weightGrams:s.weightGrams}))];
+    return checkInventory(branchId,{serviceDate,items},AbortSignal.any([c.signal,AbortSignal.timeout(8000)]))
+      .then(value=>{
+       if(value.enforcementEnabled===false)return candidates;
+       const ready=new Set(value.items.filter(item=>item.orderable).map(item=>item.productId));
+       return basket.every(item=>ready.has(item.productId))?candidates.filter(s=>ready.has(s.product.id)):[];
+      }).catch(()=>[]);
+   };
    const favouritesCheck=!smartAvailability||!selected?inventoryVerified(candidates):Promise.resolve(candidates);
-   const configuredCheck=smartAvailability?Promise.resolve(configuredRows.filter(item=>orderable.has(item.product.id))):inventoryVerified(configuredRows);
+   const configuredCheck=smartAvailability
+    ? Promise.resolve(configuredRows.filter(item=>orderable.has(item.product.id)).slice(0,5))
+    : inventoryVerified(configuredRows.slice(0,Math.max(0,100-cart.items.length)),true);
    let verified:Suggestion[]=[];
    const publish=async(candidates:Suggestion[],alreadyVerified=false)=>{
     let items=candidates.filter(s=>products.some(p=>p.id===s.product.id&&valid(p))).slice(0,5);
@@ -130,7 +139,7 @@ export default function MobileMenuSuggestions({branchId,products,groups=[],picku
      const issues=available?.dates.find(d=>d.date===selected.date)?.slots.find(s=>s.slot.id===selected.slot.id)?.issues??[];
      items=option&&!issues.some(i=>!i.available&&cart.items.some(c=>c.product.id===i.productId))?items.filter(s=>!issues.some(i=>i.productId===s.product.id&&!i.available)):[];
     }
-    if(c.signal.aborted||!items.length)return;
+    if(c.signal.aborted||!items.length||basketPickup==="blocked")return;
     verified=rank(stableSuggestions(verified,[...verified,...items.filter(s=>!verified.some(item=>item.product.id===s.product.id))])).slice(0,5);
     setResult(previous=>({key,scope,items:rank(stableSuggestions(previous?.scope===scope?previous.items:[],[...verified,...(previous?.scope===scope?previous.items.filter(s=>cart.items.some(i=>i.product.id===s.product.id)):[])]))}));
    };
@@ -144,7 +153,7 @@ export default function MobileMenuSuggestions({branchId,products,groups=[],picku
    if(!c.signal.aborted&&(branchResult?.key===key||verified.length))setResult(previous=>({key,scope,items:rank(stableSuggestions(previous?.scope===scope?previous.items:[],[...verified,...(previous?.scope===scope?previous.items.filter(s=>cart.items.some(i=>i.product.id===s.product.id)):[])]))}));
   })(),0);
   return()=>{clearTimeout(timer);c.abort();};
- },[key,branchId,request,serviceDate,cart.branchId,cart.items.length,cart.items,products,visits,selected,smartAvailability,features,branchResult,scope,seedProduct,configured,sweets,groups,pickupItems]);
+ },[key,branchId,request,serviceDate,cart.branchId,cart.items.length,cart.items,products,visits,selected,smartAvailability,features,branchResult,scope,seedProduct,configured,sweets,groups,pickupItems,basketPickup]);
  const current=result?.scope===scope?result:null;
  const live=new Map(products.map(p=>[p.id,p]));
  const groupFor=(id:number)=>groups.find(g=>g.choices.some(c=>c.productId===id));
@@ -152,8 +161,9 @@ export default function MobileMenuSuggestions({branchId,products,groups=[],picku
  const suggestionQuantity=(s:Suggestion)=>{const item=extraItems.find(i=>i.product.id===s.product.id);return s.weightGrams===null?(item?.quantity??0):((item?.weightGrams??0)>0?1:0);};
  const groupQuantity=(g:PortionGroup)=>extraItems.reduce((sum,item)=>sum+(g.choices.some(c=>c.productId===item.product.id)?item.quantity:0),0);
  const groupPrice=(g:PortionGroup)=>Math.min(...g.choices.flatMap(c=>products.filter(p=>p.id===c.productId).map(p=>p.price)));
- const suggestions=(current?.items??[]).filter(s=>live.get(s.product.id)?.available&&(!smartAvailability||!selected||!pickupItems||pickupItems.find(item=>item.productId===s.product.id)?.available!==false||cart.items.some(item=>item.product.id===s.product.id))).filter((s,index,all)=>!groupFor(s.product.id)||all.findIndex(other=>groupFor(other.product.id)?.key===groupFor(s.product.id)?.key)===index);
+ const suggestions=(current?.items??[]).filter(s=>live.get(s.product.id)?.available&&(basketPickup!=="blocked"||cart.items.some(item=>item.product.id===s.product.id))&&(!smartAvailability||!selected||!pickupItems||pickupItems.find(item=>item.productId===s.product.id)?.available!==false||cart.items.some(item=>item.product.id===s.product.id))).filter((s,index,all)=>!groupFor(s.product.id)||all.findIndex(other=>groupFor(other.product.id)?.key===groupFor(s.product.id)?.key)===index);
  async function add(s:Suggestion){
+  if(basketPickup==="blocked"){setMessage("This addition no longer fits your pickup. Choose another time.");return;}
   if(smartAvailability&&!selected){setMessage("Choose a pickup time to add this item. Your cart is saved.");return;}
   if(locked.current)return;locked.current=true;setBusy(s.product.id);setMessage("");
   const before=getCartSnapshot(),branch=getStoredBranchSnapshot(),pickup=getPickupSlotSnapshot();
@@ -178,16 +188,16 @@ export default function MobileMenuSuggestions({branchId,products,groups=[],picku
  }
  const failed=!suggestions.length&&branchResult?.key===key&&branchResult.failed===true;
 
- if(current&&!suggestions.length&&!failed&&!message&&!announcement)return null;
+ if((current||basketPickup==="blocked")&&!suggestions.length&&!failed&&!message&&!announcement&&!open&&!variant)return null;
  const summary=message||(failed?"We couldn’t load pairings. Try again.":current?"No optional additions right now.":"Checking pairings…");
  return <section className="mobile-menu-suggestions" aria-label="Pairs well with your selection">
   <h3><T text={sweets?"Complete your sweet box":"A little something extra?"}/></h3>
   <p className="menu-pairing-subtitle"><T text="Suggested for"/> {seedProduct?.name??<T text="your selection"/>}</p>
-  <div className="mobile-menu-pairing-row mobile-menu-pairings-inline">{!current&&<div className="mobile-menu-pairing-skeleton" aria-hidden="true">{[0,1,2].map(i=><div key={i}><span/><span/><span/></div>)}</div>}{suggestions.map(s=>{const group=groupFor(s.product.id);return <article key={s.product.id}><div className="mobile-menu-pairing-photo">{s.product.imageUrl?<Image src={s.product.imageUrl} alt={s.product.name} fill sizes="144px"/>:<span aria-hidden="true">G</span>}{group?<button type="button" className="menu-pairing-group-button" id={`menu-pairing-group-${group.key}`} aria-label={`Choose options for ${group.title} from pairings`} onClick={()=>{setOpen(false);setVariant(group);}}><T text={groupQuantity(group)>0?"Manage":"Choose options"}/>{groupQuantity(group)>0&&<> · {groupQuantity(group)}</>}</button>:<MenuPurchaseControl name={s.product.name} addLabel={`Add ${s.product.name} from pairings`} blocked={smartAvailability&&!selected||busy!==null&&busy!==s.product.id} quantity={suggestionQuantity(s)} label={s.weightGrams===null?undefined:formatWeight(extraItems.find(i=>i.product.id===s.product.id)?.weightGrams??s.weightGrams)} busy={busy===s.product.id} onAdd={()=>void add(s)} onDecrease={()=>cart.decreaseQuantity(s.product.id)}/> }</div>{group?<GroupDietaryLabel products={products.filter(p=>group.choices.some(c=>c.productId===p.id))}/>:<DietaryLabel vegetarian={s.product.vegetarian}/>}<h4>{group?.title??s.product.name}</h4><strong>{group?<><T text="From"/> {money(groupPrice(group))}</>:money(s.portionTotal)}</strong><small>{s.weightGrams===null?"":formatWeight(s.weightGrams)} · <T text={s.includesTax===false?"before tax":"incl. item tax"}/></small></article>;})}{!suggestions.length&&<p className={`mobile-menu-pairing-status ${!current?"sr-only":""}`} role="status"><T text={summary}/></p>}</div>
+  <div className="mobile-menu-pairing-row mobile-menu-pairings-inline">{!current&&<div className="mobile-menu-pairing-skeleton" aria-hidden="true">{[0,1,2].map(i=><div key={i}><span/><span/><span/></div>)}</div>}{suggestions.map(s=>{const group=groupFor(s.product.id);return <article key={s.product.id}><div className="mobile-menu-pairing-photo">{s.product.imageUrl?<Image src={s.product.imageUrl} alt={s.product.name} fill sizes="144px"/>:<span aria-hidden="true">G</span>}{group?<button type="button" className="menu-pairing-group-button" id={`menu-pairing-group-${group.key}`} aria-label={`Choose options for ${group.title} from pairings`} onClick={()=>{setOpen(false);setVariant(group);}}><T text={groupQuantity(group)>0?"Manage":"Choose options"}/>{groupQuantity(group)>0&&<> · {groupQuantity(group)}</>}</button>:<MenuPurchaseControl name={s.product.name} addLabel={`Add ${s.product.name} from pairings`} blocked={basketPickup==="blocked"||smartAvailability&&!selected||busy!==null&&busy!==s.product.id} quantity={suggestionQuantity(s)} label={s.weightGrams===null?undefined:formatWeight(extraItems.find(i=>i.product.id===s.product.id)?.weightGrams??s.weightGrams)} busy={busy===s.product.id} onAdd={()=>void add(s)} onDecrease={()=>cart.decreaseQuantity(s.product.id)}/> }</div>{group?<GroupDietaryLabel products={products.filter(p=>group.choices.some(c=>c.productId===p.id))}/>:<DietaryLabel vegetarian={s.product.vegetarian}/>}<h4>{group?.title??s.product.name}</h4><strong>{group?<><T text="From"/> {money(groupPrice(group))}</>:money(s.portionTotal)}</strong><small>{s.weightGrams===null?"":formatWeight(s.weightGrams)} · <T text={s.includesTax===false?"before tax":"incl. item tax"}/></small></article>;})}{!suggestions.length&&<p className={`mobile-menu-pairing-status ${!current?"sr-only":""}`} role="status"><T text={summary}/></p>}</div>
   <div className="mobile-menu-pairing-footer"><button aria-label={failed?"Retry pairings":"View optional additions"} id="mobile-menu-pairings-open" className="mobile-menu-suggestions-open" type="button" disabled={!suggestions.length&&!failed} onClick={()=>failed?setRetry(value=>value+1):setOpen(true)} aria-haspopup={failed?undefined:"dialog"}><T text={failed?"Retry pairings":"View optional additions"}/></button><p role="status">{(suggestions.length?message:"")||announcement}</p></div>
-  {variant&&<MenuVariantPicker group={variant} products={variant.choices.flatMap(c=>products.filter(p=>p.id===c.productId))} quantities={Object.fromEntries(extraItems.map(i=>[i.product.id,i.quantity]))} pickupItems={pickupItems} dateAware={smartAvailability} pickupChecking={smartAvailability&&!selected} busyId={busy} error={message} onAdd={p=>void add({product:p,weightGrams:null,portionPrice:p.price,portionTotal:p.price,reason:""})} onIncrease={id=>{const p=live.get(id);if(p)void add({product:p,weightGrams:null,portionPrice:p.price,portionTotal:p.price,reason:""});}} onDecrease={cart.decreaseQuantity} returnFocusId={`menu-pairing-group-${variant.key}`} onClose={()=>setVariant(null)}/>}
-  {open&&<MenuDiscoverySheet title="Optional additions" onClose={()=>setOpen(false)}>
-   <div className="mobile-menu-pairing-row">{suggestions.map(s=>{const group=groupFor(s.product.id);return <article key={s.product.id}><div className="mobile-menu-pairing-photo">{s.product.imageUrl?<Image src={s.product.imageUrl} alt={s.product.name} fill sizes="144px"/>:<span aria-hidden="true">G</span>}{group?<button type="button" className="menu-pairing-group-button" aria-label={`Choose options for ${group.title} from pairings`} onClick={()=>{setOpen(false);setVariant(group);}}><T text={groupQuantity(group)>0?"Manage":"Choose options"}/>{groupQuantity(group)>0&&<> · {groupQuantity(group)}</>}</button>:<MenuPurchaseControl name={s.product.name} addLabel={`Add ${s.product.name}`} blocked={smartAvailability&&!selected||busy!==null&&busy!==s.product.id} quantity={suggestionQuantity(s)} label={s.weightGrams===null?undefined:formatWeight(extraItems.find(i=>i.product.id===s.product.id)?.weightGrams??s.weightGrams)} busy={busy===s.product.id} onAdd={()=>void add(s)} onDecrease={()=>cart.decreaseQuantity(s.product.id)}/> }</div>{group?<GroupDietaryLabel products={products.filter(p=>group.choices.some(c=>c.productId===p.id))}/>:<DietaryLabel vegetarian={s.product.vegetarian}/>}<h4>{group?.title??s.product.name}</h4><strong>{group?<><T text="From"/> {money(groupPrice(group))}</>:money(s.portionTotal)}</strong><small>{s.weightGrams===null?"":formatWeight(s.weightGrams)} · <T text={s.includesTax===false?"tax checked at checkout":"incl. item tax"}/></small><p><T text={s.reason}/></p></article>;})}</div>
+  {variant&&<MenuVariantPicker group={variant} products={variant.choices.flatMap(c=>products.filter(p=>p.id===c.productId))} quantities={Object.fromEntries(extraItems.map(i=>[i.product.id,i.quantity]))} pickupItems={pickupItems} dateAware={smartAvailability} pickupChecking={basketPickup==="blocked"||smartAvailability&&!selected} busyId={busy} error={message} onAdd={p=>void add({product:p,weightGrams:null,portionPrice:p.price,portionTotal:p.price,reason:""})} onIncrease={id=>{const p=live.get(id);if(p)void add({product:p,weightGrams:null,portionPrice:p.price,portionTotal:p.price,reason:""});}} onDecrease={cart.decreaseQuantity} returnFocusId={`menu-pairing-group-${variant.key}`} onClose={()=>setVariant(null)}/>}
+  {open&&<MenuDiscoverySheet stableMenuLayer title="Optional additions" onClose={()=>setOpen(false)}>
+   <div className="mobile-menu-pairing-row">{suggestions.map(s=>{const group=groupFor(s.product.id);return <article key={s.product.id}><div className="mobile-menu-pairing-photo">{s.product.imageUrl?<Image src={s.product.imageUrl} alt={s.product.name} fill sizes="144px"/>:<span aria-hidden="true">G</span>}{group?<button type="button" className="menu-pairing-group-button" aria-label={`Choose options for ${group.title} from pairings`} onClick={()=>{setOpen(false);setVariant(group);}}><T text={groupQuantity(group)>0?"Manage":"Choose options"}/>{groupQuantity(group)>0&&<> · {groupQuantity(group)}</>}</button>:<MenuPurchaseControl name={s.product.name} addLabel={`Add ${s.product.name}`} blocked={basketPickup==="blocked"||smartAvailability&&!selected||busy!==null&&busy!==s.product.id} quantity={suggestionQuantity(s)} label={s.weightGrams===null?undefined:formatWeight(extraItems.find(i=>i.product.id===s.product.id)?.weightGrams??s.weightGrams)} busy={busy===s.product.id} onAdd={()=>void add(s)} onDecrease={()=>cart.decreaseQuantity(s.product.id)}/> }</div>{group?<GroupDietaryLabel products={products.filter(p=>group.choices.some(c=>c.productId===p.id))}/>:<DietaryLabel vegetarian={s.product.vegetarian}/>}<h4>{group?.title??s.product.name}</h4><strong>{group?<><T text="From"/> {money(groupPrice(group))}</>:money(s.portionTotal)}</strong><small>{s.weightGrams===null?"":formatWeight(s.weightGrams)} · <T text={s.includesTax===false?"tax checked at checkout":"incl. item tax"}/></small><p><T text={s.reason}/></p></article>;})}</div>
 
    {message&&<p role="status">{message}</p>}
    {!suggestions.length&&!message&&<p role="status"><T text={summary}/></p>}
