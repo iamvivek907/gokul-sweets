@@ -13,7 +13,7 @@ const slot={id:1,branchId:1,slotDate:date,startTime:'18:00:00',endTime:'19:00:00
 try{
  const context=await browser.newContext({viewport:{width:390,height:900},serviceWorkers:'block',reducedMotion:'reduce'});
  const page=await context.newPage();page.setDefaultTimeout(15000);
- let blocked=false,startersBlocked=false,addChecks=0,holdBasket=false,holdRecommendations=true,releaseBasket,startedBasket;
+ let blocked=false,startersBlocked=false,stockFails=false,addChecks=0,holdBasket=false,holdRecommendations=true,releaseBasket,startedBasket;
  let basketGate=new Promise(resolve=>releaseBasket=resolve);
  let basketStarted=new Promise(resolve=>startedBasket=resolve);
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type'};
@@ -29,8 +29,12 @@ try{
   else if(path==='/api/menu/portion-groups')json={groups:[]};
   else if(path==='/api/menu/appearance')json={banners:[],categories:[],pairings:[{seedProductId:1,suggestedProductId:2}]};
   else if(path==='/api/menu/pickup-addons/check'){addChecks++;json={orderable:!blocked};}
-  else if(path==='/api/menu/pickup-addons'&&holdBasket&&holdRecommendations)await basketGate;
+  else if(path==='/api/menu/pickup-addons'){
+   if(holdBasket&&holdRecommendations)await basketGate;
+   json=[{slotVerified:true,product:products[1],weightGrams:null,portionPrice:15,portionTotal:15,reason:'Often ordered with Sweet 1'}];
+  }
   else if(path.endsWith('/availability')){
+   if(stockFails)return route.fulfill({status:503,json:{message:'Unavailable'},headers});
    if(holdBasket){startedBasket();await basketGate;}
    const issues=blocked?[{productId:1,available:false,code:'NO_INVENTORY'}]:[];
    json={today:date,maximumDate:date,dates:[{date,available:!blocked,items:[...products,...starters].map(p=>({productId:p.id,available:!(startersBlocked&&p.categoryId===2)})),slots:[{slot,normalAvailable:!blocked,priorityAvailable:false,issues}]}]};
@@ -46,7 +50,13 @@ try{
  },{branch,slot,date,product:products[0]});
  await page.goto(base+'/menu');await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
  const addPairing=page.getByRole('button',{name:'Add Sweet 2 from pairings',exact:true});
- await addPairing.waitFor();assert.equal(await addPairing.isEnabled(),true);
+ const pairingEnabled=()=>page.waitForFunction(()=>document.querySelector('button[aria-label="Add Sweet 2 from pairings"]')?.disabled===false);
+ await pairingEnabled();
+ stockFails=true;await page.evaluate(()=>window.dispatchEvent(new Event('online')));
+ const retry=page.locator('.menu-pickup-refresh-error').getByRole('button',{name:'Retry availability',exact:true});
+ await retry.waitFor();
+ assert.equal(await addPairing.isDisabled(),true,'an older slot-verified pairing cannot enable Add after the stock check fails');
+ stockFails=false;await retry.click();await pairingEnabled();
  const card=page.locator('#gokul-product-5'),node=await card.elementHandle();
  await card.getByRole('button',{name:'View details · Sweet 5',exact:true}).click();
  const details=page.getByRole('dialog',{name:'Sweet 5',exact:true});await details.waitFor();
@@ -59,7 +69,7 @@ try{
  await addPairing.waitFor({state:'hidden'});
  assert.equal(addChecks,0,'the known basket conflict is handled before Add');
  blocked=false;await page.evaluate(()=>window.dispatchEvent(new Event('online')));
- await addPairing.waitFor();assert.equal(await addPairing.isEnabled(),true,'pairing returns after the basket fits again');
+ await pairingEnabled();
  const first=page.locator('#gokul-product-1');
  await first.getByRole('button',{name:'View details · Sweet 1',exact:true}).click();
  const firstDetails=page.getByRole('dialog',{name:'Sweet 1',exact:true});await firstDetails.waitFor();
@@ -68,7 +78,7 @@ try{
  assert.equal(await firstDetails.evaluate(dialog=>dialog.matches(':modal')),true,'moving the open card itself preserves its native modal');
  await firstDetails.getByRole('button',{name:'Close',exact:true}).click();await firstDetails.waitFor({state:'hidden'});
  blocked=false;await page.evaluate(()=>window.dispatchEvent(new Event('online')));
- await addPairing.waitFor();assert.equal(await addPairing.isEnabled(),true);
+ await pairingEnabled();
  holdBasket=true;
  const seedIncrease=page.getByRole('button',{name:'Add one more Sweet 1',exact:true});
  await seedIncrease.click();await basketStarted;

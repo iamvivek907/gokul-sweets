@@ -27,8 +27,12 @@ export function menuSearchRank(name:string, normalizedQuery:string):number {
  const value=normalizeMenuSearch(name);
  return value===normalizedQuery?0:value.startsWith(normalizedQuery)?1:value.includes(normalizedQuery)?2:3;
 }
-export function menuSearchSuggestions(products:{name:string;description?:string|null;categoryName?:string}[],query:string):string[]{
+export function menuSearchSuggestions<T extends {name:string;description?:string|null;categoryName?:string}>(products:T[],query:string,isOrderable?:(product:T)=>boolean):T[]{
  const text=normalizeMenuSearch(query);if(text.length<2||text.length>60)return [];
- const score=(name:string)=>menuSearchRank(name,text);
- return [...new Set(products.filter(p=>matchesMenuSearch(p,query)).map(p=>p.name))].sort((a,b)=>score(a)-score(b)||a.localeCompare(b)).slice(0,4);
+ return products.filter(p=>matchesMenuSearch(p,query)).sort((a,b)=>
+  menuSearchRank(a.name,text)-menuSearchRank(b.name,text)
+  ||Number(isOrderable?.(b)??false)-Number(isOrderable?.(a)??false)
+  ||a.name.localeCompare(b.name)
+  ||(a.categoryName??"").localeCompare(b.categoryName??"")
+ ).slice(0,4);
 }

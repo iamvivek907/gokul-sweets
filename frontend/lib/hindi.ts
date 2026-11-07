@@ -25,6 +25,7 @@ export const hindi: Record<string,string> = {
 "Gokul guest":"गोकुल अतिथि",
 "Remove offer":"ऑफ़र हटाएँ",
 "This offer is no longer available for your updated cart. Remove it to check your total.":"बदले हुए कार्ट पर यह ऑफ़र उपलब्ध नहीं है। कुल राशि देखने के लिए इसे हटाएँ।",
+"Retry pickup availability to add extras.":"अतिरिक्त व्यंजन जोड़ने के लिए पिकअप की उपलब्धता फिर जाँचें।",
 "Availability check failed. Your cart is saved.":"उपलब्धता की जाँच नहीं हो सकी। आपका कार्ट सुरक्षित है।",
 "Your upcoming orders":"आपके आगामी ऑर्डर",
 "View all":"सभी देखें",

@@ -48,8 +48,11 @@ interface MenuSearchProps {
   value: string;
   onChange: (value: string) => void;
   products?: MenuProduct[];
+  orderableIds?: ReadonlySet<number>|null;
   branchId?: number;
 }
+type SearchOption = {text:string;product?:MenuProduct};
+const optionKey = ({text,product}:SearchOption)=>product?.id??text;
 export default function MenuSearch({
   detached = false,
   topOnTap = false,
@@ -62,6 +65,7 @@ export default function MenuSearch({
   value,
   onChange,
   products = [],
+  orderableIds,
   branchId = 0,
 }: MenuSearchProps) {
   const enabled = enhanced && refined,
@@ -70,7 +74,7 @@ export default function MenuSearch({
     listId = useId(),
     raw = useSyncExternalStore(subscribe, read, server);
   const [focused, setFocused] = useState(false),
-    [active, setActive] = useState(-1);
+    [active, setActive] = useState<string|number|null>(null);
   const [overlay,setOverlay]=useState(false),[draft,setDraft]=useState(value);
   const [searchTrigger,setSearchTrigger]=useState<HTMLElement|null>(null);
   const restoreSearchFocus=useRef(true);
@@ -119,7 +123,7 @@ export default function MenuSearch({
     return()=>{if(timer)clearInterval(timer);observer.disconnect();motion.removeEventListener('change',sync);document.removeEventListener('visibilitychange',sync);};
   },[premium,overlay,focused,value,exampleKey]);
   function clearSearch(){
-    onChange('');setActive(-1);setFocused(true);
+    onChange('');setActive(null);setFocused(true);
     surface.current?.querySelector('input')?.focus({preventScroll:true});
   }
   function highlight(text:string){
@@ -157,22 +161,22 @@ export default function MenuSearch({
   }
   const history = recentSearches(raw, branchId),
     recent = !value.trim() && history.length > 0;
-  const options =
+  const options:SearchOption[] =
     enabled && focused
       ? recent
-        ? history.slice(0, 4)
-        : menuSearchSuggestions(products, value)
+        ? history.slice(0, 4).map(text=>({text}))
+        : menuSearchSuggestions(products,value,product=>orderableIds?.has(product.id)??false)
+            .map(product=>({text:product.name,product}))
       : [];
   const expanded = options.length > 0,
-    activeIndex = Math.min(active, options.length - 1);
+    activeIndex = options.findIndex(option=>optionKey(option)===active);
   function remember(text: string) {
     try {
       if (rememberMenuSearch(localStorage, branchId, text))
         window.dispatchEvent(new Event(MENU_PREFERENCE_EVENT));
     } catch {}
   }
-  function choose(text: string) {
-    const product=recent?undefined:products.find(item=>item.name===text);
+  function choose({text,product}:SearchOption) {
     if(product&&onSelectProduct){
       surface.current?.querySelector("input")?.blur();
       onSelectProduct(product);
@@ -182,7 +186,7 @@ export default function MenuSearch({
     }
     remember(text);
     setFocused(false);
-    setActive(-1);
+    setActive(null);
   }
   useEffect(() => {
     if (
@@ -263,29 +267,29 @@ export default function MenuSearch({
           }}
           onChange={(e) => {
             onChange(e.target.value);
-            setActive(-1);
+            setActive(null);
             setFocused(true);
           }}
           onKeyDown={(event) => {
             if (event.key === "Escape") {
               if(onDismiss){event.preventDefault();event.stopPropagation();onDismiss();}
               setFocused(false);
-              setActive(-1);
+              setActive(null);
             } else if (
               expanded &&
               (event.key === "ArrowDown" || event.key === "ArrowUp")
             ) {
               event.preventDefault();
-              setActive((index) =>
-                index < 0
+              setActive(optionKey(options[
+                activeIndex < 0
                   ? event.key === "ArrowDown"
                     ? 0
                     : options.length - 1
-                  : (index +
+                  : (activeIndex +
                       (event.key === "ArrowDown" ? 1 : -1) +
                       options.length) %
-                    options.length,
-              );
+                  options.length
+              ]));
             } else if (event.key === "Enter") {
               event.preventDefault();
               if (expanded && activeIndex >= 0) choose(options[activeIndex]);
@@ -319,18 +323,20 @@ export default function MenuSearch({
             role="listbox"
             aria-label={t(recent ? "Recent searches" : "Menu suggestions")}
           >
-            {options.map((text, index) => {
-              const product=products.find(product=>product.name===text);
-              return <li key={text} role="presentation">
+            {options.map((option, index) => {
+              const {text,product}=option;
+              const duplicate=product&&options.some(other=>other!==option&&other.text===text);
+              const label=duplicate&&product.categoryName?`${text} · ${product.categoryName}`:text;
+              return <li key={optionKey(option)} role="presentation">
                 <button
                   type="button"
                   role="option"
-                  aria-label={premium?text:undefined}
+                  aria-label={premium?label:undefined}
                   id={`${listId}-${index}`}
                   aria-selected={index === activeIndex}
                   tabIndex={-1}
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => choose(text)}
+                  onClick={() => choose(option)}
                 >
                   {premium?<>
                     <span className="menu-search-result-icon" aria-hidden="true">
@@ -366,7 +372,7 @@ export default function MenuSearch({
       )}
     </div>
     {overlay&&<MenuDiscoverySheet returnFocusId={searchTrigger?.id} restoreFocus={searchTrigger} restoreFocusOnClose={restoreSearchFocus} initialFocusSelector="input[type=search]" fitVisualViewport title="Search the menu" className="menu-search-dialog" onClose={()=>setOverlay(false)}>
-      <MenuSearch detached enhanced={enhanced} refined={refined} premium={premium} value={draft} onChange={setDraft} products={products} branchId={branchId} onSubmit={submitOverlay} onDismiss={()=>setOverlay(false)} onSelectProduct={onSelectProduct?product=>{
+      <MenuSearch detached enhanced={enhanced} refined={refined} premium={premium} value={draft} onChange={setDraft} products={products} orderableIds={orderableIds} branchId={branchId} onSubmit={submitOverlay} onDismiss={()=>setOverlay(false)} onSelectProduct={onSelectProduct?product=>{
         restoreSearchFocus.current=false;
         setOverlay(false);
         onSelectProduct(product);

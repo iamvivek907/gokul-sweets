@@ -891,10 +891,11 @@ export default function MenuScreen() {
     const pairingSeed=lastAdded??items.at(-1)?.product.id;
     const basketPickup = useMemo(()=>{
         if(!pickupCheck.features?.smartAvailability||!pickupCheck.intent.selection)return "unknown";
+        if(pickupCheck.error||pickupCheck.automaticError)return "failed";
         const decisions=new Map(pickupCheck.items?.map(item=>[item.productId,item.available]));
         if(pickupCheck.selectionUnavailable||items.some(item=>decisions.get(item.product.id)===false))return "blocked";
         return pickupCheck.data&&!pickupChecking&&items.every(item=>decisions.get(item.product.id)===true)?"ready":"unknown";
-    },[pickupCheck.features?.smartAvailability,pickupCheck.intent.selection,pickupCheck.items,pickupCheck.selectionUnavailable,pickupCheck.data,pickupChecking,items]);
+    },[pickupCheck.features?.smartAvailability,pickupCheck.intent.selection,pickupCheck.items,pickupCheck.selectionUnavailable,pickupCheck.data,pickupCheck.error,pickupCheck.automaticError,pickupChecking,items]);
     const pairing=phoneMenu&&mobileFeatures?.pickupAddOns&&branch&&items.some(i=>i.product.id===pairingSeed)&&!filterByPickup&&filteredProducts.some(p=>p.id===pairingSeed)?<div className="mobile-menu-pairing-slot"><MobileMenuSuggestions seedProduct={allProducts.find(p=>p.id===pairingSeed)} pairings={appearance?.pairings} onPairingAdded={()=>setLastAdded(pairingSeed??null)} branchId={branch.id} products={allProducts} groups={portionGroups} pickupItems={pickupCheck.items} basketPickup={basketPickup}/></div>:null;
 
     const weightPickup = useRef("");
@@ -1364,6 +1365,7 @@ export default function MenuScreen() {
                 >
 
                     <MenuSearch key={branch.id} enhanced={groupedMenu} products={allProducts} branchId={branch.id} topOnTap={phoneMenu}
+                        orderableIds={menuOrderableIds}
                         onSelectProduct={groupedMenu?goToSearchDish:undefined}
                         premium={groupedMenu}
                         refined={pickupCheck.features?.contextualStorefrontV2 === true}
