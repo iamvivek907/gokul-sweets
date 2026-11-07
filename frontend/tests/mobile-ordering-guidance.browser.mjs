@@ -10,6 +10,7 @@ async function openPairings(page){
 async function closePairings(page){const sheet=page.getByRole('dialog',{name:'Optional additions',exact:true});if(await sheet.isVisible())await sheet.getByRole('button',{name:/^Close/}).click();}
 const browser=await chromium.launch({headless:true}),base=process.env.BROWSER_BASE??'http://127.0.0.1:3311';
 const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date());
+const yesterday=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.now()-86400000));
 const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.now()+86400000));
 const branch={id:1,code:'GUIDE',name:'Gokul Tamkuhi Road',active:true,operational:true,pickupAvailable:true,address:'Main Road, opposite the bus stand',city:'Tamkuhi Road',pincode:'274407',coverImageUrl:'/logo.png'};
 const sweet={id:1,categoryId:1,categoryName:'Sweets',name:'Fresh peda',description:'Fresh milk sweet.',price:400,imageUrl:null,available:true,saleMode:'WEIGHT',minimumWeightGrams:250,weightStepGrams:50};
@@ -35,7 +36,8 @@ try{for(const [width,enabled] of [[320,true],[390,true],[640,true],[641,true],[3
   else if(p==='/api/customer/identity/orders/PREVIOUS')json={branchId:1,orderStatus:'PICKED_UP',paymentStatus:'PAID',items:[{productId:4}]};
   else if(p==='/api/customer/identity/me')json={authenticated:true,name:'Test customer',phone:'+919876543210'};
   else if(p==='/api/branches/1/pickup-discovery'){
-   json={today,maximumDate:date,dates:[{date:today,available:false,items:[],slots:[]},{date,available:true,items:[],slots:[{slot,normalAvailable:true,priorityAvailable:false,issues:[]}]}]};
+   // No automatic replacement: this fixture exercises recovery via the cart-aware picker.
+   json={today,maximumDate:date,dates:[]};
   }
   else if(p==='/api/branches/1/availability'){
    availabilityCalls++;const body=route.request().postDataJSON();
@@ -57,7 +59,7 @@ try{for(const [width,enabled] of [[320,true],[390,true],[640,true],[641,true],[3
   else if(p==='/api/orders/mobile-preview'){previewCalls++;json={quote:{items:[{name:sweet.name,unitPrice:'100',taxRate:'0',taxAmount:'0',total:'100',mealDiscount:'0'}],token:'preview',expiresAt:new Date(Date.now()+600000).toISOString(),subtotal:100,taxAmount:0,totalAmount:100,convenienceFee:0,paymentFee:0},offers:[],spendTargets:[offer],totalBeforeOffer:100,rewards:{balance:27,pendingCoins:33,rewards:[{code:'SWEET_5',name:'₹5 sweet saving',coins:30,minimumSubtotal:149,eligible:false,unavailableReason:'Not enough coins'}],terms:'Fees are excluded.'}};}
   return route.fulfill({json,headers});
  });
- await context.addInitScript(({branch,sweet,today})=>{localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-cart',JSON.stringify({branchId:1,items:[{product:sweet,quantity:0,weightGrams:250}]}));localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify({date:today,slot:{id:1,branchId:1,slotDate:today,startTime:'00:01:00',endTime:'00:02:00',active:true,remainingCapacity:10},pickupType:'NORMAL'}));},{branch,sweet,today});
+ await context.addInitScript(({branch,sweet,yesterday})=>{localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-cart',JSON.stringify({branchId:1,items:[{product:sweet,quantity:0,weightGrams:250}]}));localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify({date:yesterday,slot:{id:1,branchId:1,slotDate:yesterday,startTime:'00:01:00',endTime:'00:02:00',active:true,remainingCapacity:10},pickupType:'NORMAL'}));},{branch,sweet,yesterday});
  await page.goto(`${base}/menu`);await page.locator('.gokul-product-card').first().waitFor();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
  if(enabled)assert.equal(catalogReads,1,'first menu visit loads one versioned catalog');
  const compact=width<=640&&enabled;
