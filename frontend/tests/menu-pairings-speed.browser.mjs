@@ -45,11 +45,11 @@ try{for(const [width,enabled,constrained] of [[390,true,false]]){
  await context.addInitScript(({branch,sweet,slot,date})=>{if(!localStorage.getItem('gokul-cart')){localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-cart',JSON.stringify({branchId:1,items:[{product:sweet,quantity:0,weightGrams:250}]}));localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify({date,slot,pickupType:'NORMAL'}));localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date}));}}, {branch,sweet,slot,date});
  if(constrained)await context.addInitScript(()=>Object.defineProperty(navigator,'connection',{configurable:true,value:{effectiveType:'3g',saveData:false}}));
  await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
- const pairing=page.getByRole('region',{name:'Pairs well with your selection'});
+ const pairing=page.getByRole('region',{name:'Pairs well with your selection'});const additions=page.getByRole('dialog',{name:'Optional additions',exact:true});
  await pairing.getByRole('button',{name:'Add Special tea from pairings',exact:true}).waitFor({timeout:1000});
  assert.equal(branchReads,1,'one recommendation request publishes verified cards while availability and history are stalled');
  assert.equal(historyCalls,1);releaseHistory();releaseRatings();releaseAvailability();releasePreview();
- await openPairings(page);await pairing.getByText('Your completed-order favourite',{exact:true}).waitFor();
+ await openPairings(page);await additions.getByText('Your completed-order favourite',{exact:true}).waitFor();
  assert.equal(branchReads,1,'late history does not restart branch recommendations');
  await page.waitForTimeout(200);assert.deepEqual(errors,[]);await context.close();console.log('Verified pairings bypass serial availability and late history does not refetch');
 }}finally{await browser.close();}
