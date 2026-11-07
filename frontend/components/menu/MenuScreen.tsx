@@ -1,4 +1,5 @@
 "use client";
+import {getCartSnapshot,parseCart} from "@/lib/cartStorage";
 import {standaloneCartItems} from "@/lib/cartMeals";
 import MealShortcut from "@/components/meal/MealShortcut";
 import {useBranchMeals} from "@/hooks/useBranchMeals";
@@ -222,7 +223,7 @@ export default function MenuScreen() {
         cartNotice,
         setCartNotice
     ] =
-        useState<string | null>(
+        useState<{message:string;success:boolean} | null>(
             null
         );
 
@@ -263,13 +264,10 @@ export default function MenuScreen() {
     );
 
 
-    function showCartNotice(
-        productName: string
-    ) {
+    function showCartNotice(productName:string) {showCartMessage(`✓ ${productName} added to cart`,true);}
 
-        setCartNotice(
-            `${productName} added to cart`
-        );
+    function showCartMessage(message:string,success=false) {
+        setCartNotice({message,success});
 
 
         if (
@@ -727,7 +725,8 @@ export default function MenuScreen() {
     const pickupChecking = !!pickupCheck.features?.smartAvailability && (pickupCheck.pickupRequired || pickupCheck.findingSoonest || !pickupCheck.items || !!pickupCheck.error || !!pickupCheck.automaticError);
     const pickupStatusMessage = pickupCheck.error || pickupCheck.automaticError ? "Pickup check failed. Please retry."
         : pickupCheck.pickupRequired&&!pickupCheck.findingSoonest ? "Choose pickup time to add" : "";
-    const pickupAllows = (id:number) => !pickupCheck.features?.smartAvailability || !!pickupCheck.intent.selection && pickupCheck.intent.pickupRaw === getPickupSlotSnapshot() && pickupIsFresh(pickupCheck.intent.selection,new Date()) && !pickupCheck.findingSoonest && !pickupChecking && pickupCheck.items?.find(item=>item.productId===id)?.available === true;
+    const pickupStockById=useMemo(()=>new Map(pickupCheck.items?.map(item=>[item.productId,item])),[pickupCheck.items]);
+    const pickupAllows = (id:number) => !pickupCheck.features?.smartAvailability || !!pickupCheck.intent.selection && pickupCheck.intent.pickupRaw === getPickupSlotSnapshot() && pickupIsFresh(pickupCheck.intent.selection,new Date()) && !pickupCheck.findingSoonest && !pickupChecking && pickupStockById.get(id)?.available === true;
     const [availableOnly,setAvailableOnly]=useState(false);
     const filterByPickup = availableOnly && pickupCheck.features?.smartAvailability === true;
     // The menu may keep showing an earlier preview while cart quantities refresh.
@@ -878,9 +877,29 @@ export default function MenuScreen() {
         ||
         (phoneMenu ? (!!(mobileCategories??(effectiveCategoryId===null?[]:[effectiveCategoryId])).length || maximumPrice!==null || portionsOnly) : effectiveCategoryId !== null);
 
+    function fitsKnownPickupStock(id:number,weightGrams?:number) {
+        if(!pickupCheck.features?.smartAvailability)return true;
+        const limit=pickupStockById.get(id)?.availableQuantity;
+        if(limit==null||!Number.isFinite(limit))return true;
+        const cart=parseCart(getCartSnapshot());
+        const line=cart.branchId===branch?.id?cart.items.find(item=>item.product.id===id):undefined;
+        if(weightGrams!==undefined){
+            const included=line&&cart.meals?.length
+                ? (line.weightGrams??0)-(standaloneCartItems(cart).find(item=>item.product.id===id)?.weightGrams??0)
+                : 0;
+            return included+weightGrams<=limit;
+        }
+        const amount=line?.product.saleMode==="WEIGHT"?(line.weightGrams??line.product.minimumWeightGrams??250)+(line.product.weightStepGrams??50):(line?.quantity??0)+1;
+        return amount<=limit;
+    }
+
     const guardedIncrease = (id:number) => {
-        try {if(pickupAllows(id))increaseQuantity(id);}
-        catch {setCartNotice("Couldn’t update your cart. Try again.");}
+        try {
+            if(!pickupAllows(id))return;
+            if(!fitsKnownPickupStock(id)){showCartMessage("No more available for this pickup.");return;}
+            increaseQuantity(id);
+        }
+        catch {showCartMessage("Couldn’t update your cart. Try again.");}
     };
     const [mealShelfHost,setMealShelfHost]=useState<HTMLDivElement|null>(null);
     const pickupGrid = (products:MenuProduct[],afterLeadingRows?:ReactNode) => <ProductGrid afterLeadingRows={afterLeadingRows} pairingSeed={pairingSeed} pairing={retailBrowse?null:pairing}
@@ -901,6 +920,7 @@ export default function MenuScreen() {
     const pairing=phoneMenu&&mobileFeatures?.pickupAddOns&&branch&&items.some(i=>i.product.id===pairingSeed)&&!filterByPickup&&filteredProducts.some(p=>p.id===pairingSeed)?<div className="mobile-menu-pairing-slot"><MobileMenuSuggestions seedProduct={allProducts.find(p=>p.id===pairingSeed)} pairings={appearance?.pairings} onPairingAdded={()=>setLastAdded(pairingSeed??null)} branchId={branch.id} products={allProducts} groups={portionGroups} pickupItems={pickupCheck.items} basketPickup={basketPickup}/></div>:null;
 
     const weightPickup = useRef("");
+    const [weightNotice,setWeightNotice]=useState<string|null>(null);
     function handleAddToCart(
         product: MenuProduct
     ) {
@@ -908,6 +928,7 @@ export default function MenuScreen() {
         if (!product.available || !pickupAllows(product.id)) return;
         if (product.saleMode === "WEIGHT") {
             weightPickup.current=getPickupSlotSnapshot();
+            setWeightNotice(null);
             setWeightProduct(product);
             return;
         }
@@ -918,7 +939,7 @@ export default function MenuScreen() {
 
     function commitAddToCart(product:MenuProduct,weightGrams?:number) {
         try {writeMenuCart(product,weightGrams);}
-        catch {setCartNotice("Couldn’t update your cart. Try again.");}
+        catch {showCartMessage("Couldn’t update your cart. Try again.");}
     }
 
     function writeMenuCart(
@@ -944,9 +965,10 @@ export default function MenuScreen() {
             }
         });
 
-        if (weightGrams && pickupCheck.features?.smartAvailability && weightPickup.current!==getPickupSlotSnapshot()) {setCartNotice("Pickup changed. Review the displayed time before adding.");return;}
+        if (weightGrams && pickupCheck.features?.smartAvailability && weightPickup.current!==getPickupSlotSnapshot()) {showCartMessage("Pickup changed. Review the displayed time before adding.");return;}
         const liveProduct=allProducts.find(item=>item.id===product.id);
-        if(!liveProduct?.available || !pickupAllows(product.id)){setWeightProduct(null);setCartNotice(liveProduct?.serviceAvailability?.message??"This item is currently unavailable.");return;}
+        if(!liveProduct?.available || !pickupAllows(product.id)){setWeightProduct(null);showCartMessage(liveProduct?.serviceAvailability?.message??"This item is currently unavailable.");return;}
+        if(!fitsKnownPickupStock(product.id,weightGrams)){showCartMessage("No more available for this pickup.");return;}
         const result =
             addItem(
                 liveProduct,
@@ -1008,6 +1030,21 @@ export default function MenuScreen() {
         product: MenuProduct,
         weightGrams: number
     ) {
+        const live=allProducts.find(item=>item.id===product.id);
+        if(live?.available&&live.saleMode==="WEIGHT"){
+            if(live.price!==product.price||live.minimumWeightGrams!==product.minimumWeightGrams||live.weightStepGrams!==product.weightStepGrams){
+                setWeightProduct(live);
+                setWeightNotice("This item changed. Review the price and quantity, then confirm again.");
+                return;
+            }
+            if(!fitsKnownPickupStock(product.id,weightGrams)){
+                setWeightNotice("Choose a smaller amount for this pickup.");
+                return;
+            }
+        }else if(live?.available){
+            setWeightNotice("This item changed. Close this window and select it again.");
+            return;
+        }
         setWeightProduct(null);
         commitAddToCart(product, weightGrams);
     }
@@ -1449,7 +1486,7 @@ export default function MenuScreen() {
 
                     {groupedMenu&&<MealCollection key={branch.id} branchId={branch.id} products={allProducts}
                         meals={!isLoading&&!error?visibleMeals:[]} shelfHost={filteredProducts.length>0?mealShelfHost:undefined}
-                        smartAvailability={mobileFeatures?.smartAvailability===true} pickupItems={pickupCheck.items}
+                        smartAvailability={mobileFeatures?.smartAvailability===true} pickupItems={pickupCheck.items} stockRevision={pickupCheck.stockRevision}
                         pickupChecking={pickupChecking} pickupSelected={!!pickupCheck.intent.selection}
                         pickupFailed={!!(pickupCheck.error||pickupCheck.automaticError)} onRetryPickup={pickupCheck.retry}/>}
 
@@ -1711,7 +1748,7 @@ export default function MenuScreen() {
                     <div
                         role="status"
                         aria-live="polite"
-                        className={`${phoneMenu ? "menu-cart-announcement" : ""}
+                        className={`${phoneMenu && cartNotice.success ? "menu-cart-announcement" : ""}
                             fixed
                             bottom-40
                             left-1/2
@@ -1729,7 +1766,7 @@ export default function MenuScreen() {
                             shadow-lg
                         `}
                     >
-                        ✓ {cartNotice}
+                        <T text={cartNotice.message}/>
                     </div>
                 )}
 
@@ -1750,6 +1787,7 @@ export default function MenuScreen() {
                     <WeightSelectorSheet
                         key={weightProduct.id}
                         product={weightProduct}
+                        notice={weightNotice}
                         currentWeightGrams={
                             productWeights[weightProduct.id]
                             ?? null

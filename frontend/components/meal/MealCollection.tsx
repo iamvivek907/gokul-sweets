@@ -2,7 +2,7 @@
 import Image from 'next/image';
 import {createPortal} from 'react-dom';
 import {useCarouselAutoplay} from '@/hooks/useCarouselAutoplay';
-import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
+import {useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {apiClient} from '@/services/apiClient';
 import {mealProductsForPickup,mealCanBeBuilt} from '@/lib/mealAvailability';
 import type {ItemAvailability} from '@/services/availabilityApi';
@@ -22,9 +22,11 @@ import type {MenuProduct} from '@/types/menu';
 import type {MealDefinition,MealQuote,CartMeal} from '@/types/meal';
 import styles from './Meals.module.css';
 import MealPrice from './MealPrice';
-export default function MealCollection({branchId,products,smartAvailability,meals,pickupItems,pickupChecking=false,pickupSelected=false,pickupFailed=false,onRetryPickup,shelfHost}:{shelfHost?:HTMLElement|null;branchId:number;products:MenuProduct[];smartAvailability:boolean;meals:MealDefinition[];pickupItems?:ItemAvailability[];pickupChecking?:boolean;pickupSelected?:boolean;pickupFailed?:boolean;onRetryPickup?:()=>void}){
+export default function MealCollection({branchId,products,smartAvailability,meals,pickupItems,stockRevision,pickupChecking=false,pickupSelected=false,pickupFailed=false,onRetryPickup,shelfHost}:{shelfHost?:HTMLElement|null;branchId:number;products:MenuProduct[];smartAvailability:boolean;meals:MealDefinition[];pickupItems?:ItemAvailability[];stockRevision?:string;pickupChecking?:boolean;pickupSelected?:boolean;pickupFailed?:boolean;onRetryPickup?:()=>void}){
  const locale=useLanguage(),map=useMemo(()=>new Map(products.map(p=>[p.id,{...p,available:p.catalogAvailable??p.available}])),[products]);
  const [active,setActive]=useState<MealDefinition|null>(null),[selected,setSelected]=useState<string[]>([]),[quantity,setQuantity]=useState(1),[replaceId,setReplaceId]=useState<string|undefined>(),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[priceReview,setPriceReview]=useState<{key:string;quote:MealQuote;previousTotal:number}|null>(null);
+ const stockSnapshot=useRef({stockRevision,pickupItems});
+ useLayoutEffect(()=>{stockSnapshot.current={stockRevision,pickupItems};},[stockRevision,pickupItems]);
  const rail=useRef<HTMLDivElement>(null),[slide,setSlide]=useState(0),[paused,setPaused]=useState(false);
  const mountRail=useCallback((node:HTMLDivElement|null)=>{rail.current=node;if(node)setSlide(0);},[]);
  function goSlide(index:number){const node=rail.current,target=node?.children[index] as HTMLElement|undefined,first=node?.children[0] as HTMLElement|undefined;if(node&&target&&first)node.scrollTo({left:target.offsetLeft-first.offsetLeft,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});}
@@ -54,6 +56,7 @@ export default function MealCollection({branchId,products,smartAvailability,meal
    const draft=verifiedPickup?draftMealPickupDemand(current,active,claim,replaceId):null;
    // Start a read for the displayed choices while the server prices the recipe.
    // Reuse it only when the final quote yields the exact same basket quantities.
+   const draftStock=stockSnapshot.current;
    const early=verifiedPickup&&draft&&draft.length<=50
     ? checkCartAvailability(branchId,verifiedPickup.date,1,draft,signal).then(data=>({data}),error=>({error}))
     : null;
@@ -70,9 +73,16 @@ export default function MealCollection({branchId,products,smartAvailability,meal
      drafts.current.set(active.id,{version:active.version,selected,quantity});setNotice('Choose pickup, then reopen your meal. Your choices are saved.');setActive(null);requestMenuPickup(quote.components[0].productId);return;
     }
     const demand=mealPickupDemand(next.items);
-    const matching=early&&JSON.stringify(demand)===JSON.stringify(draft)?await early:null;
-    if(matching&&'error' in matching)throw matching.error;
-    const checked=matching?.data??await checkCartAvailability(branchId,verifiedPickup.date,1,demand,signal);
+    const matching=early&&stockSnapshot.current===draftStock&&JSON.stringify(demand)===JSON.stringify(draft)?await early:null;
+    const stillCurrent=stockSnapshot.current===draftStock;
+    if(stillCurrent&&matching&&'error' in matching)throw matching.error;
+    const exactStock=stockSnapshot.current;
+    const checked=(stillCurrent&&matching&&"data" in matching?matching.data:null)??await checkCartAvailability(branchId,verifiedPickup.date,1,demand,signal);
+    if(stockSnapshot.current.stockRevision!==exactStock.stockRevision||
+       stockSnapshot.current!==exactStock&&demand.some(line=>stockSnapshot.current.pickupItems?.some(item=>
+        item.productId===line.productId&&(!item.available||item.availableQuantity!=null&&item.availableQuantity<(line.weightGrams??line.quantity??0))))){
+     throw Error('Availability changed. Try adding again.');
+    }
     const option=checked.dates.find(d=>d.date===verifiedPickup.date)?.slots.find(s=>s.slot.id===verifiedPickup.slot.id);
     if(!pickupIsFresh(verifiedPickup,new Date())||!option||!(verifiedPickup.pickupType==='PRIORITY'?option.priorityAvailable:option.normalAvailable))throw Error('This meal and cart cannot be prepared for that pickup. Choose another time.');
    }

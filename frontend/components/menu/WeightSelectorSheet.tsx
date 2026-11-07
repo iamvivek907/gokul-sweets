@@ -26,6 +26,7 @@ type WeightInputUnit =
 
 interface WeightSelectorSheetProps {
     editing?: boolean;
+    notice?: string|null;
     product: MenuProduct | null;
     currentWeightGrams?: number | null;
     onClose: () => void;
@@ -35,6 +36,7 @@ interface WeightSelectorSheetProps {
 
 interface WeightSelectorDialogProps {
     editing?: boolean;
+    notice?: string|null;
     product: MenuProduct;
     initialWeightGrams: number;
     onClose: () => void;
@@ -169,6 +171,7 @@ function WeightSelectorDialog({
     product,
     initialWeightGrams,
     editing = false,
+    notice,
     onClose,
     onConfirm
 }: WeightSelectorDialogProps) {
@@ -516,6 +519,7 @@ function WeightSelectorDialog({
                             }
                         </p>
 
+                        {notice&&<p role="alert" className="my-3 rounded-xl bg-[#fff0e8] p-3 text-sm text-[#6e291a]"><T text={notice}/></p>}
                     </div>
 
 
@@ -872,6 +876,7 @@ export default function WeightSelectorSheet({
     product,
     currentWeightGrams,
     editing = false,
+    notice,
     onClose,
     onConfirm
 }: WeightSelectorSheetProps) {
@@ -898,6 +903,7 @@ export default function WeightSelectorSheet({
         <WeightSelectorDialog
             key={`${product.id}-${initialWeightGrams}`}
             editing={editing}
+            notice={notice}
             product={
                 product
             }

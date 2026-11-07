@@ -189,7 +189,7 @@ export function useDateAvailability(products?: MenuProduct[]) {
     const automaticState = automaticResult?.key===autoKey ? automaticResult : null;
     const noPickupMessage = automaticState?.empty ? "No verified normal pickup is available in the booking window. Choose a date to explore other times." : null;
     const pickupRequired = menuPreview && !!features?.smartAvailability && (!intent.selection || !validDate);
-    return {features, today, branch, intent, data, items, selectionUnavailable: selectionUnavailable || !!intent.selection && !validDate, error: result?.key === key ? result.error : null,
+    return {features, today, branch, intent, data, items, stockRevision:JSON.stringify([revision,menuRevision]), selectionUnavailable: selectionUnavailable || !!intent.selection && !validDate, error: result?.key === key ? result.error : null,
         noPickupMessage, pickupRequired, choosing, setChoosing, findingSoonest: needsAutomatic && !automaticState?.empty && !automaticState?.error, automaticError: automaticState?.error, hasItems: requested.length > 0, retry: refresh.request};
 }
 
