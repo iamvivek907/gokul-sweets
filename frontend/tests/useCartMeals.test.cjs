@@ -11,6 +11,19 @@ test('missing weight and branch mismatch leave the meal and quantities untouched
 test('rapid Add and Increase use the last saved quantity before the view rerenders',()=>{
  const dish={...product,saleMode:'UNIT'};
  const f=fixture({branchId:null,items:[]}),view=f.hook();
- view.addItem(dish,1);view.addItem(dish,1);view.increaseQuantity(dish.id);
+ view.addItem(dish,1);view.addItem(dish,1);view.increaseQuantity(dish.id,1);
  assert.equal(f.cart().items[0].quantity,3);
+});
+test('a stale Increase cannot change the same dish in another branch’s cart',()=>{
+ const dish={...product,saleMode:'UNIT'};
+ const f=fixture({branchId:1,items:[{product:dish,quantity:1}]}),oldMenu=f.hook();
+ oldMenu.replaceCartForBranch(dish,2);
+ for(let i=0;i<3;i++)f.hook().addItem(dish,2);
+ const before=JSON.stringify(f.cart());
+ oldMenu.increaseQuantity(dish.id,1);
+ oldMenu.increaseQuantity(dish.id);
+ assert.equal(JSON.stringify(f.cart()),before);
+ assert.equal(f.cart().items[0].quantity,4);
+ f.hook().increaseQuantity(dish.id,2);
+ assert.equal(f.cart().items[0].quantity,5);
 });

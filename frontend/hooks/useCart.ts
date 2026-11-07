@@ -38,7 +38,7 @@ interface UseCartResult {
         branchId: number,
         weightGrams?: number
     ) => AddToCartResult;
-    increaseQuantity: (productId: number) => void;
+    increaseQuantity: (productId: number, expectedBranchId?: number) => void;
     decreaseQuantity: (productId: number) => void;
     setItemWeight: (
         productId: number,
@@ -177,13 +177,14 @@ export function useCart(): UseCartResult {
         return "added";
     }
 
-    function increaseQuantity(productId: number): void {
-        const cart = parseCart(getCartSnapshot());
-        if (cart.branchId === null) {
+    function increaseQuantity(productId: number, expectedBranchId = cart.branchId ?? undefined): void {
+        const currentCart = parseCart(getCartSnapshot());
+        // A control from before a cross-tab branch change cannot edit the new cart.
+        if (currentCart.branchId === null || (expectedBranchId !== undefined && currentCart.branchId !== expectedBranchId)) {
             return;
         }
 
-        const updatedItems = cart.items.map(item =>
+        const updatedItems = currentCart.items.map(item =>
             item.product.id !== productId
                 ? item
                 : item.product.saleMode === "WEIGHT"
@@ -199,7 +200,7 @@ export function useCart(): UseCartResult {
                     }
         );
 
-        saveCart({...cart,branchId: cart.branchId, items: updatedItems});
+        saveCart({...currentCart, items: updatedItems});
     }
 
     function decreaseQuantity(productId: number): void {

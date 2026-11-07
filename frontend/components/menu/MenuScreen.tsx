@@ -895,9 +895,9 @@ export default function MenuScreen() {
 
     const guardedIncrease = (id:number) => {
         try {
-            if(!pickupAllows(id))return;
+            if(!branch||!pickupAllows(id))return;
             if(!fitsKnownPickupStock(id)){showCartMessage("No more available for this pickup.");return;}
-            increaseQuantity(id);
+            increaseQuantity(id,branch.id);
         }
         catch {showCartMessage("Couldn’t update your cart. Try again.");}
     };
