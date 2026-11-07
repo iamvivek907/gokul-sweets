@@ -32,6 +32,23 @@ export function switchCartBranch(cart:CartState,branchId:number,items:CartItem[]
  return reconcileCartMeals({branchId,items,mealNotice:hasMeals?'Your meal dishes were kept at regular prices for this branch. Build a new meal from its menu to use a meal deal.':undefined});
 }
 export function mealClaim(m:CartMeal):MealClaim {return {instanceId:m.instanceId,mealId:m.mealId,version:m.version,quantity:m.quantity,optionIds:[...m.optionIds].sort()};}
+/** Stock checks use quantities only, independent of quote prices and meal claims. */
+export function mealPickupDemand(items:CartItem[]) {
+ return items.map(item=>({productId:item.product.id,quantity:item.product.saleMode==='WEIGHT'?null:item.quantity,weightGrams:item.product.saleMode==='WEIGHT'?item.weightGrams??null:null}))
+  .sort((a,b)=>a.productId-b.productId);
+}
+export function draftMealPickupDemand(cart:CartState,meal:MealDefinition,claim:MealClaim,replaceId?:string){
+ const demand=new Map(mealPickupDemand((replaceId?removeMeal(cart,replaceId):cart).items).map(item=>[item.productId,item]));
+ const choices=new Set(claim.optionIds);
+ for(const group of meal.groups)for(const option of group.options){
+  if(!choices.has(option.key))continue;
+  const existing=demand.get(option.productId);
+  demand.set(option.productId,option.weightGrams==null
+   ?{productId:option.productId,quantity:(existing?.quantity??0)+option.quantity*claim.quantity,weightGrams:null}
+   :{productId:option.productId,quantity:null,weightGrams:(existing?.weightGrams??0)+option.weightGrams*claim.quantity});
+ }
+ return [...demand.values()].sort((a,b)=>a.productId-b.productId);
+}
 /** An atomic builder edit preserves independently ordered quantities of identical dishes. */
 export function removeMeal(cart:CartState,id:string):CartState {
  const meal=cart.meals?.find(m=>m.instanceId===id);if(!meal)return cart;

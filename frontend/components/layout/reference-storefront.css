@@ -64,7 +64,7 @@ body:has(.future-storefront[data-customer-route]){background:#fff}
 .future-storefront[data-customer-route] .mobile-menu-pairing-row h4{color:#20242b;font-size:13px}
 .future-storefront[data-customer-route] .mobile-menu-pairing-row small{color:#656b75}
 .future-storefront[data-customer-route] .mobile-menu-suggestions>.mobile-menu-suggestions-open{background:transparent;border:0;color:#656b75;font-size:11px;margin-top:0;padding:4px 0}
-.future-storefront[data-customer-route] :is(.mobile-menu-offer-progress,.mobile-checkout-savings,.mobile-cart-offer-target){background:#eef4ff!important;color:#2359ac!important;border-color:#dbe7fc!important}
+.future-storefront[data-customer-route] :is(.mobile-menu-offer-progress,.mobile-checkout-savings){background:#eef4ff!important;color:#2359ac!important;border-color:#dbe7fc!important}
 .future-storefront[data-customer-route] .mobile-checkout{background:#f5f6f8;padding:12px 16px 110px;color:#20242b}
 .future-storefront[data-customer-route] .mobile-checkout-section{border:1px solid #e7e9ed;border-radius:16px;padding:16px;margin:12px 0}
 .future-storefront[data-customer-route] .mobile-checkout-heading h1{font-size:24px;letter-spacing:-.025em}

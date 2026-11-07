@@ -7,9 +7,6 @@ import LinkFeedback from "@/components/common/LinkFeedback";
 
 import Link from "next/link";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
-import {useSelectedBranch} from "@/hooks/useSelectedBranch";
-import {usePickupIntent} from "@/hooks/usePickupIntent";
-import type {AvailableRebateResponse} from "@/types/rebate";
 import {useState, useEffect} from "react";
 import {startOfferArrival} from "@/lib/offerArrival";
 import Image from "next/image";
@@ -17,8 +14,6 @@ import {useCart} from "@/hooks/useCart";
 
 
 interface FloatingCartButtonProps {
-    offerTarget?:AvailableRebateResponse|null;
-    offerEnabled?:boolean;
 
     itemCount:
         number;
@@ -50,15 +45,11 @@ function formatCurrency(
 
 export default function FloatingCartButton({
     itemCount,
-    total,
-    offerEnabled=false,
-    offerTarget
+    total
 }: FloatingCartButtonProps) {
 
     const features = useStorefrontFeatures();
     const cart = useCart();
-    const {branch}=useSelectedBranch();
-    const pickup=usePickupIntent(branch?.id);
     const [confirmClear,setConfirmClear]=useState(false);
     const [mobile, setMobile] = useState(false);
     useEffect(() => {
@@ -67,8 +58,6 @@ export default function FloatingCartButton({
         update(); media.addEventListener("change", update);
         return () => media.removeEventListener("change", update);
     }, []);
-    const threshold=offerTarget?.nextSlabMinimumOrderAmount??0;
-    const progress=threshold>0?Math.min(1,Math.max(0,1-(offerTarget?.amountNeededForNextSlab??threshold)/threshold)):0;
     const quick = mobile && features?.simplifiedCheckout;
     const consolidated=quick&&features?.checkoutExperienceV2&&features.acceptedCheckoutQuote;
     const premium=mobile&&(features?.futuristicStorefrontV2===true||features?.checkoutExperienceV2===true)&&features?.contextualStorefrontV2===true;
@@ -93,7 +82,6 @@ export default function FloatingCartButton({
             "
         >
 
-            {consolidated&&offerEnabled&&(!premium||!!offerTarget)&&<div className="mobile-cart-offer-slot"><button type="button" className="mobile-cart-offer-target" onClick={()=>document.getElementById("menu-offers-open")?.click()}><span className="mobile-cart-offer-icon" aria-hidden="true"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="17" fill="none" stroke="#d7e5fc" strokeWidth="3"/><circle cx="20" cy="20" r="17" fill="none" stroke="#2e68c7" strokeWidth="3" strokeLinecap="round" strokeDasharray="106.82" strokeDashoffset={106.82*(1-progress)} transform="rotate(-90 20 20)"/></svg><span>%</span></span><span>{offerTarget?<><strong><T text="Unlock"/> {formatCurrency(offerTarget.nextSlabRebateAmount!)} <T text="off"/></strong><small><T text="Add"/> {formatCurrency(offerTarget.amountNeededForNextSlab!)} <T text="in eligible items"/></small></>:<><strong><T text="Offers & savings"/></strong><small><T text={!pickup.selection&&features?.smartAvailability?"Choose pickup to check your savings":"View eligible offers and ways to save"}/></small></>}</span><span aria-hidden="true">⌃</span></button></div>}
             <Link
                 data-ordering-target="cart"
                 onNavigate={()=>{if(consolidated)startOfferArrival();}}

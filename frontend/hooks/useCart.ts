@@ -113,6 +113,7 @@ export function useCart(): UseCartResult {
         selectedBranchId: number,
         requestedWeightGrams?: number
     ): AddToCartResult {
+        const cart = parseCart(getCartSnapshot());
 
         if (
             cart.branchId !== null
@@ -177,6 +178,7 @@ export function useCart(): UseCartResult {
     }
 
     function increaseQuantity(productId: number): void {
+        const cart = parseCart(getCartSnapshot());
         if (cart.branchId === null) {
             return;
         }

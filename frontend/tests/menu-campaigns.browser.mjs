@@ -33,8 +33,8 @@ try {for(const width of [320,390,640,1280]) {
  if(width<=640) {
   const strip=page.locator('[aria-label="Published menu banners"]');
   for(const family of ['Food','Sweets','Bakery','Snacks']) {await page.getByRole('button',{name:`Browse ${family}`,exact:true}).click();await heading.waitFor();assert.equal(await heading.count(),1);}
-  const rect=await strip.boundingBox(),offers=await page.locator('.menu-offers').boundingBox(),items=await page.locator('#gokul-menu-items').boundingBox();
-  assert.ok(rect.y+rect.height<=offers.y+1,'campaign leads the menu above offers');
+  const rect=await strip.boundingBox(),items=await page.locator('#gokul-menu-items').boundingBox();
+  assert.equal(await page.locator('.menu-browse-chips #menu-offers-open').count(),1,'offers use the shortcut in the menu controls');
   assert.ok(rect.y+rect.height<=items.y+1,'campaign precedes dish discovery');
   await page.getByRole('button',{name:'Explore sweets',exact:true}).click();await page.getByRole('heading',{name:'Sweets favourite',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Browse Sweets',exact:true}).getAttribute('aria-current'),'true');
  }

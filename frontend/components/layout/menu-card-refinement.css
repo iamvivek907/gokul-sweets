@@ -29,7 +29,6 @@
 .future-storefront[data-customer-design=reference] .gokul-menu-product-card .menu-sale-price {border-radius:5px;padding:3px 6px;background:#ffdf33;color:#211b0c;box-shadow:0 2px 0 #d8b723}
 .future-storefront[data-customer-design=reference] .gokul-menu-product-card .product-rating-summary {background:#fff6e5;border:1px solid #efd9ad;border-radius:9px;padding:4px 7px;color:#583712}
 .future-storefront[data-customer-design=reference] .gokul-menu-product-card :is(button.product-card-controls,.product-card-controls>button):enabled:hover {background:linear-gradient(180deg,#f5fff9,#d1f9e3)!important;box-shadow:0 5px 12px #087f5533}
-.future-storefront[data-customer-design=reference] .menu-search-dialog .menu-search-hint {margin:0 0 16px;color:#665b63;font-size:14px;line-height:1.5}
 .future-storefront[data-customer-design=reference] .menu-search-dialog .menu-search-show-results {display:block;min-height:48px;width:100%;margin-top:20px;padding:12px;border-radius:14px;background:#951436;color:#fff;font-weight:750}
 .future-storefront[data-customer-design=reference] .menu-search-dialog .menu-search-suggestions {max-height:40dvh;overflow-y:auto}
 @media(max-width:640px){

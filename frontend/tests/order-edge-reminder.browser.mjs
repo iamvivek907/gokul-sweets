@@ -48,7 +48,8 @@ try{
   assert.match(await tab.innerText(),/3 pickups/);assert.match(await tab.innerText(),/Across 2 branches/);
   const before=await page.locator('#gokul-product-3').boundingBox();
   await page.waitForFunction(()=>!document.querySelector('.active-order-edge')?.hasAttribute('data-expanded'));
-  const box=await tab.boundingBox();assert.ok(box.width<=185);assert.ok(box.height>=44);assert.ok(Math.abs(box.x+box.width-width)<2);
+  const box=await tab.boundingBox();assert.ok(box.width<=45);assert.ok(box.height>=44);assert.ok(Math.abs(box.x+box.width-width)<2);
+  assert.equal(await tab.locator(".active-order-edge-compact").innerText(),"3");
   const after=await page.locator('#gokul-product-3').boundingBox();assert.ok(Math.abs(before.y-after.y)<1,'retraction must not shift content');
   if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/order-edge-${width}.png`});
   const cartBefore=await page.evaluate(()=>localStorage.getItem('gokul-cart')),branchBefore=await page.evaluate(()=>localStorage.getItem('gokul-selected-branch'));
