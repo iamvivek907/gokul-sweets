@@ -14,16 +14,6 @@ import Image from "next/image";
 import {useCart} from "@/hooks/useCart";
 
 
-interface FloatingCartButtonProps {
-
-    itemCount:
-        number;
-
-    total:
-        number;
-}
-
-
 function formatCurrency(
     amount: number
 ): string {
@@ -44,13 +34,11 @@ function formatCurrency(
 }
 
 
-export default function FloatingCartButton({
-    itemCount,
-    total
-}: FloatingCartButtonProps) {
+export default function FloatingCartButton() {
 
     const features = useStorefrontFeatures();
     const cart = useCart();
+    const {itemCount, subtotal:total} = cart;
     const [mobile, setMobile] = useState(false);
     useEffect(() => {
         const media = window.matchMedia("(max-width: 640px)");
@@ -209,14 +197,14 @@ export default function FloatingCartButton({
                 </div>
                 </>}
             <LinkFeedback /></Link>
-            <ClearCartControl clearCart={cart.clearCart}/>
+            <ClearCartControl snapshot={cart.snapshot} clearCart={cart.clearCart}/>
 
         </div>
     );
 }
 
 /** The confirmation belongs to the cart that was visible when it was opened. */
-function ClearCartControl({clearCart}:{clearCart:(expectedSnapshot:string)=>boolean}) {
+function ClearCartControl({snapshot,clearCart}:{snapshot:string;clearCart:(expectedSnapshot:string)=>boolean}) {
     const [confirmation,setConfirmation]=useState<{snapshot:string;notice?:string}|null>(null);
     const close=()=>setConfirmation(null);
     const notice=confirmation?.notice;
@@ -231,7 +219,7 @@ function ClearCartControl({clearCart}:{clearCart:(expectedSnapshot:string)=>bool
     }
 
     return <>
-        <button type="button" className="floating-cart-delete" aria-label="Clear cart" onClick={()=>setConfirmation({snapshot:getCartSnapshot()})}>
+        <button type="button" className="floating-cart-delete" aria-label="Clear cart" onClick={()=>setConfirmation({snapshot,notice:getCartSnapshot()!==snapshot?"Your cart changed. Close this dialog and review it before clearing.":undefined})}>
             <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6M14 10v6"/></svg>
         </button>
         {confirmation&&<MenuDiscoverySheet title="Clear cart?" className="floating-cart-clear-dialog" returnFocusId="gokul-menu-search" onClose={close}>

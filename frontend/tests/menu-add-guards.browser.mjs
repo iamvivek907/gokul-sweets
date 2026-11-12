@@ -96,6 +96,24 @@ try{
  const clear=page.getByRole('button',{name:'Clear cart',exact:true});
  const clearDialog=page.getByRole('dialog',{name:'Clear cart?',exact:true});
  const confirm=clearDialog.getByRole('button',{name:'Yes, clear cart',exact:true});
+ // The storage write can be visible before this tab processes the storage event.
+ const staleOpen=await page.evaluate(()=>{
+  const key='gokul-cart',oldValue=localStorage.getItem(key);
+  const replacement=JSON.parse(oldValue);replacement.branchId=2;replacement.items[0].quantity=4;
+  const newValue=JSON.stringify(replacement);localStorage.setItem(key,newValue);
+  document.querySelector('.floating-cart-delete').click();
+  window.dispatchEvent(new StorageEvent('storage',{key,oldValue,newValue}));
+  return {oldValue,newValue};
+ });
+ await clearDialog.getByRole('alert').filter({hasText:'Your cart changed'}).waitFor();
+ assert.equal(await confirm.isDisabled(),true,'a stale control cannot ask to delete the replacement cart');
+ assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),staleOpen.newValue);
+ await clearDialog.getByRole('button',{name:'No, keep cart',exact:true}).click();
+ await clearDialog.waitFor({state:'hidden'});
+ await page.evaluate(value=>{
+  localStorage.setItem('gokul-cart',value);
+  window.dispatchEvent(new StorageEvent('storage',{key:'gokul-cart',newValue:value}));
+ },staleOpen.oldValue);
  await clear.click();await clearDialog.waitFor();
  const changed=await page.evaluate(()=>{
   const key='gokul-cart',oldValue=localStorage.getItem(key);
@@ -113,6 +131,25 @@ try{
  await clear.click();await confirm.click();
  await page.locator('.gokul-floating-cart').waitFor({state:'hidden'});
  assert.equal((await cart()).items.length,0,'a fresh confirmation may clear the current cart');
+ // The desktop weight editor must keep the cart it was opened for, even after a rerender.
+ await page.setViewportSize({width:1280,height:900});
+ await page.evaluate(product=>{
+  localStorage.setItem('gokul-cart',JSON.stringify({branchId:1,items:[{product,quantity:1,weightGrams:250}]}));
+ },products[1]);
+ await page.goto(base+'/cart');
+ await page.getByRole('button',{name:/^Change Fresh Peda quantity/}).click();
+ const editWeight=page.getByRole('dialog',{name:'Fresh Peda',exact:true});
+ const replacement=await page.evaluate(()=>{
+  const key='gokul-cart',oldValue=localStorage.getItem(key);
+  const next=JSON.parse(oldValue);next.items[0].weightGrams=500;
+  const newValue=JSON.stringify(next);localStorage.setItem(key,newValue);
+  window.dispatchEvent(new StorageEvent('storage',{key,oldValue,newValue}));
+  return newValue;
+ });
+ await page.getByRole('button',{name:/^Change Fresh Peda quantity.*500/}).waitFor({state:'attached'});
+ await editWeight.getByRole('button',{name:/^(Add |Update quantity)/}).click();
+ await page.getByRole('alert').filter({hasText:'Your cart changed. Review it and try again.'}).waitFor();
+ assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),replacement);
  await context.close();
- console.log('PASS local stock cap, price reconfirmation, invalidated meal stock, and stale clear protection');
+ console.log('PASS local stock cap, price reconfirmation, invalidated meal stock, and stale clear and weight protection');
 }finally{await browser.close();}

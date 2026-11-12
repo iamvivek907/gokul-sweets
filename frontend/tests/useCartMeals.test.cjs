@@ -68,3 +68,29 @@ test('clear confirmation only applies to the exact saved cart snapshot',()=>{
  assert.equal(view.clearCart(JSON.stringify(f.cart())),true);
  assert.equal(f.cart().items.length,0);
 });
+
+test('stale Remove and Edit weight cannot change the replacement cart even when it contains the same dish',()=>{
+ const f=fixture({branchId:1,items:[{product,quantity:1,weightGrams:500}]}),old=f.hook();
+ old.replaceCartForBranch(product,2,250);
+ const before=JSON.stringify(f.cart());
+ assert.equal(old.removeItem(product.id),false);
+ assert.equal(old.setItemWeight(product.id,300),false);
+ assert.equal(f.hook().setItemWeight(product.id,300,old.snapshot),false);
+ assert.equal(JSON.stringify(f.cart()),before);
+ assert.equal(f.hook().removeItem(product.id),true);
+ assert.equal(f.cart().items.length,0);
+});
+
+test('cart edits reject newer same-branch changes and preserve meal portions on a fresh edit',()=>{
+ const f=fixture({branchId:1,items:[{product,quantity:1,weightGrams:750}],meals:[recipe('first',500)]});
+ const old=f.hook();
+ old.addItem({...product,id:10},1,250);
+ assert.equal(old.removeItem(product.id),false);
+ assert.equal(f.hook().setItemWeight(product.id,350,old.snapshot),false);
+ assert.equal(f.hook().setItemWeight(product.id,350),true);
+ assert.equal(f.cart().items.find(item=>item.product.id===9).weightGrams,850);
+ assert.equal(f.hook().removeItem(product.id),true);
+ assert.equal(f.cart().items.find(item=>item.product.id===9).weightGrams,500);
+ assert.ok(f.cart().items.some(item=>item.product.id===10));
+ assert.equal(f.cart().meals.length,1);
+});

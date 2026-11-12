@@ -129,7 +129,6 @@ export default function MenuScreen() {
         meals,
         branchId: cartBranchId,
         itemCount,
-        subtotal,
         addItem,
         increaseQuantity,
         decreaseQuantity,
@@ -1777,14 +1776,7 @@ export default function MenuScreen() {
 
 
             {(mobileFeatures?.futuristicStorefrontV2===true||mobileFeatures?.checkoutExperienceV2===true)&&mobileFeatures?.contextualStorefrontV2===true&&!error&&categories.length>0&&<FloatingMenuCategories key={branch.id} categories={categories} selectedId={phoneMenu?(mobileCategories?.length===1?mobileCategories[0]:undefined):(effectiveCategoryId??undefined)} hasCart={itemCount>0} onSelect={jumpMenuCategory}/>}
-            <FloatingCartButton
-                itemCount={
-                    itemCount
-                }
-                total={
-                    subtotal
-                }
-            />
+            <FloatingCartButton />
 
 
             {weightProduct
