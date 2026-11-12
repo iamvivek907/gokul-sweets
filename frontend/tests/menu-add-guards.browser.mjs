@@ -152,6 +152,19 @@ try{
  assert.equal(branchReplacement.asked,true);
  await page.getByText('Your cart changed. Review it and try again.',{exact:true}).waitFor();
  assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),branchReplacement.latest);
+ // The selected branch may already have changed before this tab handles the storage event.
+ const staleBranchAsked=await add.evaluate(button=>{
+  const key='gokul-selected-branch',before=localStorage.getItem(key),originalConfirm=window.confirm;
+  localStorage.setItem(key,JSON.stringify({...JSON.parse(before),id:3,name:'New pickup branch'}));
+  let asked=false;
+  window.confirm=()=>{asked=true;return true;};
+  try{button.click();}
+  finally{window.confirm=originalConfirm;localStorage.setItem(key,before);}
+  return asked;
+ });
+ assert.equal(staleBranchAsked,false,'a stale branch must not open a cart replacement prompt');
+ await page.getByText('Your branch or pickup changed. Review it and try again.',{exact:true}).waitFor();
+ assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),branchReplacement.latest);
  page.once('dialog',dialog=>dialog.accept());
  await add.click();
  await page.waitForFunction(()=>JSON.parse(localStorage.getItem('gokul-cart'))?.branchId===1);

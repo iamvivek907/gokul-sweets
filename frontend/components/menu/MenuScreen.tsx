@@ -1,6 +1,6 @@
 "use client";
 import {getCartSnapshot,parseCart} from "@/lib/cartStorage";
-import {getStoredBranchSnapshot} from "@/lib/branchStorage";
+import {getStoredBranchSnapshot,parseStoredBranch} from "@/lib/branchStorage";
 import {standaloneCartItems} from "@/lib/cartMeals";
 import MealShortcut from "@/components/meal/MealShortcut";
 import {useBranchMeals} from "@/hooks/useBranchMeals";
@@ -1006,6 +1006,10 @@ export default function MenuScreen() {
             }
 
             const confirmedBranch = getStoredBranchSnapshot();
+            if (parseStoredBranch(confirmedBranch)?.id !== branch.id) {
+                showCartMessage("Your branch or pickup changed. Review it and try again.");
+                return;
+            }
             const confirmedPickup = getPickupSlotSnapshot();
             if (!window.confirm(translate("Your cart contains items from another branch. Clear it and start a new order from {branch}?").replace("{branch}", branch.name))) return;
 
