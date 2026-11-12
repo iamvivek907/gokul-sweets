@@ -975,6 +975,11 @@ export default function MenuScreen() {
         const liveProduct=allProducts.find(item=>item.id===product.id);
         if(!liveProduct?.available || !pickupAllows(product.id)){setWeightProduct(null);showCartMessage(liveProduct?.serviceAvailability?.message??"This item is currently unavailable.");return;}
         if(!fitsKnownPickupStock(product.id,weightGrams)){showCartMessage("No more available for this pickup.");return;}
+        const selectedBranch = getStoredBranchSnapshot();
+        if (parseStoredBranch(selectedBranch)?.id !== branch.id) {
+            showCartMessage("Your branch or pickup changed. Review it and try again.");
+            return;
+        }
         const result =
             addItem(
                 liveProduct,
@@ -1005,15 +1010,10 @@ export default function MenuScreen() {
                 return;
             }
 
-            const confirmedBranch = getStoredBranchSnapshot();
-            if (parseStoredBranch(confirmedBranch)?.id !== branch.id) {
-                showCartMessage("Your branch or pickup changed. Review it and try again.");
-                return;
-            }
             const confirmedPickup = getPickupSlotSnapshot();
             if (!window.confirm(translate("Your cart contains items from another branch. Clear it and start a new order from {branch}?").replace("{branch}", branch.name))) return;
 
-            if (getStoredBranchSnapshot() !== confirmedBranch || getPickupSlotSnapshot() !== confirmedPickup) {
+            if (getStoredBranchSnapshot() !== selectedBranch || getPickupSlotSnapshot() !== confirmedPickup) {
                 showCartMessage("Your branch or pickup changed. Review it and try again.");
                 return;
             }

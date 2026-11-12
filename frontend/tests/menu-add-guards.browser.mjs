@@ -131,13 +131,36 @@ try{
  await clear.click();await confirm.click();
  await page.locator('.gokul-floating-cart').waitFor({state:'hidden'});
  assert.equal((await cart()).items.length,0,'a fresh confirmation may clear the current cart');
+ const add=dish.getByRole('button',{name:'Add Last Laddu to cart',exact:true});
+ await add.waitFor();
+ // No replacement prompt is needed with an empty cart or a cart for the displayed branch.
+ const ordinaryAdds=await add.evaluate((button,otherProduct)=>{
+  const branchKey='gokul-selected-branch',cartKey='gokul-cart';
+  const branch=localStorage.getItem(branchKey);
+  const originalCart=localStorage.getItem(cartKey);
+  const sameBranchCart=JSON.stringify({branchId:1,items:[{product:otherProduct,quantity:1,weightGrams:null}]});
+  const results=[];
+  localStorage.setItem(branchKey,JSON.stringify({...JSON.parse(branch),id:3,name:'New pickup branch'}));
+  try{
+   for(const initial of [null,sameBranchCart]){
+    if(initial===null)localStorage.removeItem(cartKey);else localStorage.setItem(cartKey,initial);
+    button.click();
+    results.push({initial,after:localStorage.getItem(cartKey)});
+   }
+  }finally{
+   localStorage.setItem(branchKey,branch);
+   if(originalCart===null)localStorage.removeItem(cartKey);else localStorage.setItem(cartKey,originalCart);
+  }
+  return results;
+ },products[2]);
+ for(const {initial,after} of ordinaryAdds)assert.equal(after,initial,'ordinary Add must not write against a stale branch');
+ await page.getByText('Your branch or pickup changed. Review it and try again.',{exact:true}).waitFor();
  // Replacing a cart requires consent for the specific cart, not a later version.
  await page.evaluate(product=>{
   localStorage.setItem('gokul-cart',JSON.stringify({branchId:2,items:[{product,quantity:1,weightGrams:null}]}));
   window.dispatchEvent(new StorageEvent('storage',{key:'gokul-cart'}));
  },products[0]);
  await clear.waitFor();
- const add=dish.getByRole('button',{name:'Add Last Laddu to cart',exact:true});
  await add.waitFor();
  const branchReplacement=await add.evaluate(button=>{
   const key='gokul-cart',before=localStorage.getItem(key);
