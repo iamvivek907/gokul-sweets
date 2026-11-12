@@ -24,6 +24,7 @@ let pendingImageWrites = 0;
 const OFFLINE_URL =
     "/offline";
 
+const LAUNCH_WAIT_MS = 4000;
 
 const STATIC_ASSETS = [
     "/",
@@ -157,11 +158,9 @@ self.addEventListener(
             "navigate"
         ) {
 
-            event.respondWith(
-                networkFirstNavigation(
-                    request
-                )
-            );
+            event.respondWith(isStorefrontLaunch(url)
+                ? launchNavigation(request, url)
+                : networkFirstNavigation(request));
 
             return;
         }
@@ -344,6 +343,75 @@ async function staleWhileRevalidate(
     return Response.error();
 }
 
+
+function isStorefrontLaunch(url) {
+    return url.origin === self.location.origin
+        && /^(?:\/|\/menu\/?|\/branches(?:\/[1-9]\d*)?\/?)$/.test(url.pathname);
+}
+
+async function launchNavigation(request, url) {
+    const controller = new AbortController();
+    let timer;
+    try {
+        const deadline = new Promise((_, reject) => {
+            timer = setTimeout(() => {
+                reject(new Error("Storefront launch timed out"));
+                controller.abort();
+            }, LAUNCH_WAIT_MS);
+        });
+        const response = await Promise.race([fetch(request, {signal: controller.signal}), deadline]);
+        if (response.status < 500) return response;
+    } catch {
+        // A failed fetch or a slow server must not leave the launch screen blank.
+    } finally {
+        clearTimeout(timer);
+    }
+    return launchRecoveryPage(url, request.headers.get("accept-language"));
+}
+
+function launchRecoveryPage(url, language) {
+    // Render a complete document from the worker, even after old app assets are evicted.
+    const hindi = /^hi(?:[-,;\s]|$)/i.test(language ?? "");
+    const title = hindi ? "फिर से कोशिश करें" : "Let’s get you back to Gokul";
+    const message = hindi
+        ? "पेज अभी नहीं खुल सका। अपना इंटरनेट कनेक्शन जाँचें और फिर कोशिश करें।"
+        : "This page couldn’t load. Check your connection and try again.";
+    const retry = hindi ? "फिर कोशिश करें" : "Try again";
+    const href = url.href.replace(/[&"<>'`]/g, char => ({
+        "&": "&amp;", '"': "&quot;", "<": "&lt;", ">": "&gt;", "'": "&#39;", "`": "&#96;"
+    })[char]);
+    return new Response(`<!doctype html>
+<html lang="${hindi ? "hi" : "en"}">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#980c31">
+<title>${title} · Gokul</title>
+<style>
+*{box-sizing:border-box}
+html{color-scheme:dark;background:#980c31}
+body{margin:0;min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding:max(24px,env(safe-area-inset-top)) max(24px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(24px,env(safe-area-inset-left));font:1rem/1.55 system-ui,sans-serif;color:#fff3dd;background:radial-gradient(ellipse at 50% 12%,#b74041 0%,transparent 58%),linear-gradient(145deg,#980c31,#4e0b26)}
+main{width:min(100%,28rem);padding:clamp(1.5rem,6vw,3rem);text-align:center;border:1px solid #f9cf975e;border-radius:1.75rem;background:#5b0e2ada;box-shadow:0 1.25rem 4rem #2b07134d}
+.brand{margin:0;font:700 clamp(2.5rem,12vw,4rem)/1 Georgia,serif;letter-spacing:-.04em}
+.rule{display:block;width:2.5rem;height:2px;margin:1.3rem auto;background:#ffcb83;border-radius:1rem}
+h1{margin:0;font-size:clamp(1.25rem,5vw,1.65rem);line-height:1.3}
+.message{margin:.7rem 0 1.5rem;color:#fce3ca}
+a{display:inline-flex;justify-content:center;align-items:center;min-height:48px;padding:.65rem 1.65rem;border-radius:2rem;background:#fff1d7;color:#631430;font-weight:700;text-decoration:none}
+a:hover{background:#ffe2b2}
+a:focus-visible{outline:3px solid #ffcf89;outline-offset:4px}
+</style>
+<main aria-labelledby="recovery-title">
+  <p class="brand">Gokul</p><span class="rule" aria-hidden="true"></span>
+  <h1 id="recovery-title">${title}</h1>
+  <p class="message">${message}</p>
+  <a href="${href}">${retry}</a>
+</main>
+</html>`, {status: 503, headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store",
+        "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'",
+        "Referrer-Policy": "no-referrer"
+    }});
+}
 
 async function networkFirstNavigation(
     request

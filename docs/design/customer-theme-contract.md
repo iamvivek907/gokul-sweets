@@ -2,6 +2,10 @@
 
 The approved launch uses a deep burgundy gradient, ivory existing wordmark, muted gold food illustrations and a soft saffron glow. Pre-hydration boot shares its palette. Page loaders use cream/peach/saffron gradients with decorative inline SVG corner art; compact section loaders stay transparent. Existing logos, navigation, truthful stage-specific payment copy, eight-second delayed-response guidance and reduced-motion safeguards remain. No additional network assets, progress percentages, launch repeats, artificial waiting or changed checkout logic.
 
+## Installed app launch recovery
+
+An active service worker gives storefront document launches four seconds to return a network response. If the request stalls, fails, or returns a server error, show the burgundy Gokul recovery screen with a Retry link to the original page. The screen uses no external assets or app scripts and works after the browser evicts cached pages. Keep the installed app identity, native launch artwork, cart, and checkout behavior unchanged.
+
 ## November 3 quiet order reminder
 
 The owner-approved edge tab supersedes the floating bottom order tracker. Only Home (including branch Home) and Menu show it, independent of the branch being browsed. It introduces itself once per document visit, retracts after six seconds and can be swiped right to dismiss for the visit. The shared sheet provides keyboard-accessible dismissal. Cart, checkout, order pages, open dialogs and focused text inputs show no tab. No layout padding, navigation badge or cart-offer suppression is added. Keep existing cart and Categories placement. Group bounded cross-branch active orders by business date then time, with explicit branch names and pickup/delivery labels. Overflow links to paged active history; no extra polling or branch switching. Dismissal stops the reminder subscription; identity changes reset suppression. Existing owner-scoped order safeguards remain authoritative.
