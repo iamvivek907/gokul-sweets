@@ -116,9 +116,12 @@ export default function MobileCheckout(){
  const [recovery,setRecovery]=useState<string|null>(null);
  useEffect(()=>{let alive=true;queueMicrotask(()=>{if(alive)setRecovery(new URLSearchParams(window.location.search).get("paymentRecovery"));});return()=>{alive=false;};},[]);
  const frozen=!attemptLoaded||busy||!!attempt||!!pending;
- const [selecting,setSelecting]=useState(false);
- const [selection,setSelection]=useState<{branchId:number|null;ids:number[]}>({branchId:null,ids:[]});
- const selected=selection.branchId===cart.branchId?selection.ids.filter(id=>cart.items.some(item=>item.product.id===id)):[];
+ const [selection,setSelection]=useState<{snapshot:string;ids:number[]}|null>(null);
+ const selecting=selection!==null;
+ const selected=selection?.snapshot===cart.snapshot?selection.ids:[];
+ const standalone=standaloneCartItems(cart);
+ // Reset selections on a new cart, even if a later update restores an identical basket.
+ if(selection&&selection.snapshot!==cart.snapshot)setSelection({snapshot:cart.snapshot,ids:[]});
  const editingLocked=frozen||addOnBusy||pickupValidating||savingsBusy;
  const [clearReview,setClearReview]=useState<{cart:string;branch:string;pickup:string}|null>(null);
  const [undo,setUndo]=useState<CartUndo|null>(null);
@@ -136,22 +139,28 @@ export default function MobileCheckout(){
   if(cart.items.length){hadItems.current=true;return;}
   if(hadItems.current)router.replace("/menu");
  },[attemptLoaded,busy,addOnBusy,attempt,pendingValue,pending,cart.items.length,router,undoAllowed]);
- function removeItems(ids:number[],allowUndo=true){
-  if(editingLocked||getPendingOrderSnapshot()||sessionStorage.getItem(ATTEMPT))return;
-  const before=getCartSnapshot(),branchBefore=getStoredBranchSnapshot(),pickupBefore=getPickupSlotSnapshot();
-  const current=parseCart(before);
-  if(current.branchId!==cart.branchId)return;
-  const remove=new Set(ids);const next=allowUndo?ids.reduce((value,id)=>editStandalone(value,id,{remove:true}),current):{...current,items:[],meals:undefined};const items=next.items;
-  if(JSON.stringify(items)===JSON.stringify(current.items))return;
-  if(items.length)saveCart({...next,branchId:current.branchId,items});else clearStoredCart();
-  setUndo(allowUndo?{before,after:getCartSnapshot(),branch:branchBefore,pickup:pickupBefore,pending:getPendingOrderSnapshot(),attempt:sessionStorage.getItem(ATTEMPT)??"",expiresAt:Date.now()+8000}:null);
-  setSelection({branchId:cart.branchId,ids:selected.filter(id=>!remove.has(id))});
+ function editableCart(expectedSnapshot:string){
+  if(editingLocked||getPendingOrderSnapshot()||sessionStorage.getItem(ATTEMPT))return null;
+  const snapshot=getCartSnapshot();
+  if(snapshot!==expectedSnapshot){setError("Your cart changed. Review it and try again.");return null;}
+  return parseCart(snapshot);
+ }
+
+ function removeItems(ids:number[],expectedSnapshot=cart.snapshot){
+  const branchBefore=getStoredBranchSnapshot(),pickupBefore=getPickupSlotSnapshot();
+  const current=editableCart(expectedSnapshot);
+  if(!current)return;
+  const next=ids.reduce((value,id)=>editStandalone(value,id,{remove:true}),current);
+  if(next===current)return;
+  let after="";
+  if(next.items.length)after=saveCart(next);else clearStoredCart();
+  setUndo({before:expectedSnapshot,after,branch:branchBefore,pickup:pickupBefore,pending:"",attempt:"",expiresAt:Date.now()+8000});
+  setError("");
  }
 
  function decreaseItem(productId:number){
-  if(editingLocked||getPendingOrderSnapshot()||sessionStorage.getItem(ATTEMPT))return;
-  const current=parseCart(getCartSnapshot());
-  if(current.branchId!==cart.branchId)return;
+  const current=editableCart(cart.snapshot);
+  if(!current)return;
   const item=standaloneCartItems(current).find(value=>value.product.id===productId);
   if(!item)return;
   const minimum=item.product.minimumWeightGrams??250;
@@ -296,12 +305,12 @@ export default function MobileCheckout(){
   </>}
   {!pending&&!attempt&&branch&&<section ref={branchSection} className={`mobile-branch-review ${guidance==="branch"&&!branchReviewed?"mobile-checkout-guidance":""}`} aria-label="Confirm pickup branch"><span><T text="YOUR PICKUP BRANCH"/></span><h2>{branch.name}</h2><p>{[branch.address,branch.city,branch.pincode].filter(Boolean).join(", ")||"Contact the branch to confirm its location before travelling."}</p>{guidance==="branch"&&!branchReviewed&&<p role="status"><T text="Confirm this collection branch below to enable payment."/></p>}<label><input type="checkbox" checked={branchReviewed} onChange={event=>setConfirmedBranch(event.target.checked?branchReviewKey:null)}/><span><T text="I will collect my order at this branch."/></span></label><details className="checkout-policy"><summary><T text="Cancellation & refunds"/></summary><p><T text="Check the branch before paying. Future-slot orders can be cancelled only until preparation eligibility begins. Orders in the current slot cannot be cancelled by the customer. Only the food amount is refundable; additional charges and their taxes are retained."/></p><Link href="/cancellation-policy?from=/checkout/mobile"><T text="Cancellation & refunds"/></Link></details></section>}
   <section aria-label="Cart items" className="mobile-checkout-section mobile-cart-section">
-   <div className="mobile-cart-toolbar"><h2><T text="Items" /></h2><button type="button" disabled={editingLocked||!standaloneCartItems(cart).length} aria-pressed={selecting} onClick={()=>{setSelecting(v=>!v);setSelection({branchId:cart.branchId,ids:[]});}}><T text={selecting?"Cancel selection":"Select items"} /></button><button type="button" className="mobile-clear-cart" disabled={editingLocked||cart.isEmpty} onClick={()=>setClearReview({cart:cart.snapshot,branch:getStoredBranchSnapshot(),pickup:getPickupSlotSnapshot()})}><T text="Clear cart" /></button></div>
-   {selecting&&<div className="mobile-cart-selection"><label><input type="checkbox" disabled={editingLocked} checked={standaloneCartItems(cart).length>0&&selected.length===standaloneCartItems(cart).length} onChange={e=>setSelection({branchId:cart.branchId,ids:e.target.checked?standaloneCartItems(cart).map(item=>item.product.id):[]})}/><T text="Select all" /></label><button type="button" disabled={editingLocked||!selected.length} onClick={()=>removeItems(selected)}><T text="Remove selected" /> ({selected.length})</button></div>}
+   <div className="mobile-cart-toolbar"><h2><T text="Items" /></h2><button type="button" disabled={editingLocked||!standalone.length} aria-pressed={selecting} onClick={()=>setSelection(selecting?null:{snapshot:cart.snapshot,ids:[]})}><T text={selecting?"Cancel selection":"Select items"} /></button><button type="button" className="mobile-clear-cart" disabled={editingLocked||cart.isEmpty} onClick={()=>setClearReview({cart:cart.snapshot,branch:getStoredBranchSnapshot(),pickup:getPickupSlotSnapshot()})}><T text="Clear cart" /></button></div>
+   {selecting&&<div className="mobile-cart-selection"><label><input type="checkbox" disabled={editingLocked} checked={standalone.length>0&&selected.length===standalone.length} onChange={e=>setSelection({snapshot:cart.snapshot,ids:e.target.checked?standalone.map(item=>item.product.id):[]})}/><T text="Select all" /></label><button type="button" disabled={editingLocked||!selected.length} onClick={()=>selection&&removeItems(selected,selection.snapshot)}><T text="Remove selected" /> ({selected.length})</button></div>}
    <MealCartSummary disabled={editingLocked}/>
    {!!cart.meals?.length&&<p className="meal-offer-note"><T text="Offers apply to eligible extra items. Earned coins can also be used on meals."/></p>}
-   {standaloneCartItems(cart).map(item=><article className="mobile-cart-row" key={item.product.id}>
-    <div className="mobile-cart-item"><div className="mobile-cart-item-title">{selecting&&<label className="mobile-cart-item-select"><input type="checkbox" aria-label={`Select ${item.product.name}`} disabled={editingLocked} checked={selected.includes(item.product.id)} onChange={e=>setSelection({branchId:cart.branchId,ids:e.target.checked?[...selected,item.product.id]:selected.filter(id=>id!==item.product.id)})}/></label>}<strong>{item.product.name}</strong></div><div className="mobile-cart-item-meta"><p>{item.product.saleMode==="WEIGHT"?`${formatWeight(item.weightGrams??0)} · ${money(item.product.price*(item.weightGrams??0)/1000)}`:money(item.product.price*item.quantity)}</p><button className="mobile-remove-item" type="button" disabled={editingLocked} aria-label={`Remove ${item.product.name} from cart`} onClick={()=>removeItems([item.product.id])}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg><T text="Remove" /></button></div></div>
+   {standalone.map(item=><article className="mobile-cart-row" key={item.product.id}>
+    <div className="mobile-cart-item"><div className="mobile-cart-item-title">{selecting&&<label className="mobile-cart-item-select"><input type="checkbox" aria-label={`Select ${item.product.name}`} disabled={editingLocked} checked={selected.includes(item.product.id)} onChange={e=>setSelection({snapshot:cart.snapshot,ids:e.target.checked?[...selected,item.product.id]:selected.filter(id=>id!==item.product.id)})}/></label>}<strong>{item.product.name}</strong></div><div className="mobile-cart-item-meta"><p>{item.product.saleMode==="WEIGHT"?`${formatWeight(item.weightGrams??0)} · ${money(item.product.price*(item.weightGrams??0)/1000)}`:money(item.product.price*item.quantity)}</p><button className="mobile-remove-item" type="button" disabled={editingLocked} aria-label={`Remove ${item.product.name} from cart`} onClick={()=>removeItems([item.product.id])}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg><T text="Remove" /></button></div></div>
     <div className="mobile-quantity"><button type="button" disabled={editingLocked} aria-label={`Remove one ${item.product.name}`} onClick={()=>decreaseItem(item.product.id)}>−</button><span>{item.product.saleMode==="WEIGHT"?<button type="button" disabled={editingLocked} className="cart-weight-edit" aria-label={`${translate("Edit weight",locale)}: ${item.product.name}`} onClick={()=>setWeightEdit({item,cart:cart.snapshot,branch:getStoredBranchSnapshot(),pickup:getPickupSlotSnapshot()})}>{formatWeight(item.weightGrams??0)} <span aria-hidden="true">✎</span></button>:item.quantity}</span><button type="button" disabled={editingLocked} aria-label={`Add one ${item.product.name}`} onClick={()=>cart.increaseQuantity(item.product.id)}>+</button></div>
    </article>)}
   </section>
@@ -321,8 +330,10 @@ export default function MobileCheckout(){
   {clearReview&&<MenuDiscoverySheet title="Clear your cart?" onClose={()=>setClearReview(null)}>
    <p><T text="This removes every item. Your placed orders are kept."/></p>
    <div className="cart-clear-actions"><button type="button" onClick={()=>setClearReview(null)}><T text="Keep my items"/></button><button type="button" disabled={editingLocked} onClick={()=>{
-    if(clearReview.cart!==getCartSnapshot()||clearReview.branch!==getStoredBranchSnapshot()||clearReview.pickup!==getPickupSlotSnapshot()){setClearReview(null);setError("Your cart or pickup changed. Review it before clearing.");return;}
-    removeItems(cart.items.map(item=>item.product.id),false);setClearReview(null);
+    setClearReview(null);
+    if(editingLocked||getPendingOrderSnapshot()||sessionStorage.getItem(ATTEMPT))return;
+    if(clearReview.branch!==getStoredBranchSnapshot()||clearReview.pickup!==getPickupSlotSnapshot()||!cart.clearCart(clearReview.cart)){setError("Your cart or pickup changed. Review it before clearing.");return;}
+    setUndo(null);setError("");
    }}><T text="Clear cart"/></button></div>
   </MenuDiscoverySheet>}
   {weightEdit&&<WeightSelectorSheet editing product={weightEdit.item.product} currentWeightGrams={weightEdit.item.weightGrams} onClose={()=>setWeightEdit(null)} onConfirm={(product,weight)=>{

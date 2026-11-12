@@ -17,7 +17,7 @@ test('rapid Add and Increase use the last saved quantity before the view rerende
 test('a stale Increase cannot change the same dish in another branch’s cart',()=>{
  const dish={...product,saleMode:'UNIT'};
  const f=fixture({branchId:1,items:[{product:dish,quantity:1}]}),oldMenu=f.hook();
- oldMenu.replaceCartForBranch(dish,2);
+ oldMenu.replaceCartForBranch(dish,2,undefined,oldMenu.snapshot);
  for(let i=0;i<3;i++)f.hook().addItem(dish,2);
  const before=JSON.stringify(f.cart());
  oldMenu.increaseQuantity(dish.id,1);
@@ -31,7 +31,7 @@ test('a stale Increase cannot change the same dish in another branch’s cart',(
 for(const quantity of [1,2])test(`a stale Decrease from ${quantity} units leaves the new branch cart intact`,()=>{
  const dish={...product,saleMode:'UNIT'};
  const f=fixture({branchId:1,items:[{product:dish,quantity}]}),oldMenu=f.hook();
- oldMenu.replaceCartForBranch(dish,2);f.hook().addItem(dish,2);
+ oldMenu.replaceCartForBranch(dish,2,undefined,oldMenu.snapshot);f.hook().addItem(dish,2);
  const before=JSON.stringify(f.cart());
  oldMenu.decreaseQuantity(dish.id,1);oldMenu.decreaseQuantity(dish.id);
  assert.equal(JSON.stringify(f.cart()),before);
@@ -62,7 +62,7 @@ test('clear confirmation only applies to the exact saved cart snapshot',()=>{
  view.addItem(dish,1);
  assert.equal(view.clearCart(confirmed),false);
  assert.equal(f.cart().items[0].quantity,2);
- view.replaceCartForBranch(dish,2);
+ f.hook().replaceCartForBranch(dish,2,undefined,f.hook().snapshot);
  assert.equal(view.clearCart(confirmed),false);
  assert.equal(f.cart().branchId,2);
  assert.equal(view.clearCart(JSON.stringify(f.cart())),true);
@@ -71,7 +71,7 @@ test('clear confirmation only applies to the exact saved cart snapshot',()=>{
 
 test('stale Remove and Edit weight cannot change the replacement cart even when it contains the same dish',()=>{
  const f=fixture({branchId:1,items:[{product,quantity:1,weightGrams:500}]}),old=f.hook();
- old.replaceCartForBranch(product,2,250);
+ old.replaceCartForBranch(product,2,250,old.snapshot);
  const before=JSON.stringify(f.cart());
  assert.equal(old.removeItem(product.id),false);
  assert.equal(old.setItemWeight(product.id,300),false);

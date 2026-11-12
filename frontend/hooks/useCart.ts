@@ -51,8 +51,9 @@ interface UseCartResult {
     replaceCartForBranch: (
         product: MenuProduct,
         branchId: number,
-        weightGrams?: number
-    ) => void;
+        weightGrams: number | undefined,
+        expectedSnapshot: string
+    ) => boolean;
 }
 
 
@@ -291,8 +292,10 @@ export function useCart(): UseCartResult {
     function replaceCartForBranch(
         product: MenuProduct,
         selectedBranchId: number,
-        requestedWeightGrams?: number
-    ): void {
+        requestedWeightGrams: number | undefined,
+        expectedSnapshot: string
+    ): boolean {
+        if (getCartSnapshot() !== expectedSnapshot) return false;
         saveCart({
             branchId: selectedBranchId,
             items: [
@@ -306,6 +309,7 @@ export function useCart(): UseCartResult {
                 }
             ]
         });
+        return true;
     }
 
     return {

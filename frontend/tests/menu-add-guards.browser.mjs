@@ -131,6 +131,30 @@ try{
  await clear.click();await confirm.click();
  await page.locator('.gokul-floating-cart').waitFor({state:'hidden'});
  assert.equal((await cart()).items.length,0,'a fresh confirmation may clear the current cart');
+ // Replacing a cart requires consent for the specific cart, not a later version.
+ await page.evaluate(product=>{
+  localStorage.setItem('gokul-cart',JSON.stringify({branchId:2,items:[{product,quantity:1,weightGrams:null}]}));
+  window.dispatchEvent(new StorageEvent('storage',{key:'gokul-cart'}));
+ },products[0]);
+ await clear.waitFor();
+ const add=dish.getByRole('button',{name:'Add Last Laddu to cart',exact:true});
+ await add.waitFor();
+ const branchReplacement=await add.evaluate(button=>{
+  const key='gokul-cart',before=localStorage.getItem(key);
+  const updated=JSON.parse(before);updated.items[0].quantity=3;
+  const latest=JSON.stringify(updated),originalConfirm=window.confirm;
+  let asked=false;
+  window.confirm=()=>{asked=true;localStorage.setItem(key,latest);return true;};
+  try{button.click();}finally{window.confirm=originalConfirm;}
+  window.dispatchEvent(new StorageEvent('storage',{key,oldValue:before,newValue:latest}));
+  return {asked,latest};
+ });
+ assert.equal(branchReplacement.asked,true);
+ await page.getByText('Your cart changed. Review it and try again.',{exact:true}).waitFor();
+ assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),branchReplacement.latest);
+ page.once('dialog',dialog=>dialog.accept());
+ await add.click();
+ await page.waitForFunction(()=>JSON.parse(localStorage.getItem('gokul-cart'))?.branchId===1);
  // The desktop weight editor must keep the cart it was opened for, even after a rerender.
  await page.setViewportSize({width:1280,height:900});
  await page.evaluate(product=>{
@@ -151,5 +175,5 @@ try{
  await page.getByRole('alert').filter({hasText:'Your cart changed. Review it and try again.'}).waitFor();
  assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),replacement);
  await context.close();
- console.log('PASS local stock cap, price reconfirmation, invalidated meal stock, and stale clear and weight protection');
+ console.log('PASS local stock cap, price reconfirmation, invalidated meal stock, and stale clear, branch switch and weight protection');
 }finally{await browser.close();}

@@ -256,7 +256,24 @@ try{for(const scenario of ['slow-menu-search','stalled-offer','pincode-change','
   else{
    await page.evaluate(()=>{const cart=JSON.parse(localStorage.getItem('gokul-cart'));const product={...cart.items.find(i=>i.product.id===12).product,id:13,name:'Gulab Jamun',price:80,saleMode:'WEIGHT',weightStepGrams:250};cart.items.push({product,quantity:1,weightGrams:2000});localStorage.setItem('gokul-cart',JSON.stringify(cart));window.dispatchEvent(new CustomEvent('gokul-cart-change'));});await ready();const weighted=page.locator('.mobile-cart-row').filter({hasText:'Gulab Jamun'});await weighted.locator('.mobile-cart-item-meta p').getByText('2 kg · ₹160.00',{exact:true}).waitFor();await weighted.getByRole('button',{name:'Edit weight: Gulab Jamun',exact:true}).click();const weight=page.getByRole('dialog',{name:'Gulab Jamun',exact:true});await weight.getByRole('button',{name:'500 g',exact:true}).click();await weight.getByRole('button',{name:'Update quantity',exact:true}).click();await ready();assert.match(await weighted.locator('.mobile-cart-item-meta p').textContent(),/₹40.00/);await weighted.getByRole('button',{name:'Edit weight: Gulab Jamun',exact:true}).click();await weight.getByRole('button',{name:'2 kg',exact:true}).click();await weight.getByRole('button',{name:'Update quantity',exact:true}).click();await ready();await weighted.getByRole('button',{name:'Add one Gulab Jamun',exact:true}).click();await ready();assert.match(await weighted.locator('.mobile-cart-item-meta p').textContent(),/₹180.00/);await weighted.getByRole('button',{name:'Remove one Gulab Jamun',exact:true}).click();await ready();assert.match(await weighted.locator('.mobile-cart-item-meta p').textContent(),/₹160.00/);
    await page.getByRole('button',{name:'Remove Paneer meal Half from cart',exact:true}).click();await page.getByRole('button',{name:'Undo',exact:true}).click();await ready();assert.equal(await page.locator('.mobile-cart-row').count(),4);await page.getByRole('button',{name:'Remove Paneer meal Half from cart',exact:true}).click();await ready();assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items.map(i=>i.product.id).sort()),[11,12,13]);
-   await page.getByRole('button',{name:'Select items',exact:true}).click();await page.getByRole('checkbox',{name:'Select Paneer meal Full',exact:true}).check();await page.getByRole('checkbox',{name:'Select Fresh drink',exact:true}).check();await page.getByRole('button',{name:'Remove selected (2)',exact:true}).click();await ready();assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items.map(i=>i.product.id)),[13]);
+   await page.getByRole('button',{name:'Select items',exact:true}).click();await page.getByRole('checkbox',{name:'Select Paneer meal Full',exact:true}).check();await page.getByRole('checkbox',{name:'Select Fresh drink',exact:true}).check();
+   const bulk=page.getByRole('button',{name:/^Remove selected/});
+   const changedCart=await bulk.evaluate(button=>{
+    const key='gokul-cart',oldValue=localStorage.getItem(key),cart=JSON.parse(oldValue);
+    cart.items.find(item=>item.product.id===11).quantity=5;
+    const newValue=JSON.stringify(cart);localStorage.setItem(key,newValue);
+    button.click(); // The action can run before this tab sees the update.
+    window.dispatchEvent(new StorageEvent('storage',{key,oldValue,newValue}));
+    return newValue;
+   });
+   await page.getByRole('alert').filter({hasText:'Your cart changed. Review it and try again.'}).waitFor();
+   await page.getByRole('button',{name:'Remove selected (0)',exact:true}).waitFor();
+   assert.equal(await bulk.isDisabled(),true);
+   assert.equal(await page.getByRole('checkbox',{name:'Select Paneer meal Full',exact:true}).isChecked(),false);
+   assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),changedCart);
+   await page.getByRole('checkbox',{name:'Select Paneer meal Full',exact:true}).check();
+   await page.getByRole('checkbox',{name:'Select Fresh drink',exact:true}).check();
+   await page.getByRole('button',{name:'Remove selected (2)',exact:true}).click();await ready();assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items.map(i=>i.product.id)),[13]);
    await page.getByRole('checkbox',{name:'Select all',exact:true}).check();await page.getByRole('button',{name:'Remove selected (1)',exact:true}).click();await page.getByRole('button',{name:'Undo',exact:true}).waitFor();await page.getByRole('button',{name:'Undo',exact:true}).click();await ready();assert.equal(await page.locator('.mobile-cart-row').count(),1);await page.getByRole('checkbox',{name:'Select all',exact:true}).check();await page.getByRole('button',{name:'Remove selected (1)',exact:true}).click();await page.waitForURL('**/menu');
   }
   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')??'{"items":[]}').items.length),0);assert.equal(orders.length,0);assert.equal(payments,0);await context.close();continue;

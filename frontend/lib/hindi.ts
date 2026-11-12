@@ -435,6 +435,8 @@ export const hindi: Record<string,string> = {
  "Verify your phone when asked, confirm pickup and review the full price before paying. Wait for payment confirmation, then find your order in Orders.": "कहने पर फ़ोन सत्यापित करें, पिकअप की पुष्टि करें और भुगतान से पहले पूरी कीमत देखें। भुगतान की पुष्टि की प्रतीक्षा करें, फिर ऑर्डर में अपना ऑर्डर देखें।",
  "For pickup, show the order and its pickup code when it is ready. If payment is uncertain, check Orders before trying again.": "ऑर्डर तैयार होने पर उसे और उसका पिकअप कोड दिखाएँ। भुगतान की स्थिति स्पष्ट न हो तो दोबारा कोशिश से पहले ऑर्डर देखें।",
  "Clear cart?": "कार्ट खाली करें?",
+ "Your cart contains items from another branch. Clear it and start a new order from {branch}?": "आपके कार्ट में दूसरी शाखा के आइटम हैं। कार्ट खाली करके {branch} से नया ऑर्डर शुरू करें?",
+ "Your branch or pickup changed. Review it and try again.": "आपकी शाखा या पिकअप बदल गया है। उसे देखें और फिर कोशिश करें।",
  "Your cart changed. Review it and try again.": "आपका कार्ट बदल गया है। उसे देखें और फिर कोशिश करें।",
  "Your cart changed. Close this dialog and review it before clearing.": "आपका कार्ट बदल गया है। इसे खाली करने से पहले यह विंडो बंद करें और कार्ट देखें।",
  "Are you sure you want to clear your cart?": "क्या आप अपना कार्ट खाली करना चाहते हैं?",

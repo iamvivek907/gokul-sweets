@@ -1,5 +1,6 @@
 "use client";
 import {getCartSnapshot,parseCart} from "@/lib/cartStorage";
+import {getStoredBranchSnapshot} from "@/lib/branchStorage";
 import {standaloneCartItems} from "@/lib/cartMeals";
 import MealShortcut from "@/components/meal/MealShortcut";
 import {useBranchMeals} from "@/hooks/useBranchMeals";
@@ -128,6 +129,7 @@ export default function MenuScreen() {
         items,
         meals,
         branchId: cartBranchId,
+        snapshot: cartSnapshot,
         itemCount,
         addItem,
         increaseQuantity,
@@ -998,29 +1000,23 @@ export default function MenuScreen() {
             result === "branch-mismatch"
         ) {
 
-            const confirmed =
-                window.confirm(
-                    "Your cart contains items from another branch. "
-                    + "Clear the existing cart and start a new order from "
-                    + branch.name
-                    + "?"
-                );
-
-
-            if (
-                !confirmed
-            ) {
-
+            if (getCartSnapshot() !== cartSnapshot) {
+                showCartMessage("Your cart changed. Review it and try again.");
                 return;
             }
 
+            const confirmedBranch = getStoredBranchSnapshot();
+            const confirmedPickup = getPickupSlotSnapshot();
+            if (!window.confirm(translate("Your cart contains items from another branch. Clear it and start a new order from {branch}?").replace("{branch}", branch.name))) return;
 
-            replaceCartForBranch(
-                liveProduct,
-                branch.id,
-                weightGrams
-            );
-
+            if (getStoredBranchSnapshot() !== confirmedBranch || getPickupSlotSnapshot() !== confirmedPickup) {
+                showCartMessage("Your branch or pickup changed. Review it and try again.");
+                return;
+            }
+            if (!replaceCartForBranch(liveProduct, branch.id, weightGrams, cartSnapshot)) {
+                showCartMessage("Your cart changed. Review it and try again.");
+                return;
+            }
 
             setLastAdded(product.id);
             showCartNotice(
