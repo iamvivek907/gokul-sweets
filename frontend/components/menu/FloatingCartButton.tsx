@@ -1,4 +1,5 @@
 "use client";
+import {getCartSnapshot} from "@/lib/cartStorage";
 import {cartDisplayCount} from "@/lib/cartMeals";
 import MenuDiscoverySheet from "./MenuDiscoverySheet";
 import {T} from "@/lib/language";
@@ -50,7 +51,6 @@ export default function FloatingCartButton({
 
     const features = useStorefrontFeatures();
     const cart = useCart();
-    const [confirmClear,setConfirmClear]=useState(false);
     const [mobile, setMobile] = useState(false);
     useEffect(() => {
         const media = window.matchMedia("(max-width: 640px)");
@@ -209,17 +209,37 @@ export default function FloatingCartButton({
                 </div>
                 </>}
             <LinkFeedback /></Link>
-            <button type="button" className="floating-cart-delete" aria-label="Clear cart" onClick={()=>setConfirmClear(true)}>
-                <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6M14 10v6"/></svg>
-            </button>
-            {confirmClear&&<MenuDiscoverySheet title="Clear cart?" className="floating-cart-clear-dialog" returnFocusId="gokul-menu-search" onClose={()=>setConfirmClear(false)}>
-                <p><T text="Are you sure you want to clear your cart?"/></p>
-                <div className="floating-cart-clear-actions">
-                    <button type="button" onClick={()=>setConfirmClear(false)}><T text="No, keep cart"/></button>
-                    <button type="button" onClick={()=>{setConfirmClear(false);cart.clearCart();}}><T text="Yes, clear cart"/></button>
-                </div>
-            </MenuDiscoverySheet>}
+            <ClearCartControl clearCart={cart.clearCart}/>
 
         </div>
     );
+}
+
+/** The confirmation belongs to the cart that was visible when it was opened. */
+function ClearCartControl({clearCart}:{clearCart:(expectedSnapshot:string)=>boolean}) {
+    const [confirmation,setConfirmation]=useState<{snapshot:string;notice?:string}|null>(null);
+    const close=()=>setConfirmation(null);
+    const notice=confirmation?.notice;
+    function confirm() {
+        if(!confirmation||notice)return;
+        try {
+            if(clearCart(confirmation.snapshot)){close();return;}
+            setConfirmation({...confirmation,notice:"Your cart changed. Close this dialog and review it before clearing."});
+        } catch {
+            setConfirmation({...confirmation,notice:"Couldn’t update your cart. Try again."});
+        }
+    }
+
+    return <>
+        <button type="button" className="floating-cart-delete" aria-label="Clear cart" onClick={()=>setConfirmation({snapshot:getCartSnapshot()})}>
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6M14 10v6"/></svg>
+        </button>
+        {confirmation&&<MenuDiscoverySheet title="Clear cart?" className="floating-cart-clear-dialog" returnFocusId="gokul-menu-search" onClose={close}>
+            {notice?<p role="alert"><T text={notice}/></p>:<p><T text="Are you sure you want to clear your cart?"/></p>}
+            <div className="floating-cart-clear-actions">
+                <button type="button" onClick={close}><T text="No, keep cart"/></button>
+                <button type="button" disabled={!!notice} onClick={confirm}><T text="Yes, clear cart"/></button>
+            </div>
+        </MenuDiscoverySheet>}
+    </>;
 }

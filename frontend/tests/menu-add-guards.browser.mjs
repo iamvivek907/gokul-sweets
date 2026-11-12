@@ -91,6 +91,28 @@ try{
  await builder.getByRole('alert').filter({hasText:'cannot be prepared for that pickup'}).waitFor();
  assert.equal(exactChecks,2,'the newer stock result triggers a fresh exact check');
  assert.equal((await cart()).meals?.length??0,0);
+ await builder.getByRole('button',{name:'Close',exact:true}).click();
+ await builder.waitFor({state:'hidden'});
+ const clear=page.getByRole('button',{name:'Clear cart',exact:true});
+ const clearDialog=page.getByRole('dialog',{name:'Clear cart?',exact:true});
+ const confirm=clearDialog.getByRole('button',{name:'Yes, clear cart',exact:true});
+ await clear.click();await clearDialog.waitFor();
+ const changed=await page.evaluate(()=>{
+  const key='gokul-cart',oldValue=localStorage.getItem(key);
+  const cart=JSON.parse(oldValue);cart.branchId=2;cart.items[0].quantity=4;
+  const newValue=JSON.stringify(cart);localStorage.setItem(key,newValue);
+  window.dispatchEvent(new StorageEvent('storage',{key,oldValue,newValue}));
+  return newValue;
+ });
+ await confirm.click();
+ await clearDialog.getByRole('alert').filter({hasText:'Your cart changed'}).waitFor();
+ assert.equal(await confirm.isDisabled(),true,'the old confirmation cannot be used again');
+ assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),changed);
+ await clearDialog.getByRole('button',{name:'No, keep cart',exact:true}).click();
+ await clearDialog.waitFor({state:'hidden'});
+ await clear.click();await confirm.click();
+ await page.locator('.gokul-floating-cart').waitFor({state:'hidden'});
+ assert.equal((await cart()).items.length,0,'a fresh confirmation may clear the current cart');
  await context.close();
- console.log('PASS local stock cap, price reconfirmation, and invalidated meal stock');
+ console.log('PASS local stock cap, price reconfirmation, invalidated meal stock, and stale clear protection');
 }finally{await browser.close();}

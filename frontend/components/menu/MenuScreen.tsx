@@ -901,13 +901,18 @@ export default function MenuScreen() {
         }
         catch {showCartMessage("Couldn’t update your cart. Try again.");}
     };
+    const guardedDecrease = (id:number) => {
+        if(!branch)return;
+        try {decreaseQuantity(id,branch.id);}
+        catch {showCartMessage("Couldn’t update your cart. Try again.");}
+    };
     const [mealShelfHost,setMealShelfHost]=useState<HTMLDivElement|null>(null);
     const pickupGrid = (products:MenuProduct[],afterLeadingRows?:ReactNode) => <ProductGrid afterLeadingRows={afterLeadingRows} pairingSeed={pairingSeed} pairing={retailBrowse?null:pairing}
         portionGroups={groupedMenu?portionGroups:undefined} catalogProducts={catalogForResults} compactGroups={phoneMenu}
         refined={pickupCheck.features?.contextualStorefrontV2 === true} pickupItems={pickupCheck.items}
         pickupChecking={pickupChecking} pickupStatusMessage={pickupStatusMessage} dateAware={!!pickupCheck.features?.smartAvailability} products={products}
         ratingSummaries={ratingSummaries} ratingsLoading={ratingsLoading} quantities={productQuantities} weights={productWeights}
-        onIncrease={guardedIncrease} onDecrease={decreaseQuantity} onAdd={handleAddToCart}/>;
+        onIncrease={guardedIncrease} onDecrease={guardedDecrease} onAdd={handleAddToCart}/>;
     const [lastAdded,setLastAdded]=useState<number|null>(null);
     const pairingSeed=lastAdded??items.at(-1)?.product.id;
     const basketPickup = useMemo(()=>{
@@ -1624,7 +1629,7 @@ export default function MenuScreen() {
                                         guardedIncrease
                                     }
                                     onDecrease={
-                                        decreaseQuantity
+                                        guardedDecrease
                                     }
                                     onAdd={
                                         handleAddToCart
