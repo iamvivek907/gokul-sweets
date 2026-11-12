@@ -1,6 +1,6 @@
 "use client";
 import {getCartSnapshot,parseCart} from "@/lib/cartStorage";
-import {getStoredBranchSnapshot,parseStoredBranch} from "@/lib/branchStorage";
+import {getMatchingStoredBranchSnapshot,getStoredBranchSnapshot} from "@/lib/branchStorage";
 import {standaloneCartItems} from "@/lib/cartMeals";
 import MealShortcut from "@/components/meal/MealShortcut";
 import {useBranchMeals} from "@/hooks/useBranchMeals";
@@ -894,9 +894,15 @@ export default function MenuScreen() {
         return amount<=limit;
     }
 
+    function validateMenuBranch(branchId: number): string | null {
+        const snapshot = getMatchingStoredBranchSnapshot(branchId);
+        if (snapshot === null) showCartMessage("Your branch or pickup changed. Review it and try again.");
+        return snapshot;
+    }
+
     const guardedIncrease = (id:number) => {
         try {
-            if(!branch||!pickupAllows(id))return;
+            if(!branch||validateMenuBranch(branch.id)===null||!pickupAllows(id))return;
             if(!fitsKnownPickupStock(id)){showCartMessage("No more available for this pickup.");return;}
             increaseQuantity(id,branch.id);
         }
@@ -904,7 +910,10 @@ export default function MenuScreen() {
     };
     const guardedDecrease = (id:number) => {
         if(!branch)return;
-        try {decreaseQuantity(id,branch.id);}
+        try {
+            if(validateMenuBranch(branch.id)===null)return;
+            decreaseQuantity(id,branch.id);
+        }
         catch {showCartMessage("Couldn’t update your cart. Try again.");}
     };
     const [mealShelfHost,setMealShelfHost]=useState<HTMLDivElement|null>(null);
@@ -975,11 +984,8 @@ export default function MenuScreen() {
         const liveProduct=allProducts.find(item=>item.id===product.id);
         if(!liveProduct?.available || !pickupAllows(product.id)){setWeightProduct(null);showCartMessage(liveProduct?.serviceAvailability?.message??"This item is currently unavailable.");return;}
         if(!fitsKnownPickupStock(product.id,weightGrams)){showCartMessage("No more available for this pickup.");return;}
-        const selectedBranch = getStoredBranchSnapshot();
-        if (parseStoredBranch(selectedBranch)?.id !== branch.id) {
-            showCartMessage("Your branch or pickup changed. Review it and try again.");
-            return;
-        }
+        const selectedBranch = validateMenuBranch(branch.id);
+        if (selectedBranch === null) return;
         const result =
             addItem(
                 liveProduct,

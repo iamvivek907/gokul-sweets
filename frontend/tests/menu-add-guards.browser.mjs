@@ -66,6 +66,35 @@ try{
  await page.getByText('No more available for this pickup.',{exact:true}).waitFor();
  assert.equal((await cart()).items[0].quantity,1,'the verified stock limit still applies during a refresh');
  hold=false;releaseRefresh();
+ const quantityDish=page.locator('#gokul-product-3');
+ await quantityDish.getByRole('button',{name:'Add Rasgulla to cart',exact:true}).click();
+ const increase=quantityDish.getByRole('button',{name:'Add one more Rasgulla',exact:true});
+ const decrease=quantityDish.getByRole('button',{name:'Remove one Rasgulla',exact:true});
+ await increase.waitFor();
+ // A cart still at the displayed branch must not be edited after another tab selects a new one.
+ const staleQuantities=await quantityDish.evaluate(card=>{
+  const branchKey='gokul-selected-branch',cartKey='gokul-cart';
+  const branch=localStorage.getItem(branchKey),before=localStorage.getItem(cartKey);
+  localStorage.setItem(branchKey,JSON.stringify({...JSON.parse(branch),id:3}));
+  try{
+   const after=[];
+   for(const label of ['Add one more Rasgulla','Remove one Rasgulla']){
+    card.querySelector(`button[aria-label="${label}"]`).click();
+    after.push(localStorage.getItem(cartKey));
+    localStorage.setItem(cartKey,before);
+   }
+   return {before,after};
+  }finally{localStorage.setItem(branchKey,branch);}
+ });
+ assert.deepEqual(staleQuantities.after,[staleQuantities.before,staleQuantities.before]);
+ await page.getByText('Your branch or pickup changed. Review it and try again.',{exact:true}).waitFor();
+ await increase.click();
+ assert.equal((await cart()).items.find(item=>item.product.id===3).quantity,2);
+ await decrease.click();
+ assert.equal((await cart()).items.find(item=>item.product.id===3).quantity,1);
+ await decrease.click();
+ assert.equal((await cart()).items.some(item=>item.product.id===3),false);
+
 
  await page.locator('#gokul-product-2').getByRole('button',{name:'Add Fresh Peda to cart',exact:true}).click();
  const weight=page.getByRole('dialog',{name:'Fresh Peda',exact:true});

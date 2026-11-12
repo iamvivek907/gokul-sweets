@@ -10,7 +10,7 @@ import {availabilityItems,checkCartAvailability} from "@/services/availabilityAp
 import {checkInventory} from "@/services/inventoryApi";
 import {getCartSnapshot,parseCart} from "@/lib/cartStorage";
 import {standaloneCartItems} from "@/lib/cartMeals";
-import {getStoredBranchSnapshot} from "@/lib/branchStorage";
+import {getMatchingStoredBranchSnapshot,getStoredBranchSnapshot} from "@/lib/branchStorage";
 import {getPickupSlotSnapshot} from "@/lib/checkoutStorage";
 import {menuFamily} from "@/lib/menuPresentation";
 import type {MenuPairing} from "@/components/admin/WorkspaceAppearance";
@@ -164,14 +164,25 @@ export default function MobileMenuSuggestions({branchId,products,groups=[],picku
  const extraItems=standaloneCartItems(cart);
  const suggestionQuantity=(s:Suggestion)=>{const item=extraItems.find(i=>i.product.id===s.product.id);return s.weightGrams===null?(item?.quantity??0):((item?.weightGrams??0)>0?1:0);};
  const groupQuantity=(g:PortionGroup)=>extraItems.reduce((sum,item)=>sum+(g.choices.some(c=>c.productId===item.product.id)?item.quantity:0),0);
- const decrease=(id:number)=>cart.decreaseQuantity(id,branchId);
+ function validatePairingBranch(){
+  const snapshot=getMatchingStoredBranchSnapshot(branchId);
+  if(snapshot===null)setMessage("Your branch or pickup changed. Review it and try again.");
+  return snapshot;
+ }
+ const decrease=(id:number)=>{
+  if(validatePairingBranch()===null)return;
+  setMessage("");
+  cart.decreaseQuantity(id,branchId);
+ };
  const groupPrice=(g:PortionGroup)=>Math.min(...g.choices.flatMap(c=>products.filter(p=>p.id===c.productId).map(p=>p.price)));
  const suggestions=(current?.items??[]).filter(s=>live.get(s.product.id)?.available&&(basketPickup!=="blocked"||cart.items.some(item=>item.product.id===s.product.id))&&(!smartAvailability||!selected||!pickupItems||pickupItems.find(item=>item.productId===s.product.id)?.available!==false||cart.items.some(item=>item.product.id===s.product.id))).filter((s,index,all)=>!groupFor(s.product.id)||all.findIndex(other=>groupFor(other.product.id)?.key===groupFor(s.product.id)?.key)===index);
  async function add(s:Suggestion){
   if(basketPickup==="blocked"){setMessage("This addition no longer fits your pickup. Choose another time.");return;}
   if(smartAvailability&&!selected){setMessage("Choose a pickup time to add this item. Your cart is saved.");return;}
   if(locked.current)return;
-  const before=getCartSnapshot(),branch=getStoredBranchSnapshot(),pickup=getPickupSlotSnapshot();
+  const branch=validatePairingBranch();
+  if(branch===null)return;
+  const before=getCartSnapshot(),pickup=getPickupSlotSnapshot();
   const liveCart=parseCart(before);
   if(additionsBlocked||liveCart.branchId!==branchId||pickup!==intent.pickupRaw
      ||JSON.stringify({serviceDate,items:availabilityItems(liveCart.items,liveCart)})!==request){

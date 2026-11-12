@@ -23,6 +23,13 @@ export function getStoredBranchSnapshot():
 }
 
 
+/** Return the live selection only when it still matches the branch shown by the control. */
+export function getMatchingStoredBranchSnapshot(branchId: number): string | null {
+    const snapshot = getStoredBranchSnapshot();
+    return parseStoredBranch(snapshot)?.id === branchId ? snapshot : null;
+}
+
+
 export function getServerBranchSnapshot():
     string {
 

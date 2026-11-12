@@ -39,6 +39,18 @@ try{for(const width of [320,390,640]){
  await rail.getByRole('button',{name:'Add Gulab Jamun from pairings',exact:true}).click();
  await rail.getByRole('group',{name:'Gulab Jamun quantity: 250 g',exact:true}).waitFor();
  assert.equal(await weight(),750);assert.equal(checkedItems.find(i=>i.productId===2).weightGrams,750,'checked and committed total weights match');
+ const pairingCart=await rail.evaluate(container=>{
+  const branchKey='gokul-selected-branch',cartKey='gokul-cart';
+  const branch=localStorage.getItem(branchKey),before=localStorage.getItem(cartKey);
+  localStorage.setItem(branchKey,JSON.stringify({...JSON.parse(branch),id:3}));
+  try{
+   container.querySelector('button[aria-label="Add one more Gulab Jamun"]').click();
+   container.querySelector('button[aria-label="Remove one Gulab Jamun"]').click();
+   return {before,after:localStorage.getItem(cartKey)};
+  }finally{localStorage.setItem(branchKey,branch);}
+ });
+ await page.getByText('Your branch or pickup changed. Review it and try again.',{exact:true}).waitFor();
+ assert.equal(pairingCart.after,pairingCart.before);
  await rail.getByRole('button',{name:'Add one more Gulab Jamun',exact:true}).click();await rail.getByRole('group',{name:'Gulab Jamun quantity: 500 g',exact:true}).waitFor();
  assert.equal(await weight(),1000);assert.equal(checkedItems.find(i=>i.productId===2).weightGrams,1000);
  for(const expected of [950,900,850,800,750,500]){await rail.getByRole('button',{name:'Remove one Gulab Jamun',exact:true}).click();await page.waitForFunction(value=>JSON.parse(localStorage.getItem('gokul-cart')).items.find(i=>i.product.id===2).weightGrams===value,expected);}
