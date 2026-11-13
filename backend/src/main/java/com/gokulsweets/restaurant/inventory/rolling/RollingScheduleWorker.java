@@ -47,8 +47,7 @@ public class RollingScheduleWorker {
      */
     @Scheduled(cron = "0 0 0 * * *", zone = "Asia/Kolkata")
     public void reconcile() {
-        final long __gokulMethodStartedNanos =
-                MethodTiming.start(RollingScheduleWorker.class, "reconcile()");
+        final long started = MethodTiming.start(RollingScheduleWorker.class, "reconcile()");
         try {
             if (importWorker) return;
             try {
@@ -67,20 +66,22 @@ public class RollingScheduleWorker {
     private void reconcileBranches() {
         final long started = MethodTiming.start(RollingScheduleWorker.class, "reconcileBranches()");
         try {
-            for (Long branch :
-                    jdbc.queryForList(
-                            "SELECT branch_id FROM rolling_branch_schedules WHERE enabled ORDER BY"
-                                    + " branch_id",
-                            Long.class)) {
-                if (Thread.currentThread().isInterrupted()) return;
-                try {
-                    service.reconcile(branch, "SCHEDULED", "SYSTEM_ROLLING_AUTOMATION");
-                } catch (RuntimeException error) {
-                    log.error("Rolling automation failed for branch {}", branch, error);
+            try {
+                for (Long branch :
+                        jdbc.queryForList(
+                                "SELECT branch_id FROM rolling_branch_schedules WHERE enabled"
+                                        + " ORDER BY branch_id",
+                                Long.class)) {
+                    if (Thread.currentThread().isInterrupted()) return;
+                    try {
+                        service.reconcile(branch, "SCHEDULED", "SYSTEM_ROLLING_AUTOMATION");
+                    } catch (RuntimeException error) {
+                        log.error("Rolling automation failed for branch {}", branch, error);
+                    }
                 }
+            } catch (RuntimeException error) {
+                log.error("Could not load branches for daily rolling automation", error);
             }
-        } catch (RuntimeException error) {
-            log.error("Could not load branches for daily rolling automation", error);
         } finally {
             MethodTiming.finish(started, RollingScheduleWorker.class, "reconcileBranches()");
         }
