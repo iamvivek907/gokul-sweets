@@ -1126,7 +1126,7 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
         long branch =
                 jdbc.queryForObject(
                         "INSERT INTO branches(code,name) VALUES(?,'Atomic failure test') RETURNING"
-                            + " id",
+                                + " id",
                         Long.class,
                         "ROLL-ATOMIC-" + UUID.randomUUID());
         try {
@@ -1134,7 +1134,7 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
             jdbc.update("UPDATE branches SET operational=FALSE WHERE id=?", branch);
             jdbc.execute(
                     "ALTER TABLE rolling_branch_schedules ADD CONSTRAINT"
-                        + " rolling_test_reject_summary CHECK (branch_id <> "
+                            + " rolling_test_reject_summary CHECK (branch_id <> "
                             + branch
                             + " OR last_message IS NULL) NOT VALID");
             try {
@@ -1146,7 +1146,7 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
             } finally {
                 jdbc.execute(
                         "ALTER TABLE rolling_branch_schedules DROP CONSTRAINT"
-                            + " rolling_test_reject_summary");
+                                + " rolling_test_reject_summary");
             }
         } finally {
             jdbc.update("DELETE FROM rolling_branch_schedules WHERE branch_id=?", branch);
