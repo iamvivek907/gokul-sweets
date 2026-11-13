@@ -1,16 +1,22 @@
 const test=require("node:test"),assert=require("node:assert/strict"),vm=require("node:vm"),fs=require("node:fs");
 const worker=fs.readFileSync("public/sw.js","utf8");
 const origin="https://gokulsweets.in";
+const boot='<html><body><div data-gokul-storefront-boot=""><span>Opening Gokul</span><a href="">Try again</a><span data-gokul-launch-ready="" hidden=""></span></div>';
+const htmlResponse=body=>new Response(body,{headers:{"content-type":"text/html"}});
 function fixture(fetch,caches={}) {
  const handlers=new Map(),timers=new Map();
  let next=0;
  vm.runInNewContext(worker,{
-  self:{location:{origin},addEventListener:(name,handler)=>handlers.set(name,handler)},
+  self:{location:{origin},skipWaiting(){},addEventListener:(name,handler)=>handlers.set(name,handler)},
   fetch,caches,URL,Response,Request,AbortController,crypto,TextDecoder,
   setTimeout:(callback,ms)=>{const id=++next;timers.set(id,{callback,ms});return id;},
   clearTimeout:id=>timers.delete(id)
  });
- return {timers,navigate(path,language="en-IN",method="GET"){
+ return {timers,install(){
+  let done;
+  handlers.get("install")({waitUntil:promise=>{done=promise;}});
+  return done;
+ },navigate(path,language="en-IN",method="GET"){
   let response;
   handlers.get("fetch")({request:{url:new URL(path,origin).href,method,mode:"navigate",headers:new Headers({"Accept-Language":language})},
    respondWith:value=>{response=value;},waitUntil:promise=>{this.background=promise;}});
@@ -187,15 +193,78 @@ test("a clean EOF before the retry link rejects the new opening screen and never
  assert.equal((await f.navigate("/menu")).status,503,"reject a truncated page cached by an earlier worker");
 });
 
+test("opening markup renders immediately, but clean truncation cannot replace a complete offline page",async()=>{
+ let stream,stored=boot+'<main>Saved menu</main></body></html>',offline=false,writes=0;
+ const original=htmlResponse(new ReadableStream({start(controller){stream=controller;}}));
+ const f=fixture(async()=>offline?new Response("Unavailable",{status:503}):original,{
+  open:async()=>({put:async(_request,copy)=>{stored=await copy.text();writes++;}}),
+  match:async()=>htmlResponse(stored)
+ });
+ const pending=f.navigate("/menu");
+ stream.enqueue(new TextEncoder().encode(boot));
+ assert.equal(await pending,original,"the live page must still stream before EOF");
+ stream.enqueue(new TextEncoder().encode('<script>const ignored = "</body></html>";</script>'));
+ stream.close();
+ await f.background;
+ assert.equal(writes,0);
+ offline=true;
+ assert.match(await (await f.navigate("/menu")).text(),/Saved menu/);
+});
+
+test("installation keeps the offline page and only precaches a complete Home document",async()=>{
+ const complete=boot+"<main>Home</main></body></html>";
+ for(const html of [boot,complete]){
+  const added=[],stored=[];
+  const f=fixture(async()=>htmlResponse(html),{
+   open:async()=>({add:async path=>{added.push(path);},put:async(path,body)=>{stored.push([path,await body.text()]);}})
+  });
+  await f.install();
+  assert.deepEqual(added,["/offline"]);
+  assert.deepEqual(stored,html===complete?[["/",complete]]:[]);
+ }
+});
+
+test("old partial cache entries fall back to branded recovery",async()=>{
+ for(const markup of [boot,boot+'<main>Menu</main></body>',boot+'<!-- </body></html> -->']){
+  const f=fixture(async()=>new Response("Unavailable",{status:503}),{
+   match:async()=>htmlResponse(markup)
+  });
+  const response=await f.navigate("/menu");
+  assert.equal(response.status,503);
+  assert.match(await response.text(),/Reconnecting to Gokul/);
+ }
+});
+
+test("complete streamed pages can be cached and replayed after an outage",async()=>{
+ let stream,stored,offline=false;
+ const original=htmlResponse(new ReadableStream({start(controller){stream=controller;}}));
+ const f=fixture(async()=>offline?new Response("Unavailable",{status:503}):original,{
+  open:async()=>({put:async(_request,copy)=>{stored=await copy.text();}}),
+  match:async()=>htmlResponse(stored)
+ });
+ const pending=f.navigate("/menu");
+ stream.enqueue(new TextEncoder().encode(boot));
+ assert.equal(await pending,original);
+ assert.equal(stored,undefined);
+ for(const chunk of ["<main>Menu</main></bo","dy></ht","ml>"])stream.enqueue(new TextEncoder().encode(chunk));
+ stream.close();
+ await f.background;
+ assert.equal(stored,boot+"<main>Menu</main></body></html>");
+ assert.equal(f.timers.size,0);
+ offline=true;
+ assert.equal(await (await f.navigate("/menu")).text(),stored);
+});
+
 test("a complete HTML document without a launch marker still opens during rollout",async()=>{
  const app=new Response("<!doctype html><html><body><h1>Previous app build</h1></body></html>",{headers:{"content-type":"text/html"}});
  const f=fixture(async()=>app);
  assert.equal(await f.navigate("/menu"),app);
+ await f.background;
  assert.equal(f.timers.size,0);
 });
 
 test("exact cached storefront pages remain usable during outages",async()=>{
- const cached=new Response("<h1>Saved menu</h1>",{headers:{"content-type":"text/html"}});
+ const cached=htmlResponse("<html><body><h1>Saved menu</h1></body></html>");
  const reads=[];
  const f=fixture(async()=>new Response("Unavailable",{status:503}),{match:async(request,{cacheName})=>{
   reads.push([request.url,cacheName]);
@@ -206,9 +275,10 @@ test("exact cached storefront pages remain usable during outages",async()=>{
 });
 
 test("cache writes are opportunistic and a stalled cache read cannot hide recovery",async()=>{
- const app=new Response("<h1>New menu</h1>",{headers:{"content-type":"text/html"}});
+ const html="<html><body><h1>New menu</h1></body></html>";
+ const app=htmlResponse(html);
  const f=fixture(async()=>app,{open:async()=>({put:async(_request,copy)=>{
-  assert.equal(await copy.text(),"<h1>New menu</h1>");
+  assert.equal(await copy.text(),html);
   throw Error("Cache quota");
  }})});
  assert.equal(await f.navigate("/menu"),app);

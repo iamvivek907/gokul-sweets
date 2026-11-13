@@ -26,12 +26,7 @@ const OFFLINE_URL =
 
 const LAUNCH_WAIT_MS = 8000;
 const LAUNCH_CACHE_WAIT_MS = 350;
-
-const STATIC_ASSETS = [
-    "/",
-    OFFLINE_URL
-];
-
+const LAUNCH_CACHE_MAX_BYTES = 2 * 1024 * 1024;
 
 self.addEventListener(
     "install",
@@ -42,12 +37,11 @@ self.addEventListener(
                 .open(
                     STATIC_CACHE
                 )
-                .then(
-                    cache =>
-                        cache.addAll(
-                            STATIC_ASSETS
-                        )
-                )
+                .then(async cache => {
+                    await cache.add(OFFLINE_URL);
+                    // Home is an optional fallback; do not precache a partial launch.
+                    await precacheStorefrontHome(cache).catch(() => {});
+                })
         );
 
         self.skipWaiting();
@@ -355,7 +349,7 @@ function isStorefrontLaunch(url) {
 }
 
 // A Next.js response can flush metadata and scripts before it sends any launch UI.
-function launchMarkupProbe() {
+function launchMarkupProbe(complete) {
     const decoder = new TextDecoder();
     const tag = /^<\/?([a-z][\w:-]*)(?:[^"'<>]|"[^"]*"|'[^']*')*>/i;
     const headTags = new Set(["html", "body", "base", "link", "meta", "head"]);
@@ -367,6 +361,7 @@ function launchMarkupProbe() {
     const attributes = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>]+)))?/g;
     const hiddenStack = [];
     let pending = "", raw = "", inHead = false, hasBodyMarkup = false, hasBootScreen = false;
+    let ready = false, bodyClosed = false, htmlClosed = false;
 
     function readAttributes(name, openingTag) {
         const attrs = new Map();
@@ -382,7 +377,9 @@ function launchMarkupProbe() {
             || /(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*(?:hidden|collapse))\s*(?:!important)?\s*(?:;|$)/i.test(attrs.get("style") ?? "");
     }
 
-    return {isLegacyPage: () => hasBodyMarkup && !hasBootScreen, read(bytes) {
+    const isLegacyPage = () => hasBodyMarkup && !hasBootScreen;
+    return {isLegacyPage, isCompletePage: () =>
+        bodyClosed && htmlClosed && !raw && !pending.trim() && (ready || isLegacyPage()), read(bytes) {
         pending += decoder.decode(bytes, {stream: true});
         let offset = 0;
         while (offset < pending.length) {
@@ -421,7 +418,12 @@ function launchMarkupProbe() {
                 continue;
             }
 
-            if (!inHead && !hiddenStack.length && rest.startsWith(marker)) return true;
+            if (!inHead && !hiddenStack.length && rest.startsWith(marker)) {
+                ready = true;
+                if (!complete) return true;
+                offset += marker.length;
+                continue;
+            }
             if (!inHead && !hiddenStack.length && marker.startsWith(rest)) break;
 
             const match = tag.exec(rest);
@@ -432,6 +434,10 @@ function launchMarkupProbe() {
             if (name === "head") inHead = !closing;
             if (name === "body" && !closing) inHead = false;
             if (closing) {
+                if (!inHead && !hiddenStack.length) {
+                    if (name === "body") bodyClosed = true;
+                    if (name === "html" && bodyClosed) htmlClosed = true;
+                }
                 const ancestor = hiddenStack.lastIndexOf(name);
                 if (ancestor >= 0) hiddenStack.length = ancestor;
                 continue;
@@ -457,49 +463,68 @@ function launchMarkupProbe() {
     }};
 }
 
-async function checkLaunchDocument(response) {
+async function checkLaunchDocument(response, {complete = false, signal} = {}) {
     if (response.status >= 500) {
         void response.body?.cancel().catch(() => {});
         return null;
     }
-    if (!response.ok || !response.body) return response;
+    if (!response.ok || !response.body) return complete ? null : response;
+    const isHtml = /\btext\/html\b/i.test(response.headers.get("content-type") ?? "");
+    if (complete && (!isHtml || signal?.aborted)) {
+        void response.body.cancel().catch(() => {});
+        return null;
+    }
 
     // Peek at a clone so the original response keeps its URL, headers, and streaming body.
     const reader = response.clone().body.getReader();
-    const isHtml = /\btext\/html\b/i.test(response.headers.get("content-type") ?? "");
-    const markup = isHtml ? launchMarkupProbe() : null;
+    const markup = isHtml ? launchMarkupProbe(complete) : null;
+    const cancelProbe = () => { void reader.cancel().catch(() => {}); };
+    signal?.addEventListener("abort", cancelProbe, {once: true});
+    let bytes = 0, accepted = false;
     try {
         for (;;) {
             const chunk = await reader.read();
+            if (signal?.aborted) return null;
             if (chunk.done) {
-                // A complete older storefront document may not carry the marker yet.
-                if (markup?.isLegacyPage()) return response;
-                void response.body.cancel().catch(() => {});
-                return null;
+                accepted = complete ? markup.isCompletePage() : markup?.isLegacyPage();
+                return accepted ? response : null;
             }
-            if (markup ? markup.read(chunk.value) : chunk.value.byteLength > 0) return response;
+            if (complete && (bytes += chunk.value.byteLength) > LAUNCH_CACHE_MAX_BYTES) return null;
+            if (markup ? markup.read(chunk.value) : chunk.value.byteLength > 0) {
+                accepted = true;
+                return response;
+            }
         }
     } finally {
         // A tee branch's cancel promise can wait for the browser to consume the original.
-        void reader.cancel().catch(() => {});
+        signal?.removeEventListener("abort", cancelProbe);
+        cancelProbe();
+        if (!accepted) void response.body.cancel().catch(() => {});
     }
 }
 
 async function cachedLaunch(request) {
+    const controller = new AbortController();
+    const options = {complete: true, signal: controller.signal};
     let timer;
     try {
         const lookup = async () => {
             const page = await caches.match(request, {cacheName: PAGE_CACHE}).catch(() => null);
             if (page?.ok) {
-                const usable = await checkLaunchDocument(page).catch(() => null);
+                const usable = await checkLaunchDocument(page, options).catch(() => null);
                 if (usable) return usable;
             }
             const fallback = await caches.match(request, {cacheName: STATIC_CACHE});
-            return fallback?.ok ? await checkLaunchDocument(fallback) : null;
+            return fallback?.ok ? await checkLaunchDocument(fallback, options) : null;
         };
         const cached = await Promise.race([
             lookup(),
-            new Promise(resolve => { timer = setTimeout(() => resolve(null), LAUNCH_CACHE_WAIT_MS); })
+            new Promise(resolve => {
+                timer = setTimeout(() => {
+                    resolve(null);
+                    controller.abort();
+                }, LAUNCH_CACHE_WAIT_MS);
+            })
         ]);
         return cached?.ok ? cached : null;
     } catch {
@@ -509,9 +534,42 @@ async function cachedLaunch(request) {
     }
 }
 
+async function precacheStorefrontHome(cache) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), LAUNCH_WAIT_MS);
+    try {
+        const response = await fetch("/", {signal: controller.signal});
+        if (canCacheLaunch(response)) {
+            const complete = await checkLaunchDocument(response, {complete: true, signal: controller.signal});
+            if (complete) await cache.put("/", complete);
+        } else {
+            void response.body?.cancel().catch(() => {});
+        }
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+function canCacheLaunch(response) {
+    return response.ok && !response.redirected
+        && /\btext\/html\b/i.test(response.headers.get("content-type") ?? "")
+        && !/\bno-store\b/i.test(response.headers.get("cache-control") ?? "");
+}
+
 async function cacheLaunch(request, response) {
-    const cache = await caches.open(PAGE_CACHE);
-    await cache.put(request, response);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), LAUNCH_WAIT_MS);
+    try {
+        // The opening marker releases the live stream. Only a full document can
+        // replace a previously usable copy, even when the stream ends cleanly.
+        const complete = await checkLaunchDocument(response, {complete: true, signal: controller.signal});
+        if (complete) {
+            const cache = await caches.open(PAGE_CACHE);
+            await cache.put(request, complete);
+        }
+    } finally {
+        clearTimeout(timer);
+    }
 }
 
 async function launchNavigation(request, url) {
@@ -533,10 +591,7 @@ async function launchNavigation(request, url) {
     }
 
     if (response) {
-        const cacheable = response.ok && !response.redirected
-            && response.headers.get("content-type")?.includes("text/html")
-            && !/\bno-store\b/i.test(response.headers.get("cache-control") ?? "");
-        const cacheWrite = cacheable ? cacheLaunch(request, response.clone()).catch(() => {}) : undefined;
+        const cacheWrite = canCacheLaunch(response) ? cacheLaunch(request, response.clone()).catch(() => {}) : undefined;
         return {response, cacheWrite};
     }
     return {response: await cachedLaunch(request) ?? launchRecoveryPage(url, request.headers.get("accept-language"))};
