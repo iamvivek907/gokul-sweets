@@ -103,7 +103,7 @@ test("HTML head, scripts, and hidden streamed segments do not release a blank do
  const f=fixture((_request,options)=>{
   signal=options.signal;
   return Promise.resolve(new Response(new ReadableStream({start(controller){
-   controller.enqueue(new TextEncoder().encode('<!doctype html><html><head><title>Gokul</title><script>const fake="<h1>Loaded</h1>";</script></head><body><!-- <span data-gokul-launch-ready="">Opening Gokul</span> --><script src="/app.js"></script><div hidden id="S:0"><h1>Streamed menu</h1></div>'));
+   controller.enqueue(new TextEncoder().encode('<!doctype html><html><head><title>Gokul</title><script>const fake="<h1>Loaded</h1>";</script></head><body><!-- <span data-gokul-launch-ready="" hidden=""></span> --><script src="/app.js"></script><div hidden id="S:0"><h1>Streamed menu</h1></div>'));
    signal.addEventListener("abort",()=>controller.error(signal.reason),{once:true});
   }}),{headers:{"content-type":"text/html"}}));
  });
@@ -117,7 +117,7 @@ test("HTML head, scripts, and hidden streamed segments do not release a blank do
 });
 
 test("a stalled stream cannot be released by the opening marker in a hidden ancestor",async()=>{
- const marker='<span data-gokul-launch-ready="">Opening Gokul</span>';
+ const marker='<span data-gokul-launch-ready="" hidden=""></span>';
  const f=fixture(async(_request,{signal})=>new Response(new ReadableStream({start(controller){
   controller.enqueue(new TextEncoder().encode('<html><body><div hidden><section>'+marker+'</section></div>'));
   signal.addEventListener("abort",()=>controller.error(signal.reason),{once:true});
@@ -141,12 +141,27 @@ test("completed hidden-only documents do not bypass recovery through the rollout
  }
 });
 
+test("an opening label without the rest of the boot screen keeps the deadline active",async()=>{
+ const f=fixture(async(_request,{signal})=>new Response(new ReadableStream({start(controller){
+  controller.enqueue(new TextEncoder().encode('<html><body><div class="gokul-mobile-boot"><span>Opening Gokul</span>'));
+  signal.addEventListener("abort",()=>controller.error(signal.reason),{once:true});
+ }}),{headers:{"content-type":"text/html"}}));
+ const pending=f.navigate("/menu");
+ await new Promise(resolve=>setImmediate(resolve));
+ const [{callback,ms}]=f.timers.values();
+ assert.equal(ms,8000);
+ callback();
+ const response=await pending;
+ assert.equal(response.status,503);
+ assert.match(await response.text(),/Reconnecting to Gokul/);
+});
+
 test("split HTML markup releases the original stream as soon as the opening screen arrives",async()=>{
  let stream;
  const app=new Response(new ReadableStream({start(controller){stream=controller;}}),{headers:{"content-type":"text/html","cache-control":"no-store"}});
  const f=fixture(async()=>app);
  const pending=f.navigate("/menu");
- const parts=['<!doctype html><html><head><ti','tle>Gokul</title></head><body><!','-- <h1>Hidden</h1> --','><script>const fake="<body>";</scr','ipt><div hidden><div><span data-gokul-launch-ready="">Opening Gokul</span></div></div><div class="gokul-mobile-boot"><span data-gokul-launch-','ready="">Opening Gokul</span></div>'];
+ const parts=['<!doctype html><html><head><ti','tle>Gokul</title></head><body><!','-- <h1>Hidden</h1> --','><script>const fake="<body>";</scr','ipt><div hidden><div><span data-gokul-launch-ready="" hidden=""></span></div></div><div class="gokul-mobile-boot"><span>Opening Gokul</span><div class="gokul-boot-recovery"><a href="">Try again</a></div><span data-gokul-launch-','ready="" hidden=""></span></div>'];
  for(const part of parts.slice(0,-1))stream.enqueue(new TextEncoder().encode(part));
  await new Promise(resolve=>setImmediate(resolve));
  assert.equal(f.timers.size,1);

@@ -360,7 +360,8 @@ function launchMarkupProbe() {
     const tag = /^<\/?([a-z][\w:-]*)(?:[^"'<>]|"[^"]*"|'[^']*')*>/i;
     const headTags = new Set(["html", "body", "base", "link", "meta", "head"]);
     const nonRendering = new Set(["script", "style", "title", "noscript"]);
-    const marker = '<span data-gokul-launch-ready="">Opening Gokul</span>';
+    // This sentinel follows the complete opening screen, including its retry link.
+    const marker = '<span data-gokul-launch-ready="" hidden=""></span>';
     const voidTags = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
     const visualTags = new Set(["canvas", "embed", "hr", "iframe", "img", "svg", "video"]);
     const attributes = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>]+)))?/g;
