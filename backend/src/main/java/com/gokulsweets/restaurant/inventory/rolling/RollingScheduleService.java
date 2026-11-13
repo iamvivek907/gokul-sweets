@@ -4,14 +4,20 @@ import com.gokulsweets.restaurant.config.EnhancementProperties;
 import com.gokulsweets.restaurant.inventory.dto.AdminAllocationApprovalRequest;
 import com.gokulsweets.restaurant.inventory.dto.AdminReadinessUpdateRequest;
 import com.gokulsweets.restaurant.inventory.enums.InventoryAllocationStatus;
+import com.gokulsweets.restaurant.inventory.exception.InventoryConflictException;
+import com.gokulsweets.restaurant.inventory.exception.InventoryNotFoundException;
 import com.gokulsweets.restaurant.inventory.service.AdminInventoryService;
 import com.gokulsweets.restaurant.observability.MethodTiming;
 
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.TransactionTimedOutException;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -21,6 +27,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 
 /** Opt-in rolling schedules; creates missing records without rewriting existing stock or slots. */
@@ -630,16 +637,25 @@ WHERE bp.branch_id=? ORDER BY p.id FOR NO KEY UPDATE OF p
         }
     }
 
-    /** Tracks the saved plan version and cumulative branch-lock timings for one run. */
+    /** Carries the date cursor and committed coverage across transaction boundaries. */
     private static final class Reconciliation {
+        final long id;
+        final Coverage coverage = new Coverage();
+        final List<LocalDate> failedDates = new ArrayList<>();
         Long version;
-        int days = 1;
+        LocalDate date;
+        LocalDate end;
+        boolean completed;
+        boolean dateWorkStarted;
         long waitMs;
         long heldMs;
         long lockedAt;
 
-        Reconciliation(Long version) {
+        Reconciliation(long id, Long version, LocalDate date) {
+            this.id = id;
             this.version = version;
+            this.date = date;
+            this.end = date;
         }
     }
 
@@ -651,48 +667,50 @@ WHERE bp.branch_id=? ORDER BY p.id FOR NO KEY UPDATE OF p
         try {
             long began = System.nanoTime();
             long runId = diagnostics.start(branchId, trigger, actor);
-            var run = new Reconciliation(expectedVersion);
-            var coverage = new Coverage();
+            var run =
+                    new Reconciliation(runId, expectedVersion, LocalDate.now(clock.withZone(IST)));
             var bounded = new TransactionTemplate(transactions.getTransactionManager());
             bounded.setTimeout(300);
-            LocalDate today = LocalDate.now(clock.withZone(IST));
-            boolean completed = false;
+            RuntimeException firstDateFailure = null;
             try {
-                for (int offset = 0; offset < run.days; offset++) {
-                    int dayOffset = offset;
-                    Coverage day;
+                while (!run.date.isAfter(run.end)) {
+                    run.dateWorkStarted = false;
                     try {
-                        day =
-                                bounded.execute(
-                                        tx ->
-                                                reconcileDate(
-                                                        branchId, today, dayOffset, run, coverage));
+                        Coverage day = bounded.execute(tx -> reconcileDate(branchId, run));
+                        if (day == null) break;
+                        run.coverage.add(day);
+                        run.completed = true;
+                    } catch (DataIntegrityViolationException
+                            | InventoryConflictException
+                            | InventoryNotFoundException
+                            | PessimisticLockingFailureException
+                            | QueryTimeoutException
+                            | TransactionTimedOutException failure) {
+                        if (!run.dateWorkStarted) throw failure;
+                        run.failedDates.add(run.date);
+                        if (firstDateFailure == null) firstDateFailure = failure;
                     } finally {
                         if (run.lockedAt != 0) {
                             run.heldMs += elapsedMs(run.lockedAt);
                             run.lockedAt = 0;
                         }
                     }
-                    if (day == null) break;
-                    coverage.add(day);
-                    completed = true;
+                    run.date = run.date.plusDays(1);
                 }
+                if (firstDateFailure != null) throw firstDateFailure;
             } catch (RuntimeException failure) {
                 String summary =
-                        (completed
-                                        ? "Generation stopped. Completed dates were kept; the"
-                                                + " failed date was rolled back."
-                                        : "Generation failed; new branch changes were rolled back.")
+                        (run.completed
+                                        ? "Completed dates were kept."
+                                        : "Generation failed before any date completed.")
+                                + (run.failedDates.isEmpty()
+                                        ? ""
+                                        : " Failed dates: " + run.failedDates + ".")
                                 + " Review setup and retry. Cause: "
                                 + (failure instanceof ResponseStatusException response
                                         ? response.getReason()
                                         : failure.getClass().getSimpleName());
                 try {
-                    jdbc.update(
-                            "UPDATE rolling_branch_schedules SET"
-                                    + " last_attempt_at=now(),last_message=? WHERE branch_id=?",
-                            summary,
-                            branchId);
                     diagnostics.finish(
                             runId,
                             branchId,
@@ -700,9 +718,14 @@ WHERE bp.branch_id=? ORDER BY p.id FOR NO KEY UPDATE OF p
                             elapsedMs(began),
                             run.waitMs,
                             run.heldMs,
-                            coverage.slots,
-                            coverage.allocations,
+                            run.coverage.slots,
+                            run.coverage.allocations,
                             summary);
+                    jdbc.update(
+                            "UPDATE rolling_branch_schedules SET"
+                                    + " last_attempt_at=now(),last_message=? WHERE branch_id=?",
+                            summary,
+                            branchId);
                 } catch (RuntimeException loggingFailure) {
                     failure.addSuppressed(loggingFailure);
                 }
@@ -711,13 +734,13 @@ WHERE bp.branch_id=? ORDER BY p.id FOR NO KEY UPDATE OF p
             diagnostics.finish(
                     runId,
                     branchId,
-                    completed ? "SUCCESS" : "SKIPPED",
+                    run.completed ? "SUCCESS" : "SKIPPED",
                     elapsedMs(began),
                     run.waitMs,
                     run.heldMs,
-                    coverage.slots,
-                    coverage.allocations,
-                    completed ? coverage.summary() : "No enabled plan; nothing generated.");
+                    run.coverage.slots,
+                    run.coverage.allocations,
+                    run.completed ? run.coverage.summary() : "No enabled plan; nothing generated.");
         } finally {
             MethodTiming.finish(
                     started, RollingScheduleService.class, "reconcile(long,String,String,Long)");
@@ -735,12 +758,10 @@ WHERE bp.branch_id=? ORDER BY p.id FOR NO KEY UPDATE OF p
     }
 
     /** Locks and reconciles one service date, retaining the normal inventory audit path. */
-    private Coverage reconcileDate(
-            long branchId, LocalDate today, int offset, Reconciliation run, Coverage previous) {
+    private Coverage reconcileDate(long branchId, Reconciliation run) {
         final long started =
                 MethodTiming.start(
-                        RollingScheduleService.class,
-                        "reconcileDate(long,LocalDate,int,Reconciliation,Coverage)");
+                        RollingScheduleService.class, "reconcileDate(long,Reconciliation)");
         try {
             long waiting = System.nanoTime();
             try {
@@ -771,18 +792,24 @@ WHERE bp.branch_id=? ORDER BY p.id FOR NO KEY UPDATE OF p
                                 + " generating stock.");
             if (plan == null || !plan.enabled()) return null;
             run.version = plan.version();
-            run.days = plan.maintainDays();
-            if (offset == 0)
+            LocalDateTime now = LocalDateTime.now(clock.withZone(IST));
+            LocalDate today = now.toLocalDate();
+            if (run.date.isBefore(today)) run.date = today;
+            run.end = today.plusDays(plan.maintainDays() - 1L);
+            if (!run.completed && run.failedDates.isEmpty())
                 jdbc.update(
                         "UPDATE rolling_branch_schedules SET last_attempt_at=now()"
                                 + " WHERE branch_id=?",
                         branchId);
-            var day =
-                    reconcileCoverage(
-                            branchId, today.plusDays(offset), config, plan, lockedPolicies);
-            if (offset == run.days - 1) {
+
+            run.dateWorkStarted = true;
+            Coverage day = reconcileCoverage(branchId, run.date, now, config, plan, lockedPolicies);
+            diagnostics.recordProgress(run.id, day.slots, day.allocations);
+            // A date may itself take long enough to cross midnight.
+            run.end = LocalDate.now(clock.withZone(IST)).plusDays(plan.maintainDays() - 1L);
+            if (!run.date.isBefore(run.end) && run.failedDates.isEmpty()) {
                 var total = new Coverage();
-                total.add(previous);
+                total.add(run.coverage);
                 total.add(day);
                 jdbc.update(
                         "UPDATE rolling_branch_schedules SET"
@@ -793,9 +820,7 @@ WHERE bp.branch_id=? ORDER BY p.id FOR NO KEY UPDATE OF p
             return day;
         } finally {
             MethodTiming.finish(
-                    started,
-                    RollingScheduleService.class,
-                    "reconcileDate(long,LocalDate,int,Reconciliation,Coverage)");
+                    started, RollingScheduleService.class, "reconcileDate(long,Reconciliation)");
         }
     }
 
@@ -803,15 +828,15 @@ WHERE bp.branch_id=? ORDER BY p.id FOR NO KEY UPDATE OF p
     private Coverage reconcileCoverage(
             long branchId,
             LocalDate date,
+            LocalDateTime now,
             Workspace config,
             Plan plan,
             List<Policy> lockedPolicies) {
         final long started =
                 MethodTiming.start(
                         RollingScheduleService.class,
-                        "reconcileCoverage(long,LocalDate,Workspace,Plan,List<Policy>)");
+                        "reconcileCoverage(long,LocalDate,LocalDateTime,Workspace,Plan,List<Policy>)");
         try {
-            LocalDateTime now = LocalDateTime.now(clock.withZone(IST));
             var coverage = new Coverage();
             var policyMap =
                     lockedPolicies.stream()
@@ -836,7 +861,6 @@ WHERE bp.branch_id=? ORDER BY p.id FOR NO KEY UPDATE OF p
             coverage.policyMaximum = plan.usePolicyMaximum();
             LocalDate today = now.toLocalDate();
             long daysAhead = java.time.temporal.ChronoUnit.DAYS.between(today, date);
-            if (daysAhead < 0) return coverage;
             if ((plan.weekdays() & (1 << (date.getDayOfWeek().getValue() - 1))) == 0)
                 return coverage;
             jdbc.update(
@@ -1015,7 +1039,7 @@ ON CONFLICT(branch_product_id,service_date) DO NOTHING
             MethodTiming.finish(
                     started,
                     RollingScheduleService.class,
-                    "reconcileCoverage(long,LocalDate,Workspace,Plan,List<Policy>)");
+                    "reconcileCoverage(long,LocalDate,LocalDateTime,Workspace,Plan,List<Policy>)");
         }
     }
 

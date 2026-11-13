@@ -74,9 +74,10 @@ old future slots when the horizon shrinks. Review those through manual schedulin
 The worker runs once daily at midnight (12:00 AM) in Asia/Kolkata. There is no startup
 run or interval polling. Configuration changes after that run wait until the next daily
 run unless an admin triggers Generate missing coverage now using saved settings.
-Each service date commits its slots, allocations, and ledger entries together. If a date fails,
-its transaction rolls back and the run stops with a failure message. Earlier dates remain committed.
-A manual retry or the next daily run fills gaps. Other branches continue independently.
+Each service date commits its slots, allocations, ledger entries and run progress together.
+A failure specific to one date rolls back that date and generation checks the remaining dates.
+The run reports failed dates for a manual retry or the next daily run. A changed plan or an
+ineligible branch stops the run. Other branches continue independently.
 Last-attempt, last-success and summary fields are shown in the admin page.
 Reload saved settings refreshes execution diagnostics and discards the edits present when clicked.
 Editing and writes are blocked until reload settles; obsolete responses are ignored. Failed reloads
@@ -175,8 +176,9 @@ access disable retry. Paused plans do not raise overdue alerts.
 History records scheduled/manual triggers, authenticated staff username or system actor,
 start/finish times, result, created counts, elapsed time, lock wait and lock-held time. Keep the
 latest thirty completed runs per branch plus in-progress runs; the API returns at most thirty
-recent entries. Failed runs report the counts from dates that committed before the failure. RUNNING entries older than an hour
-are marked failed on the next invocation; health warns after ten minutes. Earlier last-success
+recent entries. Counts from committed dates survive restarts. Health warns after ten minutes
+without progress. The next invocation marks a run failed after an hour without progress.
+For runs with no committed progress, both thresholds use the start time. Earlier last-success
 timestamps remain valid after upgrade.
 
 Each date transaction has a five-minute deadline. Run timing sums the branch lock wait and hold

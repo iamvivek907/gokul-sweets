@@ -27,6 +27,7 @@ public class RollingAutomationDiagnostics {
             String actor,
             String status,
             String startedAt,
+            String lastProgressAt,
             String finishedAt,
             long durationMs,
             long lockWaitMs,
@@ -70,7 +71,7 @@ public class RollingAutomationDiagnostics {
                     "UPDATE rolling_automation_runs SET"
                         + " status='FAILED',finished_at=?,summary='Execution was interrupted before"
                         + " completion. Review coverage and retry.' WHERE branch_id=? AND"
-                        + " status='RUNNING' AND started_at<?",
+                        + " status='RUNNING' AND COALESCE(last_progress_at,started_at)<?",
                     java.sql.Timestamp.from(clock.instant()),
                     branch,
                     java.sql.Timestamp.from(clock.instant().minusSeconds(3600)));
@@ -86,6 +87,32 @@ public class RollingAutomationDiagnostics {
         } finally {
             MethodTiming.finish(
                     started, RollingAutomationDiagnostics.class, "start(long,String,String)");
+        }
+    }
+
+    /** Persists progress in the same transaction as the corresponding date's coverage. */
+    public void recordProgress(long id, int slots, int allocations) {
+        final long started =
+                MethodTiming.start(
+                        RollingAutomationDiagnostics.class, "recordProgress(long,int,int)");
+        try {
+            int updated =
+                    jdbc.update(
+                            """
+                            UPDATE rolling_automation_runs
+                            SET last_progress_at=?, slots_created=slots_created+?,
+                                allocations_created=allocations_created+?
+                            WHERE id=? AND status='RUNNING'
+                            """,
+                            java.sql.Timestamp.from(clock.instant()),
+                            slots,
+                            allocations,
+                            id);
+            if (updated != 1)
+                throw new IllegalStateException("Rolling execution is no longer active.");
+        } finally {
+            MethodTiming.finish(
+                    started, RollingAutomationDiagnostics.class, "recordProgress(long,int,int)");
         }
     }
 
@@ -109,7 +136,7 @@ public class RollingAutomationDiagnostics {
             jdbc.update(
                     "UPDATE rolling_automation_runs SET"
                         + " status=?,finished_at=?,duration_ms=?,lock_wait_ms=?,lock_held_ms=?,slots_created=?,allocations_created=?,summary=?"
-                        + " WHERE id=? AND branch_id=?",
+                        + " WHERE id=? AND branch_id=? AND status='RUNNING'",
                     status,
                     java.sql.Timestamp.from(clock.instant()),
                     durationMs,
@@ -148,6 +175,11 @@ public class RollingAutomationDiagnostics {
                                     rs.getString("actor"),
                                     rs.getString("status"),
                                     rs.getTimestamp("started_at").toInstant().toString(),
+                                    rs.getTimestamp("last_progress_at") == null
+                                            ? null
+                                            : rs.getTimestamp("last_progress_at")
+                                                    .toInstant()
+                                                    .toString(),
                                     rs.getTimestamp("finished_at") == null
                                             ? null
                                             : rs.getTimestamp("finished_at").toInstant().toString(),
@@ -349,10 +381,13 @@ public class RollingAutomationDiagnostics {
             boolean interrupted =
                     latest != null
                             && latest.status().equals("RUNNING")
-                            && Instant.parse(latest.startedAt())
+                            && Instant.parse(
+                                            Objects.requireNonNullElse(
+                                                    latest.lastProgressAt(), latest.startedAt()))
                                     .isBefore(clock.instant().minusSeconds(600));
-            boolean failed = latest != null && latest.status().equals("FAILED");
             boolean running = latest != null && latest.status().equals("RUNNING") && !interrupted;
+            boolean failed = latest != null && latest.status().equals("FAILED");
+            overdue = overdue && !running;
             boolean attention =
                     overdue
                             || failed

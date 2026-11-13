@@ -1122,10 +1122,11 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
     @Test
     @Transactional(
             propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
-    void scheduledRetryPreservesDatesCommittedBeforeLaterDateFails() {
+    void scheduledRetryRepairsAFailedDateAndPreservesDatesOnBothSides() {
         var f = fixture();
         var date = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(1);
         var rejectedDate = date.plusDays(1);
+        var laterDate = rejectedDate.plusDays(1);
         java.util.function.Function<LocalDate, java.util.Map<String, Object>> allocationOn =
                 day ->
                         jdbc.queryForMap(
@@ -1134,10 +1135,10 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
                                 f.product(),
                                 day);
         try {
-            service.save(f.branch(), maximumPlan(-1, 3), "manager");
-            // Reject a slot write for the last date after the previous date has committed.
+            service.save(f.branch(), maximumPlan(-1, 4), "manager");
+            // Reject a slot write for the middle date so both neighboring dates can commit.
             jdbc.execute(
-                    "ALTER TABLE pickup_slots ADD CONSTRAINT rolling_test_reject_last_date"
+                    "ALTER TABLE pickup_slots ADD CONSTRAINT rolling_test_reject_middle_date"
                             + " CHECK (branch_id <> "
                             + f.branch()
                             + " OR slot_date <> DATE '"
@@ -1145,12 +1146,16 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
                             + "') NOT VALID");
             try {
                 assertThatThrownBy(() -> service.reconcile(f.branch(), "SCHEDULED", "system"))
-                        .hasMessageContaining("rolling_test_reject_last_date");
+                        .hasMessageContaining("rolling_test_reject_middle_date");
                 var run = service.inspect(f.branch()).runs().getFirst();
                 assertThat(run.status()).isEqualTo("FAILED");
-                assertThat(run.allocationsCreated()).isPositive();
+                assertThat(run.allocationsCreated()).isGreaterThanOrEqualTo(2);
+                assertThat(run.lastProgressAt()).isNotNull();
+                assertThat(run.summary()).contains(rejectedDate.toString());
                 assertThat(run.summary()).contains("Completed dates were kept");
                 assertThat(allocationOn.apply(date)).containsEntry("status", "APPROVED");
+                assertThat(allocationOn.apply(laterDate)).containsEntry("status", "APPROVED");
+                assertThat(service.inspect(f.branch()).lastSuccess()).isNull();
                 assertThat(
                                 jdbc.queryForObject(
                                         "SELECT count(*) FROM pickup_slots WHERE branch_id=? AND"
@@ -1161,12 +1166,14 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
                         .isZero();
             } finally {
                 jdbc.execute(
-                        "ALTER TABLE pickup_slots DROP CONSTRAINT rolling_test_reject_last_date");
+                        "ALTER TABLE pickup_slots DROP CONSTRAINT rolling_test_reject_middle_date");
             }
             var committed = allocationOn.apply(date);
+            var laterCommitted = allocationOn.apply(laterDate);
             service.reconcile(f.branch(), "SCHEDULED", "system");
             assertThat(service.inspect(f.branch()).runs().getFirst().status()).isEqualTo("SUCCESS");
             assertThat(allocationOn.apply(date)).isEqualTo(committed);
+            assertThat(allocationOn.apply(laterDate)).isEqualTo(laterCommitted);
             assertThat(allocationOn.apply(rejectedDate)).containsEntry("status", "APPROVED");
         } finally {
             cleanupCommittedReadinessFixture(f);
@@ -1174,7 +1181,7 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
     }
 
     @Test
-    void reconciliationUsesTheCurrentServiceDateAfterMidnight() {
+    void singleDayReconciliationRepairsTheNewDayAfterMidnight() {
         var f = fixture();
         var zone = ZoneId.of("Asia/Kolkata");
         var today = LocalDate.of(2026, 1, 2);
@@ -1200,7 +1207,7 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
                         LocalTime.of(11, 0),
                         30,
                         5,
-                        2,
+                        1,
                         127,
                         -1,
                         List.of(
@@ -1220,6 +1227,53 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
                                 f.branch()))
                 .containsExactly(java.sql.Date.valueOf(today));
         assertThat(allocation(f, today)).containsEntry("status", "DRAFT");
+        assertThat(service.inspect(f.branch()).runs().getFirst().status()).isEqualTo("SUCCESS");
+    }
+
+    @Test
+    void recentCommittedProgressKeepsAnOldRunActiveAndCountsSurviveStaleCleanup() {
+        var f = fixture();
+        service.save(f.branch(), maximumPlan(-1, 2), "manager");
+        var now = clock.instant();
+        var audit = new RollingAutomationDiagnostics(jdbc, clock, features);
+        var oldAudit =
+                new RollingAutomationDiagnostics(
+                        jdbc, Clock.fixed(now.minusSeconds(7200), clock.getZone()), features);
+        long id = oldAudit.start(f.branch(), "SCHEDULED", "system");
+        audit.recordProgress(id, 4, 2);
+
+        var active = audit.runs(f.branch()).getFirst();
+        assertThat(active.slotsCreated()).isEqualTo(4);
+        assertThat(active.allocationsCreated()).isEqualTo(2);
+        var health = audit.health(f.branch(), service.workspace(f.branch()), List.of(active));
+        assertThat(health.status()).isEqualTo("RUNNING");
+        assertThat(health.interrupted()).isFalse();
+        assertThat(health.overdue()).isFalse();
+
+        audit.start(f.branch(), "MANUAL", "manager");
+        assertThat(audit.runs(f.branch()))
+                .filteredOn(run -> run.id() == id)
+                .singleElement()
+                .extracting(RollingAutomationDiagnostics.Run::status)
+                .isEqualTo("RUNNING");
+
+        var laterAudit =
+                new RollingAutomationDiagnostics(
+                        jdbc, Clock.fixed(now.plusSeconds(3700), clock.getZone()), features);
+        assertThat(
+                        laterAudit
+                                .health(f.branch(), service.workspace(f.branch()), List.of(active))
+                                .interrupted())
+                .isTrue();
+        laterAudit.start(f.branch(), "MANUAL", "manager");
+        var interrupted =
+                laterAudit.runs(f.branch()).stream()
+                        .filter(run -> run.id() == id)
+                        .findFirst()
+                        .orElseThrow();
+        assertThat(interrupted.status()).isEqualTo("FAILED");
+        assertThat(interrupted.slotsCreated()).isEqualTo(4);
+        assertThat(interrupted.allocationsCreated()).isEqualTo(2);
     }
 
     @Test
