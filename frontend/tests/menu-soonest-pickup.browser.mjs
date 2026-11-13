@@ -127,10 +127,19 @@ try{for(const width of [320,390,1280]){
  while(!dateDiscoveryGates.length&&Date.now()<dateDeadline)await page.waitForTimeout(50);
  assert.ok(dateDiscoveryGates.length,'date-only recovery verification started');
  assert.equal(await saved(),null,'no old-intent response has saved a slot');
- const beforeDateChange=discoveries;
- holdDateDiscovery=false;
  try {
-  await page.evaluate(date=>{localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date}));window.dispatchEvent(new StorageEvent('storage',{key:'gokul-pickup-intent',newValue:localStorage.getItem('gokul-pickup-intent'),storageArea:localStorage}));},later);
+  const previousIntent=await page.evaluate(date=>{
+   const key='gokul-pickup-intent';
+   const previous=localStorage.getItem(key);
+   localStorage.setItem(key,JSON.stringify({branchId:1,date}));
+   return previous;
+  },later);
+  const beforeDateChange=discoveries;
+  holdDateDiscovery=false;
+  await page.evaluate(oldValue=>{
+   const key='gokul-pickup-intent';
+   window.dispatchEvent(new StorageEvent('storage',{key,oldValue,newValue:localStorage.getItem(key),storageArea:localStorage}));
+  },previousIntent);
   await pickup.getByText(/Tomorrow, .*8:00/).waitFor();
   assert.ok(discoveries>beforeDateChange,'date intent alone restarts discovery');
   assert.equal((await saved()).date,tomorrow,'replacement verification completes without waiting for the old responses');

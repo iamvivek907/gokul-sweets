@@ -1122,6 +1122,41 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
     @Test
     @Transactional(
             propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void failureKeepsItsClaimWhenTheBranchSummaryCannotBeSaved() {
+        long branch =
+                jdbc.queryForObject(
+                        "INSERT INTO branches(code,name) VALUES(?,'Atomic failure test') RETURNING"
+                            + " id",
+                        Long.class,
+                        "ROLL-ATOMIC-" + UUID.randomUUID());
+        try {
+            service.save(branch, maximumPlan(-1, 2), "manager");
+            jdbc.update("UPDATE branches SET operational=FALSE WHERE id=?", branch);
+            jdbc.execute(
+                    "ALTER TABLE rolling_branch_schedules ADD CONSTRAINT"
+                        + " rolling_test_reject_summary CHECK (branch_id <> "
+                            + branch
+                            + " OR last_message IS NULL) NOT VALID");
+            try {
+                assertThatThrownBy(() -> service.reconcile(branch, "MANUAL", "manager"))
+                        .hasMessageContaining("active and operational");
+                var workspace = service.inspect(branch);
+                assertThat(workspace.runs().getFirst().status()).isEqualTo("RUNNING");
+                assertThat(workspace.message()).isNull();
+            } finally {
+                jdbc.execute(
+                        "ALTER TABLE rolling_branch_schedules DROP CONSTRAINT"
+                            + " rolling_test_reject_summary");
+            }
+        } finally {
+            jdbc.update("DELETE FROM rolling_branch_schedules WHERE branch_id=?", branch);
+            jdbc.update("DELETE FROM branches WHERE id=?", branch);
+        }
+    }
+
+    @Test
+    @Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     void scheduledRetryRepairsAFailedDateAndPreservesDatesOnBothSides() {
         var f = fixture();
         var date = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(1);

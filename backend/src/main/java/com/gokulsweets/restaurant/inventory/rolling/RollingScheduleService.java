@@ -731,21 +731,28 @@ WHERE bp.branch_id=? ORDER BY p.id FOR NO KEY UPDATE OF p
                                         ? response.getReason()
                                         : failure.getClass().getSimpleName());
                 try {
-                    diagnostics.finish(
-                            runId,
-                            branchId,
-                            "FAILED",
-                            elapsedMs(began),
-                            run.waitMs,
-                            run.heldMs,
-                            run.coverage.slots,
-                            run.coverage.allocations,
-                            summary);
-                    jdbc.update(
-                            "UPDATE rolling_branch_schedules SET"
-                                    + " last_attempt_at=now(),last_message=? WHERE branch_id=?",
-                            summary,
-                            branchId);
+                    bounded.executeWithoutResult(
+                            tx -> {
+                                // Release the run claim only when its branch summary is visible
+                                // too.
+                                if (diagnostics.finish(
+                                        runId,
+                                        branchId,
+                                        "FAILED",
+                                        elapsedMs(began),
+                                        run.waitMs,
+                                        run.heldMs,
+                                        run.coverage.slots,
+                                        run.coverage.allocations,
+                                        summary)) {
+                                    jdbc.update(
+                                            "UPDATE rolling_branch_schedules SET"
+                                                    + " last_attempt_at=now(),last_message=? WHERE"
+                                                    + " branch_id=?",
+                                            summary,
+                                            branchId);
+                                }
+                            });
                 } catch (RuntimeException loggingFailure) {
                     failure.addSuppressed(loggingFailure);
                 }

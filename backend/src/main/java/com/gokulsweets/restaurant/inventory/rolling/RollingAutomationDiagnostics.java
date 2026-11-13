@@ -174,8 +174,8 @@ public class RollingAutomationDiagnostics {
         }
     }
 
-    /** Finishes and retains the latest thirty completed runs per branch. */
-    public void finish(
+    /** Finishes a run that still owns its claim and retains thirty completed runs per branch. */
+    public boolean finish(
             long id,
             long branch,
             String status,
@@ -190,27 +190,30 @@ public class RollingAutomationDiagnostics {
                         RollingAutomationDiagnostics.class,
                         "finish(long,long,String,long,long,long,int,int,String)");
         try {
-            if (id < 0) return;
-            jdbc.update(
-                    "UPDATE rolling_automation_runs SET"
-                        + " status=?,finished_at=?,duration_ms=?,lock_wait_ms=?,lock_held_ms=?,slots_created=?,allocations_created=?,summary=?"
-                        + " WHERE id=? AND branch_id=? AND status='RUNNING'",
-                    status,
-                    java.sql.Timestamp.from(clock.instant()),
-                    durationMs,
-                    lockWaitMs,
-                    lockHeldMs,
-                    slots,
-                    allocations,
-                    summary,
-                    id,
-                    branch);
+            if (id < 0) return false;
+            int updated =
+                    jdbc.update(
+                            "UPDATE rolling_automation_runs SET"
+                                + " status=?,finished_at=?,duration_ms=?,lock_wait_ms=?,lock_held_ms=?,slots_created=?,allocations_created=?,summary=?"
+                                + " WHERE id=? AND branch_id=? AND status='RUNNING'",
+                            status,
+                            java.sql.Timestamp.from(clock.instant()),
+                            durationMs,
+                            lockWaitMs,
+                            lockHeldMs,
+                            slots,
+                            allocations,
+                            summary,
+                            id,
+                            branch);
+            if (updated == 0) return false;
             jdbc.update(
                     "DELETE FROM rolling_automation_runs WHERE branch_id=? AND status<>'RUNNING'"
                         + " AND id NOT IN (SELECT id FROM rolling_automation_runs WHERE branch_id=?"
                         + " AND status<>'RUNNING' ORDER BY finished_at DESC,id DESC LIMIT 30)",
                     branch,
                     branch);
+            return true;
         } finally {
             MethodTiming.finish(
                     started,
