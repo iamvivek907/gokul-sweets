@@ -1122,6 +1122,60 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
     @Test
     @Transactional(
             propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void scheduledRetryPreservesDatesCommittedBeforeLaterDateFails() {
+        var f = fixture();
+        var date = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(1);
+        var rejectedDate = date.plusDays(1);
+        java.util.function.Function<LocalDate, java.util.Map<String, Object>> allocationOn =
+                day ->
+                        jdbc.queryForMap(
+                                "SELECT * FROM inventory_daily_allocations WHERE"
+                                    + " branch_product_id=? AND service_date=?",
+                                f.product(),
+                                day);
+        try {
+            service.save(f.branch(), maximumPlan(-1, 3), "manager");
+            // Reject a slot write for the last date after the previous date has committed.
+            jdbc.execute(
+                    "ALTER TABLE pickup_slots ADD CONSTRAINT rolling_test_reject_last_date"
+                            + " CHECK (branch_id <> "
+                            + f.branch()
+                            + " OR slot_date <> DATE '"
+                            + rejectedDate
+                            + "') NOT VALID");
+            try {
+                assertThatThrownBy(() -> service.reconcile(f.branch(), "SCHEDULED", "system"))
+                        .hasMessageContaining("rolling_test_reject_last_date");
+                var run = service.inspect(f.branch()).runs().getFirst();
+                assertThat(run.status()).isEqualTo("FAILED");
+                assertThat(run.allocationsCreated()).isPositive();
+                assertThat(run.summary()).contains("Completed dates were kept");
+                assertThat(allocationOn.apply(date)).containsEntry("status", "APPROVED");
+                assertThat(
+                                jdbc.queryForObject(
+                                        "SELECT count(*) FROM pickup_slots WHERE branch_id=? AND"
+                                                + " slot_date=?",
+                                        Integer.class,
+                                        f.branch(),
+                                        rejectedDate))
+                        .isZero();
+            } finally {
+                jdbc.execute(
+                        "ALTER TABLE pickup_slots DROP CONSTRAINT rolling_test_reject_last_date");
+            }
+            var committed = allocationOn.apply(date);
+            service.reconcile(f.branch(), "SCHEDULED", "system");
+            assertThat(service.inspect(f.branch()).runs().getFirst().status()).isEqualTo("SUCCESS");
+            assertThat(allocationOn.apply(date)).isEqualTo(committed);
+            assertThat(allocationOn.apply(rejectedDate)).containsEntry("status", "APPROVED");
+        } finally {
+            cleanupCommittedReadinessFixture(f);
+        }
+    }
+
+    @Test
+    @Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     void durableRunStartDoesNotWaitForAnUncommittedSlotWriter() throws Exception {
         long branch =
                 jdbc.queryForObject(
