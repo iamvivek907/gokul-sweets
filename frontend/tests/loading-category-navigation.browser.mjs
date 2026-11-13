@@ -48,8 +48,15 @@ try{for(const [width,themed] of [[320,true],[390,true],[640,true],[1280,true],[3
  });
  await context.addInitScript(({branch,date,slot})=>{localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date}));localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify({date,slot,pickupType:'NORMAL'}));},{branch,date,slot});
 
+ await page.addInitScript(()=>{
+  if(location.pathname==='/menu'){
+   history.replaceState({...history.state,gokulLaunchRetry:{url:location.href,attempt:2},testHistoryState:'keep'},"");
+  }
+ });
  releaseOffers();releasePairings();
  await page.goto(`${base}/menu`);
+ await page.locator('.gokul-mobile-launch[data-launch-initialized="true"]').waitFor({state:'attached'});
+ assert.deepEqual(await page.evaluate(()=>[history.state?.gokulLaunchRetry??null,history.state?.testHistoryState]),[null,'keep'],'successful launch clears only the spent retry count');
  if(width<=640){
   await page.locator('.gokul-mobile-launch[open]').waitFor();
   const logo=page.locator('.gokul-mobile-launch .brand-loading-wordmark');

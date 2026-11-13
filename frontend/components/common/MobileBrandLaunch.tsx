@@ -27,6 +27,20 @@ export default function MobileBrandLaunch() {
     const staff = pathname.startsWith("/admin") || pathname.startsWith("/staff");
     const storefront = /^(?:\/|\/menu\/?|\/branches(?:\/[1-9]\d*)?\/?)$/.test(pathname);
     useEffect(() => {
+        if (!hydrated || !storefront) return;
+        // Recovery reloads preserve history state. Clear only the spent launch budget.
+        const state = window.history.state;
+        if (!state || !Object.hasOwn(state, "gokulLaunchRetry")) return;
+        try {
+            const next = {...state};
+            delete next.gokulLaunchRetry;
+            window.history.replaceState(next, "");
+        } catch {
+            // History can be unavailable; it must not interrupt the normal launch.
+        }
+    }, [hydrated, storefront]);
+
+    useEffect(() => {
         if (staff) return;
         const surface = dialog.current;
         if (!surface) return;
