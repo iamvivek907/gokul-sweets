@@ -6,7 +6,7 @@ function fixture(fetch,caches={}) {
  let next=0;
  vm.runInNewContext(worker,{
   self:{location:{origin},addEventListener:(name,handler)=>handlers.set(name,handler)},
-  fetch,caches,URL,Response,Request,AbortController,crypto,
+  fetch,caches,URL,Response,Request,AbortController,crypto,TextDecoder,
   setTimeout:(callback,ms)=>{const id=++next;timers.set(id,{callback,ms});return id;},
   clearTimeout:id=>timers.delete(id)
  });
@@ -98,18 +98,39 @@ test("headers without HTML do not clear the launch deadline",async()=>{
  assert.equal(f.timers.size,0);
 });
 
-test("a first HTML chunk releases the original response without waiting for the rest",async()=>{
+test("HTML head, comments, and scripts do not release a blank document",async()=>{
+ let signal;
+ const f=fixture((_request,options)=>{
+  signal=options.signal;
+  return Promise.resolve(new Response(new ReadableStream({start(controller){
+   controller.enqueue(new TextEncoder().encode('<!doctype html><html><head><title>Gokul</title><script>const fake="<h1>Loaded</h1>";</script></head><body><!-- <h1>Not visible</h1> --><script src="/app.js"></script>'));
+   signal.addEventListener("abort",()=>controller.error(signal.reason),{once:true});
+  }}),{headers:{"content-type":"text/html"}}));
+ });
+ const pending=f.navigate("/menu");
+ await new Promise(resolve=>setImmediate(resolve));
+ const [{callback,ms}]=f.timers.values();
+ assert.equal(ms,8000);
+ callback();
+ assert.equal((await pending).status,503);
+ assert.equal(signal.aborted,true);
+});
+
+test("split HTML markup releases the original stream as soon as the opening screen arrives",async()=>{
  let stream;
- const first=new TextEncoder().encode("<h1>Gokul</h1>");
- const app=new Response(new ReadableStream({start(controller){stream=controller;}}),{headers:{"cache-control":"no-store"}});
+ const app=new Response(new ReadableStream({start(controller){stream=controller;}}),{headers:{"content-type":"text/html","cache-control":"no-store"}});
  const f=fixture(async()=>app);
  const pending=f.navigate("/menu");
- stream.enqueue(first);
+ const parts=['<!doctype html><html><head><ti','tle>Gokul</title></head><body><!','-- <h1>Hidden</h1> --','><script>const fake="<body>";</scr','ipt><div class="gokul-mobile-','boot" role="status">Opening Gokul</div>'];
+ for(const part of parts.slice(0,-1))stream.enqueue(new TextEncoder().encode(part));
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(f.timers.size,1);
+ stream.enqueue(new TextEncoder().encode(parts.at(-1)));
  assert.equal(await pending,app);
  assert.equal(f.timers.size,0);
  stream.enqueue(new TextEncoder().encode("<p>Ready</p>"));
  stream.close();
- assert.equal(await app.text(),"<h1>Gokul</h1><p>Ready</p>");
+ assert.equal(await app.text(),parts.join("")+"<p>Ready</p>");
 });
 
 test("exact cached storefront pages remain usable during outages",async()=>{

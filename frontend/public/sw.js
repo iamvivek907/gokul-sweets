@@ -354,6 +354,74 @@ function isStorefrontLaunch(url) {
         && /^(?:\/|\/menu\/?|\/branches(?:\/[1-9]\d*)?\/?)$/.test(url.pathname);
 }
 
+// A Next.js response can flush metadata and scripts before it sends any launch UI.
+function launchMarkupProbe() {
+    const decoder = new TextDecoder();
+    const tag = /^<\/?([a-z][\w:-]*)(?:[^"'<>]|"[^"]*"|'[^']*')*>/i;
+    const headTags = new Set(["html", "body", "base", "link", "meta", "head"]);
+    const nonRendering = new Set(["script", "style", "title", "template", "noscript"]);
+    let pending = "", raw = "", inHead = false;
+
+    return bytes => {
+        pending += decoder.decode(bytes, {stream: true});
+        let offset = 0;
+        while (offset < pending.length) {
+            if (raw) {
+                const end = pending.toLowerCase().indexOf(raw, offset);
+                if (end < 0) {
+                    // Only a split closing delimiter needs to survive the next read.
+                    offset = Math.max(offset, pending.length - raw.length + 1);
+                    break;
+                }
+                offset = end + raw.length;
+                raw = "";
+                continue;
+            }
+
+            const next = pending[offset];
+            if (/\s/.test(next)) { offset++; continue; }
+            if (next !== "<") {
+                if (!inHead) return true;
+                const end = pending.indexOf("<", offset);
+                offset = end < 0 ? pending.length : end;
+                continue;
+            }
+
+            const rest = pending.slice(offset);
+            if ("<!--".startsWith(rest)) break;
+            if (rest.startsWith("<!--")) {
+                raw = "-->";
+                offset += 4;
+                continue;
+            }
+            if (/^<[!?]/.test(rest)) {
+                const end = rest.indexOf(">");
+                if (end < 0) break;
+                offset += end + 1;
+                continue;
+            }
+
+            const match = tag.exec(rest);
+            if (!match) break;
+            offset += match[0].length;
+            const name = match[1].toLowerCase();
+            const closing = match[0][1] === "/";
+            if (name === "head") inHead = !closing;
+            if (name === "body" && !closing) inHead = false;
+            if (closing || headTags.has(name)) continue;
+            if (nonRendering.has(name)) {
+                raw = "</" + name + ">";
+                continue;
+            }
+            if (!inHead) return true;
+        }
+        pending = pending.slice(offset);
+        // Do not keep buffering a malformed tag indefinitely.
+        if (pending.length > 128 * 1024) throw Error("Invalid storefront launch markup");
+        return false;
+    };
+}
+
 async function openLaunchDocument(request, signal) {
     const response = await fetch(request, {signal});
     if (response.status >= 500) {
@@ -364,16 +432,17 @@ async function openLaunchDocument(request, signal) {
 
     // Peek at a clone so the original response keeps its URL, headers, and streaming body.
     const reader = response.clone().body.getReader();
+    const isHtml = /\btext\/html\b/i.test(response.headers.get("content-type") ?? "");
+    const hasLaunchMarkup = isHtml ? launchMarkupProbe() : bytes => bytes.byteLength > 0;
     try {
-        let first;
-        do {
-            first = await reader.read();
-        } while (!first.done && !first.value.byteLength);
-        if (first.done) {
-            void response.body.cancel().catch(() => {});
-            return null;
+        for (;;) {
+            const chunk = await reader.read();
+            if (chunk.done) {
+                void response.body.cancel().catch(() => {});
+                return null;
+            }
+            if (hasLaunchMarkup(chunk.value)) return response;
         }
-        return response;
     } finally {
         // A tee branch's cancel promise can wait for the browser to consume the original.
         void reader.cancel().catch(() => {});
