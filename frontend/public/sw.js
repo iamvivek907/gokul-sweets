@@ -463,7 +463,7 @@ function launchMarkupProbe(complete) {
     }};
 }
 
-async function checkLaunchDocument(response, {complete = false, signal, onSizeLimit} = {}) {
+async function checkLaunchDocument(response, {complete = false, signal, onSizeLimit, onProgress} = {}) {
     if (response.status >= 500) {
         void response.body?.cancel().catch(() => {});
         return null;
@@ -493,6 +493,7 @@ async function checkLaunchDocument(response, {complete = false, signal, onSizeLi
                 onSizeLimit?.();
                 return null;
             }
+            if (chunk.value.byteLength > 0) onProgress?.();
             if (markup ? markup.read(chunk.value) : chunk.value.byteLength > 0) {
                 accepted = true;
                 return response;
@@ -561,13 +562,19 @@ function canCacheLaunch(response) {
 
 async function finishLiveLaunch(request, response, cacheable, clientId) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), LAUNCH_WAIT_MS);
-    let sizeLimit = false, complete;
+    let timer, sizeLimit = false, complete;
+    // After the opening screen, measure time without data rather than total load time.
+    function resetIdleTimeout() {
+        clearTimeout(timer);
+        timer = setTimeout(() => controller.abort(), LAUNCH_WAIT_MS);
+    }
+    resetIdleTimeout();
     try {
         // Verify the streamed document separately from the opening screen. A failed
         // validation may be reported to this navigation only, never to other tabs.
         complete = await checkLaunchDocument(response, {
-            complete: true, signal: controller.signal, onSizeLimit: () => { sizeLimit = true; }
+            complete: true, signal: controller.signal, onProgress: resetIdleTimeout,
+            onSizeLimit: () => { sizeLimit = true; }
         });
     } catch {
         // The body can fail after the browser has already painted the opening screen.

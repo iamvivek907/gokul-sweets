@@ -5,14 +5,17 @@ const boot='<html><body><div data-gokul-storefront-boot=""><span>Opening Gokul</
 const htmlResponse=body=>new Response(body,{headers:{"content-type":"text/html"}});
 function fixture(fetch,caches={},onMessage) {
  const handlers=new Map(),timers=new Map();
- let next=0;
+ let next=0,now=0;
  vm.runInNewContext(worker,{
   self:{location:{origin},skipWaiting(){},clients:{get:async id=>({postMessage:message=>onMessage?.(id,message)})},addEventListener:(name,handler)=>handlers.set(name,handler)},
   fetch,caches,URL,Response,Request,AbortController,crypto,TextDecoder,
-  setTimeout:(callback,ms)=>{const id=++next;timers.set(id,{callback,ms});return id;},
+  setTimeout:(callback,ms)=>{const id=++next;timers.set(id,{callback,ms,at:now+ms});return id;},
   clearTimeout:id=>timers.delete(id)
  });
- return {timers,install(){
+ return {timers,advance(ms){
+  now+=ms;
+  for(const [id,timer] of timers)if(timer.at<=now){timers.delete(id);timer.callback();}
+ },install(){
   let done;
   handlers.get("install")({waitUntil:promise=>{done=promise;}});
   return done;
@@ -316,6 +319,46 @@ test("only the affected live navigation is notified of a clean truncation, body 
   }
   await f.background;
   assert.deepEqual(messages,["complete","oversize"].includes(failure)?[]:[["new-navigation","gokul-launch-stream-incomplete"]],failure);
+  assert.equal(f.timers.size,0);
+ }
+});
+
+test("live recovery waits for inactivity rather than elapsed load time",async()=>{
+ for(const outcome of ["complete","stall"]){
+  let stream,stored;
+  const messages=[];
+  const original=htmlResponse(new ReadableStream({start(controller){stream=controller;}}));
+  const f=fixture(async()=>original,{open:async()=>({put:async(_request,page)=>{stored=await page.text();}})},
+   (_id,message)=>messages.push(message.type));
+  const pending=f.navigate("/menu");
+  stream.enqueue(new TextEncoder().encode(boot));
+  assert.equal(await pending,original);
+  const flush=()=>new Promise(resolve=>setImmediate(resolve));
+  await flush();
+  for(let i=0;i<3;i++){
+   f.advance(4000);
+   stream.enqueue(new TextEncoder().encode("<p>More menu content</p>"));
+   await flush();
+   assert.deepEqual(messages,[],"a progressing response must not trigger recovery");
+  }
+  if(outcome==="complete"){
+   stream.enqueue(new TextEncoder().encode("</body></html>"));
+   stream.close();
+  }else{
+   f.advance(7900);
+   stream.enqueue(new Uint8Array());
+   await flush();
+   assert.deepEqual(messages,[]);
+   f.advance(100);
+  }
+  await f.background;
+  if(outcome==="complete"){
+   assert.deepEqual(messages,[]);
+   assert.match(stored,/<p>More menu content<\/p><\/body><\/html>$/);
+  }else{
+   assert.deepEqual(messages,["gokul-launch-stream-incomplete"]);
+   assert.equal(stored,undefined);
+  }
   assert.equal(f.timers.size,0);
  }
 });
