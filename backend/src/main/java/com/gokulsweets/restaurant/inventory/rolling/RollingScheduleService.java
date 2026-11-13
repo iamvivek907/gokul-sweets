@@ -4,14 +4,20 @@ import com.gokulsweets.restaurant.config.EnhancementProperties;
 import com.gokulsweets.restaurant.inventory.dto.AdminAllocationApprovalRequest;
 import com.gokulsweets.restaurant.inventory.dto.AdminReadinessUpdateRequest;
 import com.gokulsweets.restaurant.inventory.enums.InventoryAllocationStatus;
+import com.gokulsweets.restaurant.inventory.exception.InventoryConflictException;
+import com.gokulsweets.restaurant.inventory.exception.InventoryNotFoundException;
 import com.gokulsweets.restaurant.inventory.service.AdminInventoryService;
 import com.gokulsweets.restaurant.observability.MethodTiming;
 
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.TransactionTimedOutException;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -21,6 +27,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 
 /** Opt-in rolling schedules; creates missing records without rewriting existing stock or slots. */
@@ -509,7 +516,7 @@ WHERE bp.branch_id=? ORDER BY p.id FOR NO KEY UPDATE OF p
     }
 
     /**
-     * Repairs coverage with a five-minute transaction deadline and durable execution diagnostics.
+     * Repairs coverage with a five-minute transaction deadline per date and durable diagnostics.
      */
     public void reconcile(long branchId, String trigger, String actor) {
         final long started =
@@ -522,232 +529,496 @@ WHERE bp.branch_id=? ORDER BY p.id FOR NO KEY UPDATE OF p
         }
     }
 
+    /** Counts the coverage and decisions made by committed date transactions. */
+    private static final class Coverage {
+        int slots;
+        int allocations;
+        int retained;
+        int readinessPublished;
+        int activeDates;
+        int noSlotDates;
+        int existingAllocations;
+        int unavailable;
+        int outsideWindow;
+        int limited;
+        int readinessUnitMismatches;
+        int selectedPolicies;
+        int maximumModeSkips;
+        boolean policyMaximum;
+
+        /** Adds counts only after the date transaction returns successfully. */
+        void add(Coverage day) {
+            final long started =
+                    MethodTiming.start(RollingScheduleService.Coverage.class, "add(Coverage)");
+            try {
+                slots += day.slots;
+                allocations += day.allocations;
+                retained += day.retained;
+                readinessPublished += day.readinessPublished;
+                activeDates += day.activeDates;
+                noSlotDates += day.noSlotDates;
+                existingAllocations += day.existingAllocations;
+                unavailable += day.unavailable;
+                outsideWindow += day.outsideWindow;
+                limited += day.limited;
+                readinessUnitMismatches += day.readinessUnitMismatches;
+                selectedPolicies = day.selectedPolicies;
+                maximumModeSkips = day.maximumModeSkips;
+                policyMaximum = day.policyMaximum;
+            } finally {
+                MethodTiming.finish(
+                        started, RollingScheduleService.Coverage.class, "add(Coverage)");
+            }
+        }
+
+        /** Formats committed coverage and skipped work for operators. */
+        String summary() {
+            final long started =
+                    MethodTiming.start(RollingScheduleService.Coverage.class, "summary()");
+            try {
+                String message =
+                        slots
+                                + " slots created; "
+                                + allocations
+                                + " allocations created; "
+                                + retained
+                                + " item-dates unchanged. "
+                                + selectedPolicies
+                                + " selected policies; "
+                                + activeDates
+                                + " dates with upcoming regular pickup slots; "
+                                + noSlotDates
+                                + " selected dates without upcoming regular slots."
+                                + " Skips: "
+                                + existingAllocations
+                                + " existing allocations; "
+                                + unavailable
+                                + " unavailable/offline/unsupported item-dates; "
+                                + outsideWindow
+                                + " outside booking windows; "
+                                + limited
+                                + " policy-limit or concurrent-allocation checks.";
+                message +=
+                        " Automatic readiness: "
+                                + readinessPublished
+                                + " guaranteed allocations marked ready. "
+                                + readinessUnitMismatches
+                                + " allocations skipped for inventory unit mismatch;"
+                                + " review affected dates and dishes in coverage"
+                                + " details.";
+                if (policyMaximum)
+                    message +=
+                            " Policy maximum mode: "
+                                    + maximumModeSkips
+                                    + " policies skipped because they are unavailable,"
+                                    + " unsupported or lack a usable maximum above the"
+                                    + " buffer.";
+                if (selectedPolicies == 0)
+                    message +=
+                            policyMaximum
+                                    ? " No usable policy maximums. Configure an online"
+                                            + " physical policy with a maximum greater"
+                                            + " than its safety buffer."
+                                    : " No dishes selected in the saved plan. Select"
+                                            + " dishes, enter daily quantities and save"
+                                            + " to generate inventory.";
+                if (activeDates == 0)
+                    message +=
+                            " No upcoming active regular pickup slots on selected"
+                                    + " weekdays in this range. Review Pickup scheduling;"
+                                    + " existing disabled or elapsed dates are preserved.";
+                message +=
+                        " Existing allocations are never replenished. Manual-review"
+                                + " drafts and staff readiness overrides are preserved.";
+                return message;
+            } finally {
+                MethodTiming.finish(started, RollingScheduleService.Coverage.class, "summary()");
+            }
+        }
+    }
+
+    /** Carries the date cursor and committed coverage across transaction boundaries. */
+    private static final class Reconciliation {
+        final long id;
+        final Coverage coverage = new Coverage();
+        final List<LocalDate> failedDates = new ArrayList<>();
+        Long version;
+        LocalDate date;
+        LocalDate end;
+        boolean completed;
+        boolean dateWorkStarted;
+        long waitMs;
+        long heldMs;
+        long lockedAt;
+
+        Reconciliation(long id, Long version, LocalDate date) {
+            this.id = id;
+            this.version = version;
+            this.date = date;
+            this.end = date;
+        }
+    }
+
     /** Runs only the reviewed saved version when supplied, preventing stale combined actions. */
     public void reconcile(long branchId, String trigger, String actor, Long expectedVersion) {
-        final long __gokulMethodStartedNanos =
+        final long started =
                 MethodTiming.start(
                         RollingScheduleService.class, "reconcile(long,String,String,Long)");
         try {
             long began = System.nanoTime();
-            long runId = diagnostics.start(branchId, trigger, actor);
-            long[] waitMs = {0}, heldSince = {0};
-            int[] counts = {0, 0};
-            boolean[] completed = {false};
-            String[] result = {"No enabled plan; nothing generated."};
-            var boundedTransaction = new TransactionTemplate(transactions.getTransactionManager());
-            boundedTransaction.setTimeout(300);
+            var bounded = new TransactionTemplate(transactions.getTransactionManager());
+            bounded.setTimeout(300);
+            Long runId = bounded.execute(tx -> diagnostics.tryStart(branchId, trigger, actor));
+            if (runId == null) {
+                if ("SCHEDULED".equals(trigger)) return;
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Generation is already in progress for this branch. Reload for its"
+                                + " status.");
+            }
+            var run =
+                    new Reconciliation(runId, expectedVersion, LocalDate.now(clock.withZone(IST)));
+            RuntimeException firstDateFailure = null;
             try {
-                boundedTransaction.executeWithoutResult(
-                        tx -> {
-                            long waiting = System.nanoTime();
-                            try {
-                                lock(branchId);
-                                heldSince[0] = System.nanoTime();
-                            } finally {
-                                waitMs[0] =
-                                        java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(
-                                                System.nanoTime() - waiting);
+                while (!run.date.isAfter(run.end)) {
+                    if (Thread.currentThread().isInterrupted())
+                        throw new IllegalStateException("Rolling execution was interrupted.");
+                    run.dateWorkStarted = false;
+                    try {
+                        Coverage day;
+                        try {
+                            day = bounded.execute(tx -> reconcileDate(branchId, run));
+                        } finally {
+                            if (run.lockedAt != 0) {
+                                run.heldMs += elapsedMs(run.lockedAt);
+                                run.lockedAt = 0;
                             }
-                            if (!Boolean.TRUE.equals(
-                                    jdbc.queryForObject(
-                                            "SELECT active AND operational FROM branches WHERE"
-                                                    + " id=?",
-                                            Boolean.class,
-                                            branchId)))
-                                throw new ResponseStatusException(
-                                        HttpStatus.CONFLICT,
-                                        "Branch must be active and operational.");
-                            var lockedPolicyIds = lockPolicies(branchId);
-                            var config = workspace(branchId);
-                            // A policy inserted after the lock scan is deferred to the next check.
-                            var lockedPolicies =
-                                    config.policies().stream()
-                                            .filter(p -> lockedPolicyIds.contains(p.id()))
-                                            .toList();
-                            var plan = config.plan();
-                            if (expectedVersion != null
-                                    && (plan == null || plan.version() != expectedVersion))
-                                throw new ResponseStatusException(
-                                        HttpStatus.CONFLICT,
-                                        "The saved setup changed. Reload and review it before"
-                                                + " generating stock.");
-                            if (plan == null || !plan.enabled()) return;
-                            jdbc.update(
-                                    "UPDATE rolling_branch_schedules SET last_attempt_at=now()"
-                                            + " WHERE branch_id=?",
-                                    branchId);
-                            LocalDateTime now = LocalDateTime.now(clock.withZone(IST));
-                            LocalDate today = now.toLocalDate();
-                            int slots = 0, allocations = 0, retained = 0, readinessPublished = 0;
-                            int activeDates = 0, noSlotDates = 0, existingAllocations = 0;
-                            int unavailable = 0,
-                                    outsideWindow = 0,
-                                    limited = 0,
-                                    readinessUnitMismatches = 0;
-                            var policyMap =
-                                    lockedPolicies.stream()
-                                            .collect(
-                                                    java.util.stream.Collectors.toMap(
-                                                            Policy::id, policy -> policy));
-                            // Maximum is the gross allocation. The existing approval service
-                            // withholds the policy buffer once; do not subtract it here.
-                            var effectiveTemplates =
-                                    plan.usePolicyMaximum()
-                                            ? lockedPolicies.stream()
-                                                    .filter(RollingScheduleService::usableMaximum)
-                                                    .map(
-                                                            p ->
-                                                                    new Template(
-                                                                            p.id(),
-                                                                            p.maximum(),
-                                                                            true))
-                                                    .toList()
-                                            : plan.templates();
-                            int maximumModeSkips =
-                                    plan.usePolicyMaximum()
-                                            ? config.policies().size() - effectiveTemplates.size()
-                                            : 0;
-                            for (int offset = 0; offset < plan.maintainDays(); offset++) {
-                                LocalDate date = today.plusDays(offset);
-                                if ((plan.weekdays() & (1 << (date.getDayOfWeek().getValue() - 1)))
-                                        == 0) continue;
-                                jdbc.update(
-                                        "INSERT INTO rolling_schedule_dates VALUES(?,?) ON CONFLICT"
-                                                + " DO NOTHING",
+                        }
+                        if (day == null) break;
+                        run.coverage.add(day);
+                        run.completed = true;
+                    } catch (DataIntegrityViolationException
+                            | InventoryConflictException
+                            | InventoryNotFoundException
+                            | PessimisticLockingFailureException
+                            | QueryTimeoutException
+                            | TransactionTimedOutException failure) {
+                        if (!run.dateWorkStarted) throw failure;
+                        run.failedDates.add(run.date);
+                        if (firstDateFailure == null) firstDateFailure = failure;
+                        // The date transaction has rolled back. Record activity without adding
+                        // counts.
+                        try {
+                            diagnostics.recordProgress(runId, 0, 0);
+                        } catch (RuntimeException progressFailure) {
+                            failure.addSuppressed(progressFailure);
+                            throw failure;
+                        }
+                    }
+                    run.date = run.date.plusDays(1);
+                }
+                if (firstDateFailure != null) throw firstDateFailure;
+            } catch (RuntimeException failure) {
+                String summary =
+                        (run.completed
+                                        ? "Completed dates were kept."
+                                        : "Generation failed before any date completed.")
+                                + (run.failedDates.isEmpty()
+                                        ? ""
+                                        : " Failed dates: " + run.failedDates + ".")
+                                + " Review setup and retry. Cause: "
+                                + (failure instanceof ResponseStatusException response
+                                        ? response.getReason()
+                                        : failure.getClass().getSimpleName());
+                try {
+                    bounded.executeWithoutResult(
+                            tx -> {
+                                // Release the run claim only when its branch summary is visible
+                                // too.
+                                if (diagnostics.finish(
+                                        runId,
                                         branchId,
-                                        date);
-                                // Disabled and manual intervals reserve their time too. Load once
-                                // per
-                                // date so repeat checks do not attempt an INSERT for every existing
-                                // slot.
-                                var intervals =
-                                        jdbc.query(
-                                                "SELECT start_time,end_time FROM pickup_slots WHERE"
-                                                        + " branch_id=? AND slot_date=? AND"
-                                                        + " occasion_enquiry_id IS NULL",
-                                                (rs, row) ->
-                                                        new SlotInterval(
-                                                                rs.getObject(1, LocalTime.class),
-                                                                rs.getObject(2, LocalTime.class)),
-                                                branchId,
-                                                date);
-                                int start = plan.openingTime().toSecondOfDay() / 60,
-                                        end = plan.closingTime().toSecondOfDay() / 60;
-                                for (int minute = start;
-                                        minute + plan.slotMinutes() <= end;
-                                        minute += plan.slotMinutes()) {
-                                    LocalTime from = LocalTime.of(minute / 60, minute % 60);
-                                    LocalTime to =
-                                            LocalTime.of(
-                                                    (minute + plan.slotMinutes()) / 60,
-                                                    (minute + plan.slotMinutes()) % 60);
-                                    if (date.equals(today) && !from.isAfter(now.toLocalTime()))
-                                        continue;
-                                    if (intervals.stream()
-                                            .anyMatch(
-                                                    interval ->
-                                                            interval.start().isBefore(to)
-                                                                    && interval.end()
-                                                                            .isAfter(from)))
-                                        continue;
-                                    slots +=
-                                            jdbc.update(
-                                                    """
+                                        "FAILED",
+                                        elapsedMs(began),
+                                        run.waitMs,
+                                        run.heldMs,
+                                        run.coverage.slots,
+                                        run.coverage.allocations,
+                                        summary)) {
+                                    jdbc.update(
+                                            "UPDATE rolling_branch_schedules SET"
+                                                    + " last_attempt_at=now(),last_message=? WHERE"
+                                                    + " branch_id=?",
+                                            summary,
+                                            branchId);
+                                }
+                            });
+                } catch (RuntimeException loggingFailure) {
+                    failure.addSuppressed(loggingFailure);
+                }
+                throw failure;
+            }
+            diagnostics.finish(
+                    runId,
+                    branchId,
+                    run.completed ? "SUCCESS" : "SKIPPED",
+                    elapsedMs(began),
+                    run.waitMs,
+                    run.heldMs,
+                    run.coverage.slots,
+                    run.coverage.allocations,
+                    run.completed ? run.coverage.summary() : "No enabled plan; nothing generated.");
+        } finally {
+            MethodTiming.finish(
+                    started, RollingScheduleService.class, "reconcile(long,String,String,Long)");
+        }
+    }
+
+    /** Converts a monotonic timestamp to elapsed milliseconds. */
+    private static long elapsedMs(long start) {
+        final long started = MethodTiming.start(RollingScheduleService.class, "elapsedMs(long)");
+        try {
+            return java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+        } finally {
+            MethodTiming.finish(started, RollingScheduleService.class, "elapsedMs(long)");
+        }
+    }
+
+    /** Locks and reconciles one service date, retaining the normal inventory audit path. */
+    private Coverage reconcileDate(long branchId, Reconciliation run) {
+        final long started =
+                MethodTiming.start(
+                        RollingScheduleService.class, "reconcileDate(long,Reconciliation)");
+        try {
+            long waiting = System.nanoTime();
+            try {
+                lock(branchId);
+                run.lockedAt = System.nanoTime();
+            } finally {
+                run.waitMs += elapsedMs(waiting);
+            }
+            if (!Boolean.TRUE.equals(
+                    jdbc.queryForObject(
+                            "SELECT active AND operational FROM branches WHERE" + " id=?",
+                            Boolean.class,
+                            branchId)))
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT, "Branch must be active and operational.");
+            var lockedPolicyIds = lockPolicies(branchId);
+            var config = workspace(branchId);
+            // A policy inserted after the lock scan is deferred to the next check.
+            var lockedPolicies =
+                    config.policies().stream()
+                            .filter(p -> lockedPolicyIds.contains(p.id()))
+                            .toList();
+            var plan = config.plan();
+            if (run.version != null && (plan == null || plan.version() != run.version))
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "The saved setup changed. Reload and review it before"
+                                + " generating stock.");
+            if (plan == null || !plan.enabled()) return null;
+            run.version = plan.version();
+            LocalDateTime now = LocalDateTime.now(clock.withZone(IST));
+            LocalDate today = now.toLocalDate();
+            if (run.date.isBefore(today)) run.date = today;
+            run.end = today.plusDays(plan.maintainDays() - 1L);
+            if (!run.completed && run.failedDates.isEmpty())
+                jdbc.update(
+                        "UPDATE rolling_branch_schedules SET last_attempt_at=now()"
+                                + " WHERE branch_id=?",
+                        branchId);
+
+            run.dateWorkStarted = true;
+            Coverage day = reconcileCoverage(branchId, run.date, now, config, plan, lockedPolicies);
+            diagnostics.recordProgress(run.id, day.slots, day.allocations);
+            // A date may itself take long enough to cross midnight.
+            run.end = LocalDate.now(clock.withZone(IST)).plusDays(plan.maintainDays() - 1L);
+            if (!run.date.isBefore(run.end) && run.failedDates.isEmpty()) {
+                var total = new Coverage();
+                total.add(run.coverage);
+                total.add(day);
+                jdbc.update(
+                        "UPDATE rolling_branch_schedules SET"
+                            + " last_success_at=clock_timestamp(),last_message=? WHERE branch_id=?",
+                        total.summary(),
+                        branchId);
+            }
+            return day;
+        } finally {
+            MethodTiming.finish(
+                    started, RollingScheduleService.class, "reconcileDate(long,Reconciliation)");
+        }
+    }
+
+    /** Reconciles the selected date using the current locked branch and policies. */
+    private Coverage reconcileCoverage(
+            long branchId,
+            LocalDate date,
+            LocalDateTime now,
+            Workspace config,
+            Plan plan,
+            List<Policy> lockedPolicies) {
+        final long started =
+                MethodTiming.start(
+                        RollingScheduleService.class,
+                        "reconcileCoverage(long,LocalDate,LocalDateTime,Workspace,Plan,List<Policy>)");
+        try {
+            var coverage = new Coverage();
+            var policyMap =
+                    lockedPolicies.stream()
+                            .collect(
+                                    java.util.stream.Collectors.toMap(
+                                            Policy::id, policy -> policy));
+            // Maximum is the gross allocation. The existing approval service
+            // withholds the policy buffer once; do not subtract it here.
+            var effectiveTemplates =
+                    plan.usePolicyMaximum()
+                            ? lockedPolicies.stream()
+                                    .filter(RollingScheduleService::usableMaximum)
+                                    .map(p -> new Template(p.id(), p.maximum(), true))
+                                    .toList()
+                            : plan.templates();
+            int maximumModeSkips =
+                    plan.usePolicyMaximum()
+                            ? config.policies().size() - effectiveTemplates.size()
+                            : 0;
+            coverage.selectedPolicies = effectiveTemplates.size();
+            coverage.maximumModeSkips = maximumModeSkips;
+            coverage.policyMaximum = plan.usePolicyMaximum();
+            LocalDate today = now.toLocalDate();
+            long daysAhead = java.time.temporal.ChronoUnit.DAYS.between(today, date);
+            if ((plan.weekdays() & (1 << (date.getDayOfWeek().getValue() - 1))) == 0)
+                return coverage;
+            jdbc.update(
+                    "INSERT INTO rolling_schedule_dates VALUES(?,?) ON CONFLICT" + " DO NOTHING",
+                    branchId,
+                    date);
+            // Disabled and manual intervals reserve their time too. Load once
+            // per
+            // date so repeat checks do not attempt an INSERT for every existing
+            // slot.
+            var intervals =
+                    jdbc.query(
+                            "SELECT start_time,end_time FROM pickup_slots WHERE"
+                                    + " branch_id=? AND slot_date=? AND"
+                                    + " occasion_enquiry_id IS NULL",
+                            (rs, row) ->
+                                    new SlotInterval(
+                                            rs.getObject(1, LocalTime.class),
+                                            rs.getObject(2, LocalTime.class)),
+                            branchId,
+                            date);
+            int start = plan.openingTime().toSecondOfDay() / 60,
+                    end = plan.closingTime().toSecondOfDay() / 60;
+            for (int minute = start;
+                    minute + plan.slotMinutes() <= end;
+                    minute += plan.slotMinutes()) {
+                LocalTime from = LocalTime.of(minute / 60, minute % 60);
+                LocalTime to =
+                        LocalTime.of(
+                                (minute + plan.slotMinutes()) / 60,
+                                (minute + plan.slotMinutes()) % 60);
+                if (date.equals(today) && !from.isAfter(now.toLocalTime())) continue;
+                if (intervals.stream()
+                        .anyMatch(
+                                interval ->
+                                        interval.start().isBefore(to)
+                                                && interval.end().isAfter(from))) continue;
+                coverage.slots +=
+                        jdbc.update(
+                                """
 INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity,booked_count,
 priority_enabled,priority_capacity,priority_booked_count,priority_charge,active,rolling_generated)
 VALUES(?,?,?,?,?,0,FALSE,0,0,0,TRUE,TRUE) ON CONFLICT DO NOTHING
 """,
-                                                    branchId,
-                                                    date,
-                                                    from,
-                                                    to,
-                                                    plan.capacity());
-                                }
-                                var first =
-                                        jdbc.query(
-                                                """
+                                branchId,
+                                date,
+                                from,
+                                to,
+                                plan.capacity());
+            }
+            var first =
+                    jdbc.query(
+                            """
 SELECT min(start_time) FROM pickup_slots WHERE branch_id=? AND slot_date=? AND active
 AND occasion_enquiry_id IS NULL AND (slot_date<>? OR start_time>?)
 """,
-                                                rs ->
-                                                        rs.next()
-                                                                ? rs.getObject(1, LocalTime.class)
-                                                                : null,
-                                                branchId,
-                                                date,
-                                                today,
-                                                now.toLocalTime());
-                                if (first == null) {
-                                    noSlotDates++;
-                                    continue;
-                                }
-                                activeDates++;
-                                var existing =
-                                        new java.util.HashSet<>(
-                                                jdbc.queryForList(
-                                                        "SELECT a.branch_product_id FROM"
-                                                            + " inventory_daily_allocations a JOIN"
-                                                            + " branch_products bp ON"
-                                                            + " bp.id=a.branch_product_id WHERE"
-                                                            + " bp.branch_id=? AND"
-                                                            + " a.service_date=?",
-                                                        Long.class,
-                                                        branchId,
-                                                        date));
-                                var readinessCandidates =
-                                        plan.autoReady()
-                                                ? new java.util.HashSet<>(
-                                                        jdbc.queryForList(
-                                                                "SELECT branch_product_id FROM"
-                                                                    + " inventory_daily_allocations"
-                                                                    + " WHERE service_date=? AND"
-                                                                    + " branch_product_id IN"
-                                                                    + " (SELECT id FROM"
-                                                                    + " branch_products WHERE"
-                                                                    + " branch_id=?) AND"
-                                                                    + " status='APPROVED' AND"
-                                                                    + " approved_by='SYSTEM_ROLLING_AUTOMATION'"
-                                                                    + " AND ready_quantity=0 AND"
-                                                                    + " actual_ready_at IS NULL AND"
-                                                                    + " held_quantity=0 AND"
-                                                                    + " committed_quantity=0 AND"
-                                                                    + " wasted_quantity=0",
-                                                                Long.class,
-                                                                date,
-                                                                branchId))
-                                                : java.util.Set.<Long>of();
-                                for (var template : effectiveTemplates) {
-                                    var policy = policyMap.get(template.policyId());
-                                    if (policy == null || !policy.eligible()) {
-                                        unavailable++;
-                                        retained++;
-                                        continue;
-                                    }
-                                    if (existing.contains(policy.branchProductId())) {
-                                        if (readinessCandidates.contains(policy.branchProductId())
-                                                && template.autoApprove()
-                                                && policy.readyStockRequired()
-                                                && offset <= policy.bookingDays()
-                                                && offset <= features.getFutureOrderingDays()) {
-                                            var recovery = publishUntouchedReadiness(policy, date);
-                                            if (recovery == ReadinessRecovery.PUBLISHED)
-                                                readinessPublished++;
-                                            if (recovery == ReadinessRecovery.UNIT_MISMATCH)
-                                                readinessUnitMismatches++;
-                                        }
-                                        existingAllocations++;
-                                        retained++;
-                                        continue;
-                                    }
-                                    if (offset > policy.bookingDays()
-                                            || offset > features.getFutureOrderingDays()) {
-                                        outsideWindow++;
-                                        retained++;
-                                        continue;
-                                    }
-                                    int inserted =
-                                            jdbc.update(
-                                                    """
+                            rs -> rs.next() ? rs.getObject(1, LocalTime.class) : null,
+                            branchId,
+                            date,
+                            today,
+                            now.toLocalTime());
+            if (first == null) {
+                coverage.noSlotDates++;
+                return coverage;
+            }
+            coverage.activeDates++;
+            var existing =
+                    new java.util.HashSet<>(
+                            jdbc.queryForList(
+                                    "SELECT a.branch_product_id FROM"
+                                            + " inventory_daily_allocations a JOIN"
+                                            + " branch_products bp ON"
+                                            + " bp.id=a.branch_product_id WHERE"
+                                            + " bp.branch_id=? AND"
+                                            + " a.service_date=?",
+                                    Long.class,
+                                    branchId,
+                                    date));
+            var readinessCandidates =
+                    plan.autoReady()
+                            ? new java.util.HashSet<>(
+                                    jdbc.queryForList(
+                                            "SELECT branch_product_id FROM"
+                                                    + " inventory_daily_allocations"
+                                                    + " WHERE service_date=? AND"
+                                                    + " branch_product_id IN"
+                                                    + " (SELECT id FROM"
+                                                    + " branch_products WHERE"
+                                                    + " branch_id=?) AND"
+                                                    + " status='APPROVED' AND"
+                                                    + " approved_by='SYSTEM_ROLLING_AUTOMATION'"
+                                                    + " AND ready_quantity=0 AND"
+                                                    + " actual_ready_at IS NULL AND"
+                                                    + " held_quantity=0 AND"
+                                                    + " committed_quantity=0 AND"
+                                                    + " wasted_quantity=0",
+                                            Long.class,
+                                            date,
+                                            branchId))
+                            : java.util.Set.<Long>of();
+            for (var template : effectiveTemplates) {
+                var policy = policyMap.get(template.policyId());
+                if (policy == null || !policy.eligible()) {
+                    coverage.unavailable++;
+                    coverage.retained++;
+                    continue;
+                }
+                if (existing.contains(policy.branchProductId())) {
+                    if (readinessCandidates.contains(policy.branchProductId())
+                            && template.autoApprove()
+                            && policy.readyStockRequired()
+                            && daysAhead <= policy.bookingDays()
+                            && daysAhead <= features.getFutureOrderingDays()) {
+                        var recovery = publishUntouchedReadiness(policy, date);
+                        if (recovery == ReadinessRecovery.PUBLISHED) coverage.readinessPublished++;
+                        if (recovery == ReadinessRecovery.UNIT_MISMATCH)
+                            coverage.readinessUnitMismatches++;
+                    }
+                    coverage.existingAllocations++;
+                    coverage.retained++;
+                    continue;
+                }
+                if (daysAhead > policy.bookingDays()
+                        || daysAhead > features.getFutureOrderingDays()) {
+                    coverage.outsideWindow++;
+                    coverage.retained++;
+                    continue;
+                }
+                int inserted =
+                        jdbc.update(
+                                """
 INSERT INTO inventory_daily_allocations(branch_product_id,service_date,status,inventory_unit,
 forecast_quantity,safety_buffer_quantity,expected_ready_at,note,created_at,updated_at)
 SELECT p.branch_product_id,?,'DRAFT',p.inventory_unit,?,p.default_safety_buffer,?,
@@ -759,158 +1030,43 @@ AND NOT bp.occasion_only AND ? > p.default_safety_buffer
 AND (p.maximum_daily_allocation IS NULL OR ?<=p.maximum_daily_allocation)
 ON CONFLICT(branch_product_id,service_date) DO NOTHING
 """,
-                                                    date,
-                                                    template.quantity(),
-                                                    date.atTime(first),
-                                                    template.policyId(),
-                                                    branchId,
-                                                    template.quantity(),
-                                                    template.quantity());
-                                    if (inserted == 0) {
-                                        limited++;
-                                        retained++;
-                                        continue;
-                                    }
-                                    if (template.autoApprove()) {
-                                        inventory.approveAllocation(
-                                                policy.branchProductId(),
-                                                date,
-                                                new AdminAllocationApprovalRequest(
-                                                        template.quantity(),
-                                                        null,
-                                                        null,
-                                                        null,
-                                                        date.atTime(first),
-                                                        "Guaranteed quantity from separate rolling"
-                                                                + " automation"),
-                                                "SYSTEM_ROLLING_AUTOMATION");
-                                        if (plan.autoReady() && policy.readyStockRequired()) {
-                                            publishReadiness(
-                                                    policy,
-                                                    date,
-                                                    template.quantity(),
-                                                    date.atTime(first));
-                                            readinessPublished++;
-                                        }
-                                    }
-                                    allocations++;
-                                }
-                            }
-                            String message =
-                                    slots
-                                            + " slots created; "
-                                            + allocations
-                                            + " allocations created; "
-                                            + retained
-                                            + " item-dates unchanged. "
-                                            + effectiveTemplates.size()
-                                            + " selected policies; "
-                                            + activeDates
-                                            + " dates with upcoming regular pickup slots; "
-                                            + noSlotDates
-                                            + " selected dates without upcoming regular slots."
-                                            + " Skips: "
-                                            + existingAllocations
-                                            + " existing allocations; "
-                                            + unavailable
-                                            + " unavailable/offline/unsupported item-dates; "
-                                            + outsideWindow
-                                            + " outside booking windows; "
-                                            + limited
-                                            + " policy-limit or concurrent-allocation checks.";
-                            message +=
-                                    " Automatic readiness: "
-                                            + readinessPublished
-                                            + " guaranteed allocations marked ready. "
-                                            + readinessUnitMismatches
-                                            + " allocations skipped for inventory unit mismatch;"
-                                            + " review affected dates and dishes in coverage"
-                                            + " details.";
-                            if (plan.usePolicyMaximum())
-                                message +=
-                                        " Policy maximum mode: "
-                                                + maximumModeSkips
-                                                + " policies skipped because they are unavailable,"
-                                                + " unsupported or lack a usable maximum above the"
-                                                + " buffer.";
-                            if (effectiveTemplates.isEmpty())
-                                message +=
-                                        plan.usePolicyMaximum()
-                                                ? " No usable policy maximums. Configure an online"
-                                                        + " physical policy with a maximum greater"
-                                                        + " than its safety buffer."
-                                                : " No dishes selected in the saved plan. Select"
-                                                        + " dishes, enter daily quantities and save"
-                                                        + " to generate inventory.";
-                            if (activeDates == 0)
-                                message +=
-                                        " No upcoming active regular pickup slots on selected"
-                                            + " weekdays in this range. Review Pickup scheduling;"
-                                            + " existing disabled or elapsed dates are preserved.";
-                            message +=
-                                    " Existing allocations are never replenished. Manual-review"
-                                        + " drafts and staff readiness overrides are preserved.";
-                            jdbc.update(
-                                    "UPDATE rolling_branch_schedules SET"
-                                        + " last_success_at=clock_timestamp(),last_message=? WHERE"
-                                        + " branch_id=?",
-                                    message,
-                                    branchId);
-                            completed[0] = true;
-                            counts[0] = slots;
-                            counts[1] = allocations;
-                            result[0] = message;
-                        });
-            } catch (RuntimeException failure) {
-                String failureSummary =
-                        "Generation failed; new branch changes were rolled back. Review setup and"
-                                + " retry. Cause: "
-                                + (failure instanceof ResponseStatusException response
-                                        ? response.getReason()
-                                        : failure.getClass().getSimpleName());
-                try {
-                    jdbc.update(
-                            "UPDATE rolling_branch_schedules SET"
-                                    + " last_attempt_at=now(),last_message=? WHERE branch_id=?",
-                            failureSummary,
-                            branchId);
-                    diagnostics.finish(
-                            runId,
-                            branchId,
-                            "FAILED",
-                            java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(
-                                    System.nanoTime() - began),
-                            waitMs[0],
-                            heldSince[0] == 0
-                                    ? 0
-                                    : java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(
-                                            System.nanoTime() - heldSince[0]),
-                            0,
-                            0,
-                            failureSummary);
-                } catch (RuntimeException loggingFailure) {
-                    failure.addSuppressed(loggingFailure);
+                                date,
+                                template.quantity(),
+                                date.atTime(first),
+                                template.policyId(),
+                                branchId,
+                                template.quantity(),
+                                template.quantity());
+                if (inserted == 0) {
+                    coverage.limited++;
+                    coverage.retained++;
+                    continue;
                 }
-                throw failure;
+                if (template.autoApprove()) {
+                    inventory.approveAllocation(
+                            policy.branchProductId(),
+                            date,
+                            new AdminAllocationApprovalRequest(
+                                    template.quantity(),
+                                    null,
+                                    null,
+                                    null,
+                                    date.atTime(first),
+                                    "Guaranteed quantity from separate rolling" + " automation"),
+                            "SYSTEM_ROLLING_AUTOMATION");
+                    if (plan.autoReady() && policy.readyStockRequired()) {
+                        publishReadiness(policy, date, template.quantity(), date.atTime(first));
+                        coverage.readinessPublished++;
+                    }
+                }
+                coverage.allocations++;
             }
-            diagnostics.finish(
-                    runId,
-                    branchId,
-                    completed[0] ? "SUCCESS" : "SKIPPED",
-                    java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - began),
-                    waitMs[0],
-                    heldSince[0] == 0
-                            ? 0
-                            : java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(
-                                    System.nanoTime() - heldSince[0]),
-                    counts[0],
-                    counts[1],
-                    result[0]);
+            return coverage;
         } finally {
             MethodTiming.finish(
-                    __gokulMethodStartedNanos,
+                    started,
                     RollingScheduleService.class,
-                    "reconcile(long,String,String,Long)");
+                    "reconcileCoverage(long,LocalDate,LocalDateTime,Workspace,Plan,List<Policy>)");
         }
     }
 

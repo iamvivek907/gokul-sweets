@@ -14,7 +14,7 @@ const browser=await chromium.launch({headless:true});
 try{for(const width of [320,390,1280]){
  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();page.setDefaultTimeout(15000);
  await page.clock.install({time:new Date(`${today}T22:00:00+05:30`)});
- let outage=false,holdDiscovery=false,release=null,discoveries=0;const checks=[],errors=[];page.on('pageerror',e=>errors.push(e.message));
+ let outage=false,holdDiscovery=false,release=null,discoveries=0;const dateDiscoveryGates=[];let holdDateDiscovery=false;const checks=[],errors=[];page.on('pageerror',e=>errors.push(e.message));
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key'};
  await context.route('**/api/**',async route=>{
   const request=route.request(),path=new URL(request.url()).pathname;let json=[];
@@ -27,6 +27,7 @@ try{for(const width of [320,390,1280]){
   else if(path==='/api/storefront/customer-identity')json={enabled:false};
   else if(path.endsWith('/pickup-discovery')){
    discoveries++;
+   if(holdDateDiscovery)await new Promise(resolve=>dateDiscoveryGates.push(resolve));
    if(holdDiscovery){holdDiscovery=false;await new Promise(resolve=>{release=resolve;});}
    if(outage)return route.fulfill({status:503,headers,json:{message:'Offline'}});
    json={today,maximumDate:later,dates:[today,tomorrow,later].map((date,index)=>({date,slots:[{slot:slot(date,index+1),normalAvailable:true,issues:[]}]}))};
@@ -119,14 +120,33 @@ try{for(const width of [320,390,1280]){
   localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date:today}));
   localStorage.setItem('gokul-menu-pickup-mode:v1',JSON.stringify({branchId:1,mode:'fixed',pickup:''}));
  },today);
- holdDiscovery=true;release=null;await page.reload();
- const dateDeadline=Date.now()+15000;while(!release&&Date.now()<dateDeadline)await page.waitForTimeout(50);assert.ok(release,'date-only recovery verification started');
- const oldRelease=release,beforeDateChange=discoveries;
- await page.evaluate(date=>{localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date}));window.dispatchEvent(new Event('storage'));},later);
- await pickup.getByText(/Tomorrow, .*8:00/).waitFor();
- assert.ok(discoveries>beforeDateChange,'date intent alone restarts discovery');
- assert.equal((await saved()).date,tomorrow,'replacement verification completes without waiting for the old response');
- oldRelease();await page.waitForTimeout(600);
+ // Startup may replace its first discovery as the catalog hydrates. Hold every
+ // request from the old intent so none can save a slot before the date changes.
+ holdDateDiscovery=true;await page.reload();
+ const dateDeadline=Date.now()+15000;
+ while(!dateDiscoveryGates.length&&Date.now()<dateDeadline)await page.waitForTimeout(50);
+ assert.ok(dateDiscoveryGates.length,'date-only recovery verification started');
+ assert.equal(await saved(),null,'no old-intent response has saved a slot');
+ try {
+  const previousIntent=await page.evaluate(date=>{
+   const key='gokul-pickup-intent';
+   const previous=localStorage.getItem(key);
+   localStorage.setItem(key,JSON.stringify({branchId:1,date}));
+   return previous;
+  },later);
+  const beforeDateChange=discoveries;
+  holdDateDiscovery=false;
+  await page.evaluate(oldValue=>{
+   const key='gokul-pickup-intent';
+   window.dispatchEvent(new StorageEvent('storage',{key,oldValue,newValue:localStorage.getItem(key),storageArea:localStorage}));
+  },previousIntent);
+  await pickup.getByText(/Tomorrow, .*8:00/).waitFor();
+  assert.ok(discoveries>beforeDateChange,'date intent alone restarts discovery');
+  assert.equal((await saved()).date,tomorrow,'replacement verification completes without waiting for the old responses');
+ } finally {
+  for(const releaseOldDiscovery of dateDiscoveryGates)releaseOldDiscovery();
+ }
+ await page.waitForTimeout(600);
  assert.equal((await saved()).date,tomorrow);
  assert.equal(await pickup.getByText('Finding soonest pickup…',{exact:true}).count(),0);
  await page.waitForFunction(()=>document.querySelector('button[aria-label="Add Aloo Paratha to cart"]')?.disabled===false);
