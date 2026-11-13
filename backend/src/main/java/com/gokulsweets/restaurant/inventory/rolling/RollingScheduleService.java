@@ -674,9 +674,19 @@ WHERE bp.branch_id=? ORDER BY p.id FOR NO KEY UPDATE OF p
             RuntimeException firstDateFailure = null;
             try {
                 while (!run.date.isAfter(run.end)) {
+                    if (Thread.currentThread().isInterrupted())
+                        throw new IllegalStateException("Rolling execution was interrupted.");
                     run.dateWorkStarted = false;
                     try {
-                        Coverage day = bounded.execute(tx -> reconcileDate(branchId, run));
+                        Coverage day;
+                        try {
+                            day = bounded.execute(tx -> reconcileDate(branchId, run));
+                        } finally {
+                            if (run.lockedAt != 0) {
+                                run.heldMs += elapsedMs(run.lockedAt);
+                                run.lockedAt = 0;
+                            }
+                        }
                         if (day == null) break;
                         run.coverage.add(day);
                         run.completed = true;
@@ -689,10 +699,13 @@ WHERE bp.branch_id=? ORDER BY p.id FOR NO KEY UPDATE OF p
                         if (!run.dateWorkStarted) throw failure;
                         run.failedDates.add(run.date);
                         if (firstDateFailure == null) firstDateFailure = failure;
-                    } finally {
-                        if (run.lockedAt != 0) {
-                            run.heldMs += elapsedMs(run.lockedAt);
-                            run.lockedAt = 0;
+                        // The date transaction has rolled back. Record activity without adding
+                        // counts.
+                        try {
+                            diagnostics.recordProgress(runId, 0, 0);
+                        } catch (RuntimeException progressFailure) {
+                            failure.addSuppressed(progressFailure);
+                            throw failure;
                         }
                     }
                     run.date = run.date.plusDays(1);

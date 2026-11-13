@@ -71,7 +71,8 @@ old future slots when the horizon shrinks. Review those through manual schedulin
 
 ## Recovery and operations
 
-The worker runs once daily at midnight (12:00 AM) in Asia/Kolkata. There is no startup
+The worker starts once daily at midnight (12:00 AM) in Asia/Kolkata on a dedicated
+thread. It processes one batch at a time so other scheduled jobs can run. There is no startup
 run or interval polling. Configuration changes after that run wait until the next daily
 run unless an admin triggers Generate missing coverage now using saved settings.
 Each service date commits its slots, allocations, ledger entries and run progress together.
@@ -176,10 +177,11 @@ access disable retry. Paused plans do not raise overdue alerts.
 History records scheduled/manual triggers, authenticated staff username or system actor,
 start/finish times, result, created counts, elapsed time, lock wait and lock-held time. Keep the
 latest thirty completed runs per branch plus in-progress runs; the API returns at most thirty
-recent entries. Counts from committed dates survive restarts. Health warns after ten minutes
-without progress. The next invocation marks a run failed after an hour without progress.
-For runs with no committed progress, both thresholds use the start time. Earlier last-success
-timestamps remain valid after upgrade.
+recent entries. Counts from committed dates survive restarts. Successful and failed date
+attempts both refresh run activity. Health warns after ten minutes without activity. The next
+invocation marks a run failed after an hour without activity. Both thresholds use the start time
+until the first date attempt finishes. Coverage health stays in progress while any run is active.
+Earlier last-success timestamps remain valid after upgrade.
 
 Each date transaction has a five-minute deadline. Run timing sums the branch lock wait and hold
 times across dates. The worker rechecks the saved plan version under the branch lock before each

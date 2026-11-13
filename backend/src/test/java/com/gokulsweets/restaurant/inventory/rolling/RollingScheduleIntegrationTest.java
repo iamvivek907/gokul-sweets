@@ -1277,6 +1277,43 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
     }
 
     @Test
+    void failedDateActivityKeepsAnOlderRunVisibleBehindNewerFailures() {
+        var f = fixture();
+        service.save(f.branch(), maximumPlan(-1, 2), "manager");
+        var now = clock.instant();
+        var oldAudit =
+                new RollingAutomationDiagnostics(
+                        jdbc, Clock.fixed(now.minusSeconds(1200), clock.getZone()), features);
+        var audit = new RollingAutomationDiagnostics(jdbc, clock, features);
+        long activeId = oldAudit.start(f.branch(), "SCHEDULED", "system");
+        oldAudit.recordProgress(activeId, 4, 2);
+        assertThat(service.inspect(f.branch()).health().interrupted()).isTrue();
+
+        // An attempt rolled back, so only its activity timestamp is refreshed.
+        audit.recordProgress(activeId, 0, 0);
+        for (int i = 0; i < 31; i++) {
+            long failedId = audit.start(f.branch(), "MANUAL", "manager");
+            audit.finish(failedId, f.branch(), "FAILED", 0, 0, 0, 0, 0, "Saved plan changed");
+        }
+        var workspace = service.inspect(f.branch());
+        assertThat(workspace.runs()).noneMatch(run -> run.id() == activeId);
+        assertThat(workspace.health().status()).isEqualTo("RUNNING");
+        assertThat(workspace.health().lastRunFailed()).isFalse();
+        assertThat(workspace.health().interrupted()).isFalse();
+        assertThat(workspace.health().overdue()).isFalse();
+        assertThat(
+                        jdbc.queryForMap(
+                                "SELECT slots_created, allocations_created FROM"
+                                        + " rolling_automation_runs WHERE id=?",
+                                activeId))
+                .containsEntry("slots_created", 4)
+                .containsEntry("allocations_created", 2);
+
+        audit.finish(activeId, f.branch(), "SUCCESS", 1200000, 0, 0, 4, 2, "Coverage checked");
+        assertThat(service.inspect(f.branch()).health().lastRunFailed()).isTrue();
+    }
+
+    @Test
     @Transactional(
             propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     void durableRunStartDoesNotWaitForAnUncommittedSlotWriter() throws Exception {

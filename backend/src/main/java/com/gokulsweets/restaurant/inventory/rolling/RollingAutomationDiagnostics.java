@@ -62,6 +62,9 @@ public class RollingAutomationDiagnostics {
     /** Existing allocation state; quantities and operational overrides remain authoritative. */
     private record Allocation(long product, LocalDate date, String status, String unit) {}
 
+    /** Branch-wide execution status, independent of the size of the history response. */
+    private record ExecutionHealth(Instant enabledSince, Instant lastSuccess, boolean running) {}
+
     /** Starts a durable execution before taking the transactional branch lock. */
     public long start(long branch, String trigger, String actor) {
         final long started =
@@ -90,7 +93,7 @@ public class RollingAutomationDiagnostics {
         }
     }
 
-    /** Persists progress in the same transaction as the corresponding date's coverage. */
+    /** Records a committed date's counts or refreshes activity after a failed date rolls back. */
     public void recordProgress(long id, int slots, int allocations) {
         final long started =
                 MethodTiming.start(
@@ -358,36 +361,50 @@ public class RollingAutomationDiagnostics {
                 }
             }
             var midnight = today.atStartOfDay(IST).toInstant();
-            var timestamps =
+            var staleBefore = now.toInstant().minusSeconds(600);
+            var execution =
                     jdbc.query(
-                            "SELECT s.enabled_since_at,GREATEST(s.last_success_at,"
-                                    + " (SELECT max(r.finished_at) FROM rolling_automation_runs r"
-                                    + " WHERE r.branch_id=s.branch_id AND r.status='SUCCESS'))"
-                                    + " FROM rolling_branch_schedules s WHERE s.branch_id=?",
+                            """
+                            SELECT s.enabled_since_at,
+                                GREATEST(s.last_success_at, (
+                                    SELECT max(r.finished_at) FROM rolling_automation_runs r
+                                    WHERE r.branch_id=s.branch_id AND r.status='SUCCESS'
+                                )),
+                                EXISTS (
+                                    SELECT 1 FROM rolling_automation_runs r
+                                    WHERE r.branch_id=s.branch_id AND r.status='RUNNING'
+                                      AND COALESCE(r.last_progress_at, r.started_at)>=?
+                                )
+                            FROM rolling_branch_schedules s WHERE s.branch_id=?
+                            """,
                             rs -> {
-                                if (!rs.next()) return new Instant[] {clock.instant(), null};
+                                if (!rs.next())
+                                    return new ExecutionHealth(now.toInstant(), null, false);
                                 var success = rs.getTimestamp(2);
-                                return new Instant[] {
-                                    rs.getTimestamp(1).toInstant(),
-                                    success == null ? null : success.toInstant()
-                                };
+                                return new ExecutionHealth(
+                                        rs.getTimestamp(1).toInstant(),
+                                        success == null ? null : success.toInstant(),
+                                        rs.getBoolean(3));
                             },
+                            java.sql.Timestamp.from(staleBefore),
                             branch);
+            boolean running = execution.running();
             boolean overdue =
-                    !now.toInstant().isBefore(midnight.plusSeconds(900))
-                            && timestamps[0].isBefore(midnight)
-                            && (timestamps[1] == null || timestamps[1].isBefore(midnight));
+                    !running
+                            && !now.toInstant().isBefore(midnight.plusSeconds(900))
+                            && execution.enabledSince().isBefore(midnight)
+                            && (execution.lastSuccess() == null
+                                    || execution.lastSuccess().isBefore(midnight));
             var latest = runs.isEmpty() ? null : runs.getFirst();
             boolean interrupted =
-                    latest != null
+                    !running
+                            && latest != null
                             && latest.status().equals("RUNNING")
                             && Instant.parse(
                                             Objects.requireNonNullElse(
                                                     latest.lastProgressAt(), latest.startedAt()))
-                                    .isBefore(clock.instant().minusSeconds(600));
-            boolean running = latest != null && latest.status().equals("RUNNING") && !interrupted;
-            boolean failed = latest != null && latest.status().equals("FAILED");
-            overdue = overdue && !running;
+                                    .isBefore(staleBefore);
+            boolean failed = !running && latest != null && latest.status().equals("FAILED");
             boolean attention =
                     overdue
                             || failed
