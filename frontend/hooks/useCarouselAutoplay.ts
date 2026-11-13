@@ -1,7 +1,7 @@
 "use client";
 import {useEffect,useLayoutEffect,useRef,type RefObject} from 'react';
 /** Timed scrolling never runs offscreen, in the background, during interaction or reduced motion. */
-export function useCarouselAutoplay(ref:RefObject<HTMLElement|null>,count:number,advance:()=>void,paused=false){
+export function useCarouselAutoplay(ref:RefObject<HTMLElement|null>,count:number,advance:()=>void,paused=false,mountHost?:HTMLElement|null){
  const callback=useRef(advance),manualPause=useRef<(()=>void)|null>(null);
  useLayoutEffect(()=>{callback.current=advance;},[advance]);
  useEffect(()=>{
@@ -27,6 +27,7 @@ export function useCarouselAutoplay(ref:RefObject<HTMLElement|null>,count:number
   window.addEventListener('pointerup',up);window.addEventListener('pointercancel',up);
   timer=setTimeout(tick,4500);
   return()=>{clearTimeout(timer);if(manualPause.current===pauseForInteraction)manualPause.current=null;observer.disconnect();node.removeEventListener('pointerenter',enter);node.removeEventListener('pointerleave',leave);node.removeEventListener('pointerdown',down);node.removeEventListener('wheel',interact);node.removeEventListener('focusout',interact);window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',up);};
- },[ref,count,paused]);
+ // A portal can replace the rail without changing the ref object or item count.
+ },[ref,count,paused,mountHost]);
  return ()=>manualPause.current?.();
 }

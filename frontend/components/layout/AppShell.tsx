@@ -4,7 +4,6 @@ import BadgeCelebration from "@/components/customer/BadgeCelebration";
 import "@/components/customer/badges.css";
 
 import {usePathname} from "next/navigation";
-import {T} from "@/lib/language";
 import {useEffect, useState, type ReactNode} from "react";
 
 import BranchOperationalGuard from "./BranchOperationalGuard";
@@ -121,17 +120,6 @@ export default function AppShell({
                 {tourAllowed && <OrderingTour key={pathname} pathname={pathname} onActivityChange={setOrderingGuideActive} />}
                 {!orderingGuideActive && <NotificationOptIn />}
                 {futuristic && features?.truthfulOrderTracking && (pathname === "/" || pathname === "/menu" || /^\/branches\/\d+$/.test(pathname)) && <ActiveOrderShortcut />}
-                {pathname === "/menu" && tourAllowed && !orderingGuideActive && (
-                    <div className="flex justify-end px-3">
-                        <button
-                            type="button"
-                            className="min-h-11 rounded-full border border-[#ead7df] bg-white px-3 text-sm font-semibold text-[#841638] focus-visible:outline-2 focus-visible:outline-offset-2"
-                            onClick={() => window.dispatchEvent(new Event(OPEN_ORDERING_TOUR))}
-                        >
-                            <T text="How to order" />
-                        </button>
-                    </div>
-                )}
                 {children}
             </main>
 

@@ -133,8 +133,9 @@ try{for(const width of [320,390,1280]){
  // Late automatic responses cannot overwrite a confirmed manual pickup from another tab.
  await page.evaluate(()=>{for(const key of ['gokul-menu-pickup-mode:v1','gokul-selected-pickup-slot','gokul-pickup-intent'])localStorage.removeItem(key);});holdDiscovery=true;release=null;
  // Hold discovery itself; a background inventory read must not consume this gate.
- await page.reload();await page.waitForFunction(()=>document.querySelector('.mobile-menu-pickup')?.textContent?.includes('Finding'));
+ await page.reload();await pickup.waitFor();
  const deadline=Date.now()+15000;while(!release&&Date.now()<deadline)await page.waitForTimeout(50);assert.ok(release,"automatic verification started");
+ assert.equal(await pickup.getByText('Finding soonest pickup…',{exact:true}).count(),0,'automatic pickup lookup stays in the background');
  await page.evaluate(value=>{
   const raw=JSON.stringify(value);localStorage.setItem('gokul-selected-pickup-slot',raw);
   localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date:value.date}));

@@ -104,7 +104,8 @@ try{for(const [width,themed] of [[320,true],[390,true],[640,true],[1280,true],[3
   await close.click();await sheet.waitFor({state:'hidden'});await floating.click();await sheet.waitFor();
   assert.ok((await sheet.boundingBox()).width<width,'category panel has side margins');
   if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/category-panel-${width}.png`});
-  await page.keyboard.press('Escape');await sheet.waitFor({state:'hidden'});assert.equal(await floating.evaluate(n=>n===document.activeElement),true);
+  await page.keyboard.press('Escape');await sheet.waitFor({state:'hidden'});
+  await page.waitForFunction(()=>document.activeElement?.classList.contains('menu-floating-category-trigger'));
   const y=await page.evaluate(()=>scrollY);await floating.click();
   await sheet.getByRole('button',{name:/Dairy/}).click();await page.locator('#gokul-product-3').waitFor();
   assert.equal(await page.locator('#gokul-product-1').count(),0);assert.equal(await page.locator('#gokul-product-7').count(),0);
