@@ -781,7 +781,7 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
                 java.util.concurrent.Callable<Void> job =
                         () -> {
                             start.await();
-                            service.reconcile(f.branch());
+                            service.reconcile(f.branch(), "SCHEDULED", "system");
                             return null;
                         };
                 var first = workers.submit(job);
