@@ -25,6 +25,21 @@ export default function MobileBrandLaunch() {
     const {branch} = useSelectedBranch();
     const paymentReturn = pathname.startsWith("/checkout/payment") || pathname.startsWith("/orders/");
     const staff = pathname.startsWith("/admin") || pathname.startsWith("/staff");
+    const storefront = /^(?:\/|\/menu\/?|\/branches(?:\/[1-9]\d*)?\/?)$/.test(pathname);
+    useEffect(() => {
+        if (!hydrated || !storefront) return;
+        // Recovery reloads preserve history state. Clear only the spent launch budget.
+        const state = window.history.state;
+        if (!state || !Object.hasOwn(state, "gokulLaunchRetry")) return;
+        try {
+            const next = {...state};
+            delete next.gokulLaunchRetry;
+            window.history.replaceState(next, "");
+        } catch {
+            // History can be unavailable; it must not interrupt the normal launch.
+        }
+    }, [hydrated, storefront]);
+
     useEffect(() => {
         if (staff) return;
         const surface = dialog.current;
@@ -58,7 +73,16 @@ export default function MobileBrandLaunch() {
         const cover = branch.mobileCoverImageUrl || branch.coverImageUrl;
         if (cover) {const image = new Image(); image.src = cover;}
     }, [branch, staff, paymentReturn, router]);
-    return <>{!hydrated&&!staff&&!paymentReturn&&<div className="gokul-mobile-boot" role="status" aria-label="Opening Gokul"/>}<dialog ref={dialog} className="gokul-mobile-launch" data-launch-initialized={initialized?"true":undefined} aria-labelledby="gokul-launch-title">
+    return <>{!hydrated&&!staff&&!paymentReturn&&<div className="gokul-mobile-boot" role={storefront ? undefined : "status"} aria-label={storefront ? undefined : "Opening Gokul"} data-gokul-storefront-boot={storefront ? "" : undefined}>{storefront && <>
+        <span className="gokul-boot-opening">Opening Gokul</span>
+        <div className="gokul-boot-live-progress" role="status"><T text="Reconnecting to Gokul"/><div aria-hidden="true"><i/><i/><i/></div></div>
+        <div className="gokul-boot-recovery">
+            <p role="status">Gokul is taking longer to open.</p>
+            <a href="">Try again</a>
+        </div>
+        {/* Keep this after the fallback so the worker never releases a partial opening screen. */}
+        <span data-gokul-launch-ready="" hidden />
+    </>}</div>}<dialog ref={dialog} className="gokul-mobile-launch" data-launch-initialized={initialized?"true":undefined} aria-labelledby="gokul-launch-title">
         <BrandBackdrop/>
         <div className="gokul-mobile-launch-copy">
             <h1 id="gokul-launch-title"><span className="sr-only"><T text="Gokul Sweets" /></span><ReferenceWordmark className="brand-loading-wordmark" /></h1>

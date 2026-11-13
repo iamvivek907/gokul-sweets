@@ -6,7 +6,7 @@ import styles from "./MenuDiscoverySheet.module.css";
 import {useMenuSheetDismiss} from "@/hooks/useMenuSheetDismiss";
 import {T,useTranslation} from "@/lib/language";
 
-export default function MenuDiscoverySheet({title,children,onClose,onDismissStart,className,returnFocusId,restoreFocus,initialFocusSelector,restoreFocusOnClose,fitVisualViewport=false,stableMenuLayer=false,tactile=false,footer,closeLabel="Close",hideClose=false}:{title:string;children:ReactNode;onClose:()=>void;onDismissStart?:()=>void;className?:string;returnFocusId?:string;restoreFocus?:HTMLElement|null;initialFocusSelector?:string;restoreFocusOnClose?:RefObject<boolean>;fitVisualViewport?:boolean;stableMenuLayer?:boolean;tactile?:boolean;footer?:ReactNode|((close:()=>void)=>ReactNode);closeLabel?:string;hideClose?:boolean}){
+export default function MenuDiscoverySheet({title,children,onClose,onDismissStart,className,returnFocusId,restoreFocus,initialFocusSelector,restoreFocusOnClose,fitVisualViewport=false,stableMenuLayer=false,preservePageScroll=false,tactile=false,footer,closeLabel="Close",hideClose=false}:{title:string;children:ReactNode;onClose:()=>void;onDismissStart?:()=>void;className?:string;returnFocusId?:string;restoreFocus?:HTMLElement|null;initialFocusSelector?:string;restoreFocusOnClose?:RefObject<boolean>;fitVisualViewport?:boolean;stableMenuLayer?:boolean;preservePageScroll?:boolean;tactile?:boolean;footer?:ReactNode|((close:()=>void)=>ReactNode);closeLabel?:string;hideClose?:boolean}){
  const translate=useTranslation(),features=useStorefrontFeatures();
  const polished=tactile&&!!(features?.futuristicStorefrontV2||features?.checkoutExperienceV2);
  const dialog=useRef<HTMLDialogElement>(null),titleId=useId();
@@ -16,7 +16,11 @@ export default function MenuDiscoverySheet({title,children,onClose,onDismissStar
   const surface=dialog.current,previous=restoreFocus??document.activeElement as HTMLElement|null;
   const body=document.body,root=document.documentElement,y=window.scrollY,x=window.scrollX;
   const saved={position:body.style.position,top:body.style.top,left:body.style.left,width:body.style.width,overflow:body.style.overflow,rootOverflow:root.style.overflow};
-  body.style.position="fixed";body.style.top=`-${y}px`;body.style.left=`-${x}px`;body.style.width="100%";body.style.overflow="hidden";root.style.overflow="hidden";
+  // Keep the scroll container and its compositor layers in place for the order reminder.
+  // The modal's open state locks root scrolling in CSS without moving the page.
+  if(!preservePageScroll){
+   body.style.position="fixed";body.style.top=`-${y}px`;body.style.left=`-${x}px`;body.style.width="100%";body.style.overflow="hidden";root.style.overflow="hidden";
+  }
   const viewport=fitVisualViewport?window.visualViewport:null;
   const fit=()=>{
    if(!viewport)return;
@@ -30,12 +34,16 @@ export default function MenuDiscoverySheet({title,children,onClose,onDismissStar
   if(initialFocusSelector)surface?.querySelector<HTMLElement>(initialFocusSelector)?.focus({preventScroll:true});
   return()=>{
    viewport?.removeEventListener("resize",fit);viewport?.removeEventListener("scroll",fit);
-   surface?.close();Object.assign(body.style,{position:saved.position,top:saved.top,left:saved.left,width:saved.width,overflow:saved.overflow});root.style.overflow=saved.rootOverflow;
-   window.scrollTo({left:x,top:y,behavior:"instant"});
+   surface?.close();
+   if(!preservePageScroll){
+    Object.assign(body.style,{position:saved.position,top:saved.top,left:saved.left,width:saved.width,overflow:saved.overflow});root.style.overflow=saved.rootOverflow;
+    window.scrollTo({left:x,top:y,behavior:"instant"});
+   }
    // This ref is an explicit close-time decision made by the caller.
    // eslint-disable-next-line react-hooks/exhaustive-deps
    if(restoreFocusOnClose?.current===false)return;
    const resolveTarget=()=>restoreFocus&&returnFocusId?document.getElementById(returnFocusId):previous?.isConnected?previous:returnFocusId?document.getElementById(returnFocusId):null;resolveTarget()?.focus({preventScroll:true});
+   if(preservePageScroll)return;
    // Header observers can briefly make the trigger inert during scroll unlock.
    // Resolve it again after the header settles; never move the viewport to focus it.
    {
@@ -49,13 +57,13 @@ export default function MenuDiscoverySheet({title,children,onClose,onDismissStar
     requestAnimationFrame(restore);
    }
   };
- },[returnFocusId,restoreFocus,initialFocusSelector,restoreFocusOnClose,fitVisualViewport]);
+ },[returnFocusId,restoreFocus,initialFocusSelector,restoreFocusOnClose,fitVisualViewport,preservePageScroll]);
  const content=<>
   <header><h2 id={titleId}><T text={title}/></h2>{!polished&&!hideClose&&<button type="button" aria-label={closeLabel==="Close"?undefined:translate(closeLabel)} onClick={()=>tactile?dismiss(true):closeImmediately()} autoFocus={!initialFocusSelector}><T text="Close"/> ×</button>}</header>
   <div tabIndex={polished?0:undefined} className={`mobile-menu-suggestion-body ${polished?styles.scrollBody:""}`}>{children}</div>
   {footer&&<footer className={styles.footer}>{typeof footer==="function"?footer(()=>tactile?dismiss():closeImmediately()):footer}</footer>}
  </>;
- const sheet=<dialog ref={dialog} className={`mobile-menu-suggestion-dialog ${styles.dialog} ${tactile?styles.motion:""} ${polished?styles.polished:""} ${className??""}`} aria-labelledby={titleId} onCancel={event=>{event.preventDefault();if(tactile)dismiss();else closeImmediately();}} onClick={event=>{const box=event.currentTarget.getBoundingClientRect();if(event.target===event.currentTarget&&(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom)){if(tactile)dismiss();else closeImmediately();}}}>
+ const sheet=<dialog ref={dialog} data-preserve-page-scroll={preservePageScroll||undefined} className={`mobile-menu-suggestion-dialog ${styles.dialog} ${tactile?styles.motion:""} ${polished?styles.polished:""} ${className??""}`} aria-labelledby={titleId} onCancel={event=>{event.preventDefault();if(tactile)dismiss();else closeImmediately();}} onClick={event=>{const box=event.currentTarget.getBoundingClientRect();if(event.target===event.currentTarget&&(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom)){if(tactile)dismiss();else closeImmediately();}}}>
   {polished&&!hideClose&&<button type="button" className={styles.floatingClose} aria-label={translate(closeLabel)} onClick={()=>dismiss(true)} autoFocus><span aria-hidden="true">×</span></button>}
   {polished?<div className={styles.frame}>{content}</div>:content}
  </dialog>;

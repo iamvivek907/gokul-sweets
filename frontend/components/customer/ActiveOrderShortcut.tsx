@@ -67,7 +67,7 @@ function OrderReminder(){
     <span className="active-order-edge-chevron" aria-hidden="true">›</span>
    </button>
   </aside>
-  {open&&<MenuDiscoverySheet title="Your upcoming orders" tactile restoreFocus={trigger} onClose={()=>setOpen(false)} footer={<button type="button" className="active-order-dismiss" onClick={dismiss}>{locale==='hi'?'इस बार रिमाइंडर छिपाएँ':'Hide reminder for this visit'}</button>}>
+  {open&&<MenuDiscoverySheet title="Your upcoming orders" tactile preservePageScroll restoreFocus={trigger} onClose={()=>setOpen(false)} footer={<button type="button" className="active-order-dismiss" onClick={dismiss}>{locale==='hi'?'इस बार रिमाइंडर छिपाएँ':'Hide reminder for this visit'}</button>}>
    <div className="active-order-list">
     {stale&&<p role="status"><T text="Status may have changed. Open your order for the latest update."/></p>}
     {groups.map(group=><section key={group.date} aria-label={reminderDay(group.date,locale)}><h3>{reminderDay(group.date,locale)}</h3>{group.orders.map(value=><article key={value.orderNumber}>

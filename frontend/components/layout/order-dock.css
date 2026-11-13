@@ -23,7 +23,10 @@
 .active-order-edge-copy small{font-size:11px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#765852}
 .active-order-edge[data-expanded] .active-order-edge-chevron{display:block;font-size:22px}
 .active-order-edge-trigger:focus-visible{outline:3px solid #8f1838;outline-offset:-4px}
-body:has(dialog[open]) .active-order-edge,body:has(.ordering-tour-overlay) .active-order-edge,body:has(input:focus) .active-order-edge,body:has(textarea:focus) .active-order-edge{visibility:hidden;pointer-events:none}
+/* Keep the page and reminder in place behind the native modal. */
+html:has(.active-order-edge){scrollbar-gutter:stable}
+html:has(dialog[open][data-preserve-page-scroll]){overflow:hidden;overscroll-behavior:none}
+body:has(dialog[open]:not([data-preserve-page-scroll])) .active-order-edge,body:has(.ordering-tour-overlay) .active-order-edge,body:has(input:focus) .active-order-edge,body:has(textarea:focus) .active-order-edge{visibility:hidden;pointer-events:none}
 .active-order-list h3{font-size:13px;color:#80644d;margin:18px 0 10px;font-weight:750}
 .future-storefront .active-order-dismiss{min-height:44px;padding:8px 14px;font-size:13px;color:#8f1838;border:1px solid #e7d8d8;border-radius:12px;background:#fffaf4}
 @media(prefers-reduced-motion:reduce){.future-storefront .active-order-edge,.future-storefront .active-order-edge-trigger{transition:none}}
