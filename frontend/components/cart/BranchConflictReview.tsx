@@ -11,8 +11,8 @@ import {mealSavings,switchCartBranch} from "@/lib/cartMeals";
 import {menuMoney} from "@/lib/menuPresentationDetails";
 import type {CartItem} from "@/types/cart";
 
-export default function BranchConflictReview({branchId, items, removeItem, clearCart}: {
-    branchId: number; items: CartItem[]; removeItem: (id: number) => void; clearCart: () => void;
+export default function BranchConflictReview({branchId, items, snapshot, removeItem, clearCart}: {
+    branchId: number; items: CartItem[]; snapshot: string; removeItem: (id: number, expectedSnapshot: string) => boolean; clearCart: (expectedSnapshot: string) => boolean;
 }) {
     const translate=useTranslation();
     const router = useRouter();
@@ -30,12 +30,12 @@ export default function BranchConflictReview({branchId, items, removeItem, clear
     useEffect(() => {
         if (!serviceDate || !items.length) return;
         const controller = new AbortController();
-        const cartSnapshot = getCartSnapshot();
+        const cartSnapshot = snapshot;
         previewCartSwitch(branchId, serviceDate, items, AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]))
             .then(preview => {if (!controller.signal.aborted) {setResult({preview, cartSnapshot}); setError(null);}})
             .catch(() => {if (!controller.signal.aborted) {setResult(null); setError("Couldn't verify availability. The original cart is saved.");}});
         return () => controller.abort();
-    }, [branchId, serviceDate, items]);
+    }, [branchId, serviceDate, items, snapshot]);
 
     async function applyAvailableItems() {
         if (!result || !serviceDate || busy) return;
@@ -43,14 +43,16 @@ export default function BranchConflictReview({branchId, items, removeItem, clear
         setBusy(true);
         try {
             const latest = await previewCartSwitch(branchId, serviceDate, items, AbortSignal.timeout(10000));
-            if (getCartSnapshot() !== result.cartSnapshot || JSON.stringify(latest) !== JSON.stringify(result.preview)) {
+            if (getCartSnapshot() !== result.cartSnapshot) {setError("Your cart changed. Review it and try again."); return;}
+            if (JSON.stringify(latest) !== JSON.stringify(result.preview)) {
                 setError("Availability changed. Review the refreshed cart before switching.");
-                setResult({preview: latest, cartSnapshot: getCartSnapshot()});
+                setResult({preview: latest, cartSnapshot: result.cartSnapshot});
                 return;
             }
             const available = latest.lines.filter(line => line.orderable && line.proposed);
             if (!available.length || latest.availableSlots === 0) {setError("Choose another date or browse this branch's menu."); return;}
             if (latest.conflicts && !window.confirm("Remove unavailable items and keep only available items for this branch?")) return;
+            if (getCartSnapshot() !== result.cartSnapshot) {setError("Your cart changed. Review it and try again."); return;}
             saveCart(switchCartBranch(parseCart(result.cartSnapshot),branchId,available.map(line => ({...line.item, product: line.proposed!})),acceptsRegularPrices));
         } catch {setError("Couldn't recheck this branch. Your original cart is unchanged.");}
         finally {setBusy(false);}
@@ -71,13 +73,13 @@ export default function BranchConflictReview({branchId, items, removeItem, clear
         {result && <ul className="mt-3 space-y-2">{result.preview.lines.map(line =>
             <li key={line.item.product.id} className="rounded-lg bg-white p-3">
                 <strong>{line.item.product.name}</strong> — {line.orderable ? "Available" : line.reason ?? "Unavailable"}
-                {!line.orderable && <button type="button" className="ml-3 font-bold text-[#7a1625] underline" onClick={() => removeItem(line.item.product.id)}><T text="Remove" /></button>}
+                {!line.orderable && <button type="button" className="ml-3 font-bold text-[#7a1625] underline" onClick={() => removeItem(line.item.product.id, result.cartSnapshot)}><T text="Remove" /></button>}
             </li>)}</ul>}
         {result?.preview.availableSlots === 0 && <p className="mt-2 font-semibold"><T text="No pickup time has capacity for this date. Choose another date." /></p>}
-        {error && <p role="alert" className="mt-2 text-red-700">{error}</p>}
+        {error && <p role="alert" className="mt-2 text-red-700"><T text={error}/></p>}
         <div className="mt-4 flex flex-wrap gap-4">
             {result && result.preview.lines.some(line => line.orderable) && <button type="button" disabled={busy || result.preview.availableSlots === 0 || hasMeals&&!acceptsRegularPrices} onClick={() => void applyAvailableItems()} className="min-h-11 rounded-lg bg-[#7a1625] px-4 font-semibold text-white disabled:opacity-50">{hasMeals?<T text="Keep dishes at regular prices"/>:unavailable.length ? "Use available items" : "Confirm this branch"}</button>}
-            {result && unavailable.length === result.preview.lines.length && <button type="button" onClick={() => {if (window.confirm("Clear the original cart and browse this branch's menu?")) {clearCart(); router.push("/menu");}}} className="min-h-11 font-bold text-[#7a1625] underline"><T text="Clear cart and choose again" /></button>}
+            {result && unavailable.length === result.preview.lines.length && <button type="button" onClick={() => {if (window.confirm("Clear the original cart and browse this branch's menu?")) {if (clearCart(result.cartSnapshot)) router.push("/menu"); else setError("Your cart changed. Review it and try again.");}}} className="min-h-11 font-bold text-[#7a1625] underline"><T text="Clear cart and choose again" /></button>}
         </div>
     </section>;
 }

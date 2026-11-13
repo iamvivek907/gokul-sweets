@@ -1,3 +1,17 @@
+## Menu search, availability and pairing guidance
+
+The premium phone search field opens a lavender search panel near the top, sized to the visible viewport above the keyboard. Cancel restores the browsing position. Selecting a dish opens its category and focuses its card; selecting a recent query still searches by text. Keep dish names, portions, cart and pickup unchanged.
+
+Show confirmed orderable dishes first within a category and move categories with no orderable dishes later. Exact search matches take precedence. The advisory menu preview retries transient transport failures once and briefly reuses an identical recent result; checkout still checks the current cart. Network failures never become sold-out or stock-readiness statuses.
+
+Branch managers can save and publish dish pairings in Menu appearance. Prefer those choices when verified for the pickup, followed by relevant suggestions. Hide the rail when there is no match and keep the ordering guide behind a help icon next to pickup.
+
+## Compact menu offers and pickup reminder
+
+On the modern phone menu, the Offers shortcut sits beside Filters and previews a current saving when one is known. Its sheet shows the terms, eligibility and retry state. Spend-to-unlock progress stays in checkout; the menu cart dock shows the cart. Keep the shortcut dimensions stable when offers load or expire.
+
+Keep the active order tab at the right edge. After the brief introduction, show a receipt icon and a count in a 44px control with a descriptive accessible name. The existing upcoming-orders sheet, dismissal and refresh behavior stay the same.
+
 ## November 3 colourful brand loading
 
 The approved launch uses a deep burgundy gradient, ivory existing wordmark, muted gold food illustrations and a soft saffron glow. Pre-hydration boot shares its palette. Page loaders use cream/peach/saffron gradients with decorative inline SVG corner art; compact section loaders stay transparent. Existing logos, navigation, truthful stage-specific payment copy, eight-second delayed-response guidance and reduced-motion safeguards remain. No additional network assets, progress percentages, launch repeats, artificial waiting or changed checkout logic.
@@ -8,7 +22,7 @@ An active service worker gives storefront document launches eight seconds to del
 
 ## November 3 quiet order reminder
 
-The owner-approved edge tab supersedes the floating bottom order tracker. Only Home (including branch Home) and Menu show it, independent of the branch being browsed. It introduces itself once per document visit, retracts after six seconds and can be swiped right to dismiss for the visit. The shared sheet provides keyboard-accessible dismissal. Cart, checkout, order pages, open dialogs and focused text inputs show no tab. No layout padding, navigation badge or cart-offer suppression is added. Keep existing cart and Categories placement. Group bounded cross-branch active orders by business date then time, with explicit branch names and pickup/delivery labels. Overflow links to paged active history; no extra polling or branch switching. Dismissal stops the reminder subscription; identity changes reset suppression. Existing owner-scoped order safeguards remain authoritative.
+The owner-approved edge tab supersedes the floating bottom order tracker. Only Home (including branch Home) and Menu show it, independent of the branch being browsed. It introduces itself once per document visit, retracts after six seconds and can be swiped right to dismiss for the visit. The shared sheet provides keyboard-accessible dismissal. Cart, checkout, order pages, unrelated dialogs and focused text inputs show no tab. The reminder’s own modal keeps the tab inert behind its backdrop and preserves the current page scroll. No layout padding, navigation badge or cart-offer suppression is added. Keep existing cart and Categories placement. Group bounded cross-branch active orders by business date then time, with explicit branch names and pickup/delivery labels. Overflow links to paged active history; no extra polling or branch switching. Dismissal stops the reminder subscription; identity changes reset suppression. Existing owner-scoped order safeguards remain authoritative.
 
 ## November 2 meal checkout and order dock
 

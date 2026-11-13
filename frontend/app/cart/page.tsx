@@ -79,6 +79,7 @@ function CartContent() {
 
     const {
         items,
+        snapshot,
         meals,
         branchId,
         itemCount,
@@ -97,7 +98,7 @@ function CartContent() {
         weightItem,
         setWeightItem
     ] =
-        useState<CartItemType | null>(
+        useState<(CartItemType & {snapshot:string}) | null>(
             null
         );
 
@@ -110,50 +111,27 @@ function CartContent() {
         branch.id === branchId;
 
 
+    const [cartNotice, setCartNotice] = useState<string | null>(null);
+
     function handleClearCart() {
-
-        const confirmed =
-            window.confirm(
-                "Remove all items from your cart?"
-            );
-
-
-        if (
-            !confirmed
-        ) {
-
+        if (!window.confirm(translate("Remove all items from your cart?"))) return;
+        if (!clearCart(snapshot)) {
+            setCartNotice("Your cart changed. Review it and try again.");
             return;
         }
-
-
-        setWeightItem(
-            null
-        );
-
-
-        clearCart();
+        setCartNotice(null);
+        setWeightItem(null);
     }
 
-
-    function handleRemoveItem(
-        productId: number
-    ): void {
-
-        if (
-            weightItem?.product.id === productId
-        ) {
-
-            setWeightItem(
-                null
-            );
+    function handleRemoveItem(productId: number, expectedSnapshot = snapshot): boolean {
+        if (!removeItem(productId, expectedSnapshot)) {
+            setCartNotice("Your cart changed. Review it and try again.");
+            return false;
         }
-
-
-        removeItem(
-            productId
-        );
+        setCartNotice(null);
+        if (weightItem?.product.id === productId) setWeightItem(null);
+        return true;
     }
-
 
     function handleContinue() {
 
@@ -275,6 +253,8 @@ function CartContent() {
                 </div>
 
 
+                {cartNotice && <p role="alert" className="mt-3 text-sm text-[#7a1625]"><T text={cartNotice}/></p>}
+
                 {isEmpty
                     ? (
                         <div
@@ -289,7 +269,7 @@ function CartContent() {
                         <>
 
                             {inPlaceBranchSwitch && branch && !cartMatchesSelectedBranch &&
-                                <BranchConflictReview branchId={branch.id} items={items} removeItem={handleRemoveItem} clearCart={clearCart} />}
+                                <BranchConflictReview branchId={branch.id} items={items} snapshot={snapshot} removeItem={handleRemoveItem} clearCart={clearCart} />}
 
                             {(pickupCheck.selectionUnavailable || pickupCheck.items?.some(item => !item.available)) &&
                                 <PickupContext check={pickupCheck} cart />}
@@ -461,7 +441,7 @@ function CartContent() {
                                                         decreaseQuantity
                                                     }
                                                     onChangeWeight={
-                                                        setWeightItem
+                                                        selected => setWeightItem({...selected,snapshot})
                                                     }
                                                     onRemove={
                                                         handleRemoveItem
@@ -556,10 +536,8 @@ function CartContent() {
                                 weightGrams
                             ) => {
 
-                                setItemWeight(
-                                    product.id,
-                                    weightGrams
-                                );
+                                const updated = setItemWeight(product.id, weightGrams, weightItem.snapshot);
+                                setCartNotice(updated ? null : "Your cart changed. Review it and try again.");
 
 
                                 setWeightItem(

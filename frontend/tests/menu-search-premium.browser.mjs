@@ -7,6 +7,10 @@ const later=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(ne
 const branch={id:1,name:'Menu branch',active:true,operational:true,address:'Menu road',phone:'1111111111',pickupAvailable:true};
 const orderBranch={...branch,id:2,name:'Order branch',address:'Order road',phone:'9999999999'};
 const products=[{id:1,name:'Paneer Burger Half',categoryId:1,categoryName:'Snacks',price:40,saleMode:'UNIT',available:true,imageUrl:null},{id:2,name:'Paneer Burger Full',categoryId:1,categoryName:'Snacks',price:80,saleMode:'UNIT',available:true,imageUrl:null},{id:3,name:'Fresh Peda',categoryId:2,categoryName:'Sweets',price:500,saleMode:'WEIGHT',minimumWeightGrams:250,weightStepGrams:50,available:true,imageUrl:null}];
+products.push(
+ {id:4,name:'Special Box',categoryId:1,categoryName:'Snacks',price:40,saleMode:'UNIT',available:true,imageUrl:null},
+ {id:5,name:'Special Box',categoryId:2,categoryName:'Sweets',price:80,saleMode:'UNIT',available:true,imageUrl:null},
+);
 const slot=(value)=>({id:value===date?1:2,branchId:1,slotDate:value,startTime:'18:00:00',endTime:'19:00:00',active:true,remainingCapacity:20,priorityEnabled:false});
 const original={date,slot:slot(date),pickupType:'NORMAL'};
 try{
@@ -23,7 +27,7 @@ try{
     json={branchExperience:true,futuristicStorefrontV2:true,checkoutExperienceV2:true,contextualStorefrontV2:true,simplifiedCheckout:true,acceptedCheckoutQuote:true,smartAvailability:true,smartPickupSelection:true,truthfulOrderTracking:true,today:date,futureOrderingDays:7};
    }else if(path==='/api/branches')json=[branch,orderBranch];
    else if(path==='/api/branches/1')json=branch;else if(path==='/api/branches/2')json=orderBranch;
-   else if(path==='/api/menu')json=[{id:1,name:'Snacks',products:products.slice(0,2)},{id:2,name:'Sweets',products:products.slice(2)}];
+   else if(path==='/api/menu')json=[{id:1,name:'Snacks',products:products.filter(p=>p.categoryId===1)},{id:2,name:'Sweets',products:products.filter(p=>p.categoryId===2)}];
    else if(path==='/api/menu/portion-groups')json={groups:[{key:'burger',title:'Paneer Burger',choices:[{productId:1,label:'Half'},{productId:2,label:'Full'}]}]};
    else if(path==='/api/storefront/customer-identity')json={enabled:true,guestCheckoutEnabled:false};
    else if(path==='/api/customer/identity/me')json={authenticated:true,name:'Customer',phone:'+919876543210'};
@@ -33,7 +37,7 @@ try{
    else if(path.endsWith('/availability')){
     const payload=req.postDataJSON();checks.push(payload);
     const values=payload.days>1?[date,later]:[payload.startDate];
-    json={today:date,maximumDate:later,dates:values.map(value=>{const issues=(payload.items??[]).filter(i=>i.productId===2&&value===date).map(i=>({productId:i.productId,available:false,reason:'Unavailable for selected pickup'}));return {date:value,available:!issues.length,items:products.map(p=>({productId:p.id,available:!(p.id===2&&value===date),reason:p.id===2&&value===date?'Unavailable for selected pickup':null})),slots:[{slot:slot(value),normalAvailable:!issues.length,issues}]};})};
+    json={today:date,maximumDate:later,dates:values.map(value=>{const unavailable=id=>[2,4].includes(id)&&value===date;const issues=(payload.items??[]).filter(i=>unavailable(i.productId)).map(i=>({productId:i.productId,available:false,reason:'Unavailable for selected pickup'}));return {date:value,available:!issues.length,items:products.map(p=>({productId:p.id,available:!unavailable(p.id),reason:unavailable(p.id)?'Unavailable for selected pickup':null})),slots:[{slot:slot(value),normalAvailable:!issues.length,issues}]};})};
    }else if(path.endsWith('/pickup-discovery'))json={today:date,maximumDate:later,dates:[date,later].map(value=>({date:value,slots:[{slot:slot(value),normalAvailable:true,issues:[]}]}))};
    await route.fulfill({headers,json});
   });
@@ -56,11 +60,25 @@ try{
   await page.keyboard.press('ArrowDown');const active=await input.getAttribute('aria-activedescendant');assert.ok(active);assert.equal(await page.locator(`[id="${active}"]`).getAttribute('aria-selected'),'true');const chosen=await page.locator(`[id="${active}"]`).getAttribute('aria-label');await page.keyboard.press('Enter');
   assert.equal(await input.inputValue(),chosen);
   const clear=page.getByRole('button',{name:'Clear search',exact:true});const rect=await clear.boundingBox();assert.ok(rect.width>=44&&rect.height>=44);
-  await clear.click();assert.equal(await input.inputValue(),'');assert.equal(await input.evaluate(n=>n===document.activeElement),true,'clear retains keyboard focus');
+  await clear.click();assert.equal(await input.inputValue(),'');await page.clock.runFor(64);assert.equal(await input.evaluate(n=>n===document.activeElement),true,'clear retains keyboard focus');
   await page.locator('#gokul-product-3').waitFor();
   await input.fill('zzzzzzzzz');await page.getByText('No matching items',{exact:true}).waitFor();assert.equal(await page.getByRole('listbox',{name:'Menu suggestions',exact:true}).count(),0);
   await clear.click();assert.equal(await input.inputValue(),'');assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),cart);assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-branch')),selectedBranch);
   await input.fill('Paneer');await list.waitFor();if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/premium-search-${width}.png`});
+  if(width===390){
+   await input.click();
+   const dialog=page.getByRole('dialog',{name:'Search the menu',exact:true});
+   const search=dialog.getByRole('combobox');
+   await search.fill('Special Box');
+   const matches=dialog.getByRole('option',{name:/^Special Box ·/});
+   await matches.last().waitFor();
+   assert.deepEqual(await matches.evaluateAll(nodes=>nodes.map(node=>node.getAttribute('aria-label'))),['Special Box · Sweets','Special Box · Snacks']);
+   await search.press('ArrowDown');await search.press('Enter');
+   await page.locator('#gokul-product-5[data-search-arrival]').waitFor();
+   await input.click();await search.fill('Special Box');
+   await dialog.getByRole('option',{name:'Special Box · Snacks',exact:true}).click();
+   await page.locator('#gokul-product-4[data-search-arrival]').waitFor();
+  }
   if(width===640){await page.evaluate(()=>{localStorage.setItem('gokul-language','hi');window.dispatchEvent(new Event('storage'));});await page.getByRole('button',{name:'खोज साफ़ करें',exact:true}).click();assert.equal(await input.inputValue(),'');assert.match(await page.locator('.menu-search-example').first().innerText(),/खोजें/);}
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.deepEqual(errors,[]);await context.close();console.log(`PASS premium search examples, clear, suggestions and keyboard ${width}px`);
  }

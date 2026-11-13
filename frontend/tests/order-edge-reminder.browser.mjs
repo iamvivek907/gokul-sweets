@@ -12,7 +12,8 @@ const original={date,slot:slot(date),pickupType:'NORMAL'};
 try{
  for(const width of [320,390,640,1280]){
   const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',reducedMotion:width===640?'reduce':'no-preference',hasTouch:true}),page=await context.newPage();page.setDefaultTimeout(15000);
-  const errors=[],checks=[];let failSettings=false,activeReads=0;
+  const errors=[],checks=[];let crashes=0,activeReads=0;let failSettings=false;
+  page.on('crash',()=>crashes++);
   page.on('pageerror',e=>errors.push(e.message));
   const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,PUT,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key'};
   await context.route('**/api/**',async route=>{
@@ -43,21 +44,41 @@ try{
    if(!localStorage.getItem('gokul-selected-pickup-slot'))localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify(original));
   },{branch,original,products});
   await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
-  const tab=page.getByRole('complementary',{name:'Active order'});
+  const tab=page.locator('aside.active-order-edge');
   await tab.waitFor();await page.waitForFunction(()=>document.querySelector('.active-order-edge')?.dataset.expanded==='true');
   assert.match(await tab.innerText(),/3 pickups/);assert.match(await tab.innerText(),/Across 2 branches/);
   const before=await page.locator('#gokul-product-3').boundingBox();
   await page.waitForFunction(()=>!document.querySelector('.active-order-edge')?.hasAttribute('data-expanded'));
-  const box=await tab.boundingBox();assert.ok(box.width<=185);assert.ok(box.height>=44);assert.ok(Math.abs(box.x+box.width-width)<2);
+  const box=await tab.boundingBox();assert.ok(box.width<=45);assert.ok(box.height>=44);assert.ok(Math.abs(box.x+box.width-width)<2);
+  assert.equal(await tab.locator(".active-order-edge-compact").innerText(),"3");
   const after=await page.locator('#gokul-product-3').boundingBox();assert.ok(Math.abs(before.y-after.y)<1,'retraction must not shift content');
   if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/order-edge-${width}.png`});
   const cartBefore=await page.evaluate(()=>localStorage.getItem('gokul-cart')),branchBefore=await page.evaluate(()=>localStorage.getItem('gokul-selected-branch'));
-  await tab.getByRole('button').click();const sheet=page.getByRole('dialog',{name:'Your upcoming orders'});await sheet.waitFor();assert.equal(await tab.isVisible(),false);
+  const trigger=tab.locator('.active-order-edge-trigger');
+  const menuState=await page.evaluate(()=>{
+   window.scrollTo({top:Math.min(500,document.documentElement.scrollHeight-window.innerHeight),behavior:"instant"});
+   return {y:window.scrollY,bodyPosition:document.body.style.position,documentStart:performance.timeOrigin};
+  });
+  assert.ok(menuState.y>0,'fixture must scroll the menu');
+  const sheet=page.getByRole('dialog',{name:'Your upcoming orders'});
+  const assertStableMenu=async()=>assert.deepEqual(await page.evaluate(()=>({
+   y:window.scrollY,bodyPosition:document.body.style.position,documentStart:performance.timeOrigin
+  })),menuState,'the order sheet must preserve the original document and its scroll position');
+  await trigger.click();await sheet.waitFor();assert.equal(await tab.isVisible(),true);
+  assert.equal(await page.evaluate(()=>getComputedStyle(document.documentElement).overflowY),'hidden');
+  await assertStableMenu();
+  const triggerBox=await trigger.boundingBox();
+  assert.equal(await page.evaluate(({x,y})=>!!document.elementFromPoint(x,y)?.closest('.active-order-edge'),{x:triggerBox.x+10,y:triggerBox.y+10}),false,'the backdrop must block interaction with the visible reminder');
   assert.equal(await sheet.locator('article').count(),3);assert.equal(await sheet.locator('.active-order-list>section').count(),2);
   const cards=await sheet.locator('article').allTextContents();assert.match(cards[0],/Menu branch.*2:00/s);assert.match(cards[1],/Order branch.*6:00/s);
   await sheet.locator('article').nth(1).getByRole('button').click();await sheet.getByRole('link',{name:'Call',exact:true}).waitFor();assert.equal(await sheet.getByRole('link',{name:'Call',exact:true}).getAttribute('href'),'tel:9999999999');
   assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-branch')),branchBefore);assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),cartBefore);
-  await sheet.getByRole('button',{name:'Close',exact:true}).click();await sheet.waitFor({state:'hidden'});await tab.waitFor();
+  await sheet.getByRole('button',{name:'Close',exact:true}).tap();await sheet.waitFor({state:'hidden'});await tab.waitFor();
+  await assertStableMenu();assert.equal(await trigger.evaluate(node=>node===document.activeElement),true);
+  await trigger.tap();await sheet.waitFor();await page.keyboard.press('Escape');await sheet.waitFor({state:'hidden'});
+  await assertStableMenu();assert.equal(await trigger.evaluate(node=>node===document.activeElement),true);
+  await trigger.tap();await sheet.waitFor();await page.touchscreen.tap(5,5);await sheet.waitFor({state:'hidden'});
+  await assertStableMenu();
   if(width<641){await page.locator('.menu-floating-category-trigger').click();const categories=page.getByRole('dialog',{name:'Jump to a category'});await categories.waitFor();assert.equal(await tab.isVisible(),false);await categories.getByRole('button',{name:'Close',exact:true}).click();await categories.waitFor({state:'hidden'});}
   await tab.getByRole('button').click();await sheet.getByRole('button',{name:'Hide reminder for this visit'}).click();await tab.waitFor({state:'detached'});
   await page.evaluate(()=>window.dispatchEvent(new Event('gokul-customer-identity-changed')));await tab.waitFor();
@@ -66,6 +87,6 @@ try{
   await page.locator('.customer-bottom-navigation').getByRole('link',{name:'Menu',exact:true}).click();await page.waitForURL('**/menu');assert.equal(await tab.count(),0);
   await page.reload();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});await tab.waitFor();
   await page.goto(base+'/checkout/pickup');assert.equal(await tab.count(),0);
-  assert.deepEqual(errors,[]);assert.ok(activeReads<8);await context.close();console.log(`PASS edge reminder grouping, dismissal, modal hiding and navigation ${width}px`);
+  assert.deepEqual(errors,[]);assert.equal(crashes,0);assert.ok(activeReads<8);await context.close();console.log(`PASS edge reminder grouping, dismissal, modal hiding and navigation ${width}px`);
  }
 }finally{await browser.close();}

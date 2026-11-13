@@ -5,7 +5,7 @@ function fixture({price=100,edit=false,fail=false,abort=false}={}){
  const map=new Map([[1,{id:1,price:100,saleMode:'UNIT',available:true}],[2,{id:2,price:50,saleMode:'UNIT',available:true}]]),active={id:1,version:1,title:'Combo',pricingMode:'SELECTED_ITEMS',basePrice:0,discountType:'PERCENT',discountValue:2,groups:[{minimum:1,maximum:1,options:[{key:'a',productId:1,quantity:1,weightGrams:null,upgrade:0}]},{minimum:1,maximum:1,options:[{key:'b',productId:2,quantity:1,weightGrams:null,upgrade:0}]}]};
  const old={instanceId:'old',mealId:1,version:1,title:'Combo',quantity:1,optionIds:['a','b'],total:147,regularTotal:150,components:[{productId:1,quantity:1,weightGrams:null},{productId:2,quantity:1,weightGrams:null}]};
  let raw=JSON.stringify(edit?meals.addMeal({branchId:1,items:[]},old,map,1):{branchId:1,items:[]}),writes=0,closed=false;
- const env={exports:{},Error,AbortSignal,AbortController,crypto,active,map,quantity:1,selected:['a','b'],replaceId:edit?'old':undefined,priceReview:null,busy:false,branchId:1,smartAvailability:false,dismissing:{current:false},controller:{current:null},drafts:{current:new Map()},sessionStorage:{getItem:()=>null},getPendingOrderSnapshot:()=>'',getCartSnapshot:()=>raw,getStoredBranchSnapshot:()=>'{"id":1}',getPickupSlotSnapshot:()=>'',parseCart:JSON.parse,mealEstimate:meals.mealEstimate,addMeal:meals.addMeal,menuTapFeedback:()=>{},setBusy:b=>env.busy=b,setPriceReview:v=>env.priceReview=v,saveCart:c=>{writes++;raw=JSON.stringify(c);}};
+ const env={exports:{},Error,AbortSignal,AbortController,crypto,active,map,quantity:1,selected:['a','b'],replaceId:edit?'old':undefined,priceReview:null,busy:false,branchId:1,smartAvailability:false,dismissing:{current:false},controller:{current:null},stockSnapshot:{current:{}},drafts:{current:new Map()},sessionStorage:{getItem:()=>null},getPendingOrderSnapshot:()=>'',getCartSnapshot:()=>raw,getStoredBranchSnapshot:()=>'{"id":1}',getPickupSlotSnapshot:()=>'',parseCart:JSON.parse,mealEstimate:meals.mealEstimate,addMeal:meals.addMeal,menuTapFeedback:()=>{},setBusy:b=>env.busy=b,setPriceReview:v=>env.priceReview=v,saveCart:c=>{writes++;raw=JSON.stringify(c);}};
  for(const [,name]of methods.submit.matchAll(/\b(set[A-Z]\w*)\(/g))if(!env[name])env[name]=()=>{};
  env.apiClient=async()=>{if(fail)throw Error('Quote failed');if(abort)env.controller.current.abort();return {title:'Combo',total:Math.round((price+50)*98)*env.quantity/100,regularTotal:(price+50)*env.quantity,components:[{productId:1,quantity:env.quantity,weightGrams:null,unitPrice:price},{productId:2,quantity:env.quantity,weightGrams:null,unitPrice:50}]};};
  vm.runInNewContext(ts.transpileModule(methods.priceContext+'\nexports.run='+methods.submit,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,env);
@@ -17,3 +17,20 @@ test('another server price change requires renewed confirmation',async()=>{const
 for(const change of ['quantity','cart'])test('changed '+change+' invalidates old confirmation',async()=>{const f=fixture({price:120});await f.run();if(change==='quantity')f.env.quantity=2;else f.changeCart();await f.run();assert.equal(f.writes,0);assert.equal(f.closed,false);await f.run();assert.equal(f.writes,1);});
 test('meal edits preserve the original until price confirmation',async()=>{const f=fixture({price:120,edit:true}),before=f.raw;await f.run();assert.equal(f.raw,before);await f.run();const cart=JSON.parse(f.raw);assert.equal(cart.meals.length,1);assert.equal(cart.meals[0].instanceId,'old');assert.equal(cart.meals[0].total,166.6);});
 for(const options of [{fail:true},{abort:true}])test('failed/cancelled quote leaves cart unchanged '+JSON.stringify(options),async()=>{const f=fixture(options),before=f.raw;await f.run();assert.equal(f.raw,before);assert.equal(f.writes,0);assert.equal(f.closed,false);assert.equal(f.env.priceReview,null);});
+test('a draft stock check cannot authorize different quantities returned by the meal quote',async()=>{
+ const f=fixture(),pickup={date:'2026-11-08',slot:{branchId:1,id:7},pickupType:'NORMAL'},checks=[];
+ Object.assign(f.env,{
+  smartAvailability:true,getPickupSlotSnapshot:()=>JSON.stringify(pickup),parsePickupSlot:JSON.parse,pickupIsFresh:()=>true,
+  draftMealPickupDemand:meals.draftMealPickupDemand,mealPickupDemand:meals.mealPickupDemand,
+  checkCartAvailability:async(_branch,date,_days,items)=>{
+   const quantity=items.find(item=>item.productId===1).quantity;
+   checks.push(quantity);
+   return {dates:[{date,slots:[{slot:pickup.slot,normalAvailable:quantity===1}]}]};
+  },
+ });
+ const quote=f.env.apiClient;
+ f.env.apiClient=async()=>{const priced=await quote();priced.components[0].quantity=2;return priced;};
+ await f.run();
+ assert.deepEqual(checks,[1,2]);
+ assert.equal(f.writes,0,'only the canonical basket can authorize an Add');
+});
