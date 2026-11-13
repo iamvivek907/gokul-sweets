@@ -154,7 +154,7 @@ self.addEventListener(
         ) {
 
             if (isStorefrontLaunch(url)) {
-                const launch = launchNavigation(request, url);
+                const launch = launchNavigation(request, url, event.resultingClientId);
                 event.respondWith(launch.then(result => result.response));
                 event.waitUntil(launch.then(result => result.cacheWrite).catch(() => {}));
             } else {
@@ -463,7 +463,7 @@ function launchMarkupProbe(complete) {
     }};
 }
 
-async function checkLaunchDocument(response, {complete = false, signal} = {}) {
+async function checkLaunchDocument(response, {complete = false, signal, onSizeLimit} = {}) {
     if (response.status >= 500) {
         void response.body?.cancel().catch(() => {});
         return null;
@@ -489,7 +489,10 @@ async function checkLaunchDocument(response, {complete = false, signal} = {}) {
                 accepted = complete ? markup.isCompletePage() : markup?.isLegacyPage();
                 return accepted ? response : null;
             }
-            if (complete && (bytes += chunk.value.byteLength) > LAUNCH_CACHE_MAX_BYTES) return null;
+            if (complete && (bytes += chunk.value.byteLength) > LAUNCH_CACHE_MAX_BYTES) {
+                onSizeLimit?.();
+                return null;
+            }
             if (markup ? markup.read(chunk.value) : chunk.value.byteLength > 0) {
                 accepted = true;
                 return response;
@@ -556,23 +559,38 @@ function canCacheLaunch(response) {
         && !/\bno-store\b/i.test(response.headers.get("cache-control") ?? "");
 }
 
-async function cacheLaunch(request, response) {
+async function finishLiveLaunch(request, response, cacheable, clientId) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), LAUNCH_WAIT_MS);
+    let sizeLimit = false, complete;
     try {
-        // The opening marker releases the live stream. Only a full document can
-        // replace a previously usable copy, even when the stream ends cleanly.
-        const complete = await checkLaunchDocument(response, {complete: true, signal: controller.signal});
-        if (complete) {
-            const cache = await caches.open(PAGE_CACHE);
-            await cache.put(request, complete);
-        }
+        // Verify the streamed document separately from the opening screen. A failed
+        // validation may be reported to this navigation only, never to other tabs.
+        complete = await checkLaunchDocument(response, {
+            complete: true, signal: controller.signal, onSizeLimit: () => { sizeLimit = true; }
+        });
+    } catch {
+        // The body can fail after the browser has already painted the opening screen.
     } finally {
         clearTimeout(timer);
     }
+    if (!complete) {
+        // Size alone says nothing about whether the live page succeeded.
+        if (!sizeLimit && clientId) {
+            const client = await self.clients.get(clientId);
+            client?.postMessage({type: "gokul-launch-stream-incomplete"});
+        }
+        return;
+    }
+    if (!cacheable) {
+        void complete.body.cancel().catch(() => {});
+        return;
+    }
+    const cache = await caches.open(PAGE_CACHE);
+    await cache.put(request, complete);
 }
 
-async function launchNavigation(request, url) {
+async function launchNavigation(request, url, clientId) {
     const controller = new AbortController();
     let timer, response;
     try {
@@ -591,7 +609,11 @@ async function launchNavigation(request, url) {
     }
 
     if (response) {
-        const cacheWrite = canCacheLaunch(response) ? cacheLaunch(request, response.clone()).catch(() => {}) : undefined;
+        const cacheable = canCacheLaunch(response);
+        const monitor = clientId && response.ok && !response.redirected && response.body
+            && /\btext\/html\b/i.test(response.headers.get("content-type") ?? "");
+        const cacheWrite = cacheable || monitor
+            ? finishLiveLaunch(request, response.clone(), cacheable, clientId).catch(() => {}) : undefined;
         return {response, cacheWrite};
     }
     return {response: await cachedLaunch(request) ?? launchRecoveryPage(url, request.headers.get("accept-language"))};

@@ -74,7 +74,8 @@ export default function MobileBrandLaunch() {
         if (cover) {const image = new Image(); image.src = cover;}
     }, [branch, staff, paymentReturn, router]);
     return <>{!hydrated&&!staff&&!paymentReturn&&<div className="gokul-mobile-boot" role={storefront ? undefined : "status"} aria-label={storefront ? undefined : "Opening Gokul"} data-gokul-storefront-boot={storefront ? "" : undefined}>{storefront && <>
-        <span>Opening Gokul</span>
+        <span className="gokul-boot-opening">Opening Gokul</span>
+        <div className="gokul-boot-live-progress" role="status"><T text="Reconnecting to Gokul"/><div aria-hidden="true"><i/><i/><i/></div></div>
         <div className="gokul-boot-recovery">
             <p role="status">Gokul is taking longer to open.</p>
             <a href="">Try again</a>

@@ -3,11 +3,11 @@ const worker=fs.readFileSync("public/sw.js","utf8");
 const origin="https://gokulsweets.in";
 const boot='<html><body><div data-gokul-storefront-boot=""><span>Opening Gokul</span><a href="">Try again</a><span data-gokul-launch-ready="" hidden=""></span></div>';
 const htmlResponse=body=>new Response(body,{headers:{"content-type":"text/html"}});
-function fixture(fetch,caches={}) {
+function fixture(fetch,caches={},onMessage) {
  const handlers=new Map(),timers=new Map();
  let next=0;
  vm.runInNewContext(worker,{
-  self:{location:{origin},skipWaiting(){},addEventListener:(name,handler)=>handlers.set(name,handler)},
+  self:{location:{origin},skipWaiting(){},clients:{get:async id=>({postMessage:message=>onMessage?.(id,message)})},addEventListener:(name,handler)=>handlers.set(name,handler)},
   fetch,caches,URL,Response,Request,AbortController,crypto,TextDecoder,
   setTimeout:(callback,ms)=>{const id=++next;timers.set(id,{callback,ms});return id;},
   clearTimeout:id=>timers.delete(id)
@@ -18,7 +18,7 @@ function fixture(fetch,caches={}) {
   return done;
  },navigate(path,language="en-IN",method="GET"){
   let response;
-  handlers.get("fetch")({request:{url:new URL(path,origin).href,method,mode:"navigate",headers:new Headers({"Accept-Language":language})},
+  handlers.get("fetch")({resultingClientId:onMessage?"new-navigation":undefined,request:{url:new URL(path,origin).href,method,mode:"navigate",headers:new Headers({"Accept-Language":language})},
    respondWith:value=>{response=value;},waitUntil:promise=>{this.background=promise;}});
   return response;
  }};
@@ -293,6 +293,33 @@ test("cache writes are opportunistic and a stalled cache read cannot hide recove
  assert.equal((await pending).status,503);
 });
 
+test("only the affected live navigation is notified of a clean truncation, body error or stall",async()=>{
+ for(const failure of ["eof","error","stall","complete","oversize"]){
+  let stream;
+  const messages=[];
+  const original=new Response(new ReadableStream({start(controller){stream=controller;}}),{
+   headers:{"content-type":"text/html","cache-control":"no-store"}
+  });
+  const f=fixture(async()=>original,{},(id,message)=>messages.push([id,message.type]));
+  const pending=f.navigate("/menu");
+  stream.enqueue(new TextEncoder().encode(boot));
+  assert.equal(await pending,original);
+  if(failure==="error")stream.error(new Error("connection lost"));
+  else if(failure==="stall"){
+   const [{callback,ms}]=f.timers.values();
+   assert.equal(ms,8000);
+   callback();
+  }else{
+   if(failure==="oversize")stream.enqueue(new Uint8Array(2*1024*1024).fill(32));
+   if(failure==="complete"||failure==="oversize")stream.enqueue(new TextEncoder().encode("<main>Menu</main></body></html>"));
+   stream.close();
+  }
+  await f.background;
+  assert.deepEqual(messages,["complete","oversize"].includes(failure)?[]:[["new-navigation","gokul-launch-stream-incomplete"]],failure);
+  assert.equal(f.timers.size,0);
+ }
+});
+
 function retryDocument(script,{state=null,type="navigate",denyState=false}={}){
  const timers=[],listeners={},classes=[];
  const history={state,replaceState(next){if(denyState)throw Error("Unavailable");this.state=next;}};
@@ -329,4 +356,44 @@ test("two failed automatic reloads end in a manual retry without a reload loop",
  assert.equal(second.timers[0].cleared,true);
  second.listeners.pageshow({persisted:true});
  assert.deepEqual(second.classes,[]);
+});
+
+test("live retry shares the same history budget and ignores already hydrated pages",()=>{
+ const ts=require("typescript"), startup={};
+ new Function("exports",ts.transpileModule(fs.readFileSync("lib/pwaStartup.ts","utf8"),{
+  compilerOptions:{module:ts.ModuleKind.CommonJS}
+ }).outputText)(startup);
+ function setup(state=null,type="navigate"){
+  const attrs=new Map(),listeners={},timers=[],controller={};
+  const screen={hasAttribute:key=>attrs.has(key),getAttribute:key=>attrs.get(key),setAttribute:(key,value)=>attrs.set(key,value)};
+  let boot=screen,reloads=0;
+  const history={state,replaceState(next){this.state=next;}};
+  const location={pathname:"/menu",href:origin+"/menu",reload(){reloads++;}};
+  vm.runInNewContext(startup.liveLaunchRecoveryScript,{
+   location,history,navigator:{serviceWorker:{controller,addEventListener:(_name,fn)=>{listeners.message=fn;}}},
+   document:{readyState:"complete",querySelector:()=>boot,addEventListener:()=>{}},
+   performance:{getEntriesByType:()=>[{type}]},setTimeout:fn=>{timers.push(fn);},clearTimeout(){},addEventListener(){}
+  });
+  return {history,timers,attrs,removeBoot:()=>{boot=null;},reloads:()=>reloads,
+   fail:source=>listeners.message({source:source??controller,data:{type:"gokul-launch-stream-incomplete"}})};
+ }
+ const first=setup({unrelated:true});
+ first.fail({});
+ assert.equal(first.timers.length,0);
+ first.fail();first.fail();
+ assert.equal(first.timers.length,1);
+ assert.equal(first.history.state.unrelated,true);
+ first.timers[0]();
+ assert.equal(first.reloads(),1);
+ const second=setup(first.history.state,"reload");
+ second.fail();
+ second.removeBoot();
+ second.timers[0]();
+ second.fail();
+ assert.equal(second.reloads(),0);
+ assert.equal(second.timers.length,1);
+ const exhausted=setup(second.history.state,"reload");
+ exhausted.fail();
+ assert.equal(exhausted.attrs.get("data-live-launch-recovery"),"manual");
+ assert.equal(exhausted.timers.length,0);
 });
