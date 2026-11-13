@@ -59,7 +59,13 @@ export default function MobileBrandLaunch() {
         const cover = branch.mobileCoverImageUrl || branch.coverImageUrl;
         if (cover) {const image = new Image(); image.src = cover;}
     }, [branch, staff, paymentReturn, router]);
-    return <>{!hydrated&&!staff&&!paymentReturn&&<div className="gokul-mobile-boot" role="status" aria-label="Opening Gokul" data-gokul-storefront-boot={storefront ? "" : undefined}>{storefront && <span data-gokul-launch-ready="">Opening Gokul</span>}</div>}<dialog ref={dialog} className="gokul-mobile-launch" data-launch-initialized={initialized?"true":undefined} aria-labelledby="gokul-launch-title">
+    return <>{!hydrated&&!staff&&!paymentReturn&&<div className="gokul-mobile-boot" role={storefront ? undefined : "status"} aria-label={storefront ? undefined : "Opening Gokul"} data-gokul-storefront-boot={storefront ? "" : undefined}>{storefront && <>
+        <span data-gokul-launch-ready="">Opening Gokul</span>
+        <div className="gokul-boot-recovery">
+            <p role="status">Gokul is taking longer to open.</p>
+            <a href="">Try again</a>
+        </div>
+    </>}</div>}<dialog ref={dialog} className="gokul-mobile-launch" data-launch-initialized={initialized?"true":undefined} aria-labelledby="gokul-launch-title">
         <BrandBackdrop/>
         <div className="gokul-mobile-launch-copy">
             <h1 id="gokul-launch-title"><span className="sr-only"><T text="Gokul Sweets" /></span><ReferenceWordmark className="brand-loading-wordmark" /></h1>

@@ -116,12 +116,37 @@ test("HTML head, scripts, and hidden streamed segments do not release a blank do
  assert.equal(signal.aborted,true);
 });
 
+test("a stalled stream cannot be released by the opening marker in a hidden ancestor",async()=>{
+ const marker='<span data-gokul-launch-ready="">Opening Gokul</span>';
+ const f=fixture(async(_request,{signal})=>new Response(new ReadableStream({start(controller){
+  controller.enqueue(new TextEncoder().encode('<html><body><div hidden><section>'+marker+'</section></div>'));
+  signal.addEventListener("abort",()=>controller.error(signal.reason),{once:true});
+ }}),{headers:{"content-type":"text/html"}}));
+ const pending=f.navigate("/menu");
+ await new Promise(resolve=>setImmediate(resolve));
+ const [{callback,ms}]=f.timers.values();
+ assert.equal(ms,8000);
+ callback();
+ assert.equal((await pending).status,503);
+});
+
+test("completed hidden-only documents do not bypass recovery through the rollout fallback",async()=>{
+ for(const body of [
+  '<body><div hidden><h1>Streamed menu</h1></div></body>',
+  '<body style="display:none"><h1>Previous menu</h1></body>',
+  '<body><div><dialog><h1>Closed launch</h1></dialog></div></body>'
+ ]){
+  const f=fixture(async()=>new Response('<html>'+body+'</html>',{headers:{"content-type":"text/html"}}));
+  assert.equal((await f.navigate("/menu")).status,503);
+ }
+});
+
 test("split HTML markup releases the original stream as soon as the opening screen arrives",async()=>{
  let stream;
  const app=new Response(new ReadableStream({start(controller){stream=controller;}}),{headers:{"content-type":"text/html","cache-control":"no-store"}});
  const f=fixture(async()=>app);
  const pending=f.navigate("/menu");
- const parts=['<!doctype html><html><head><ti','tle>Gokul</title></head><body><!','-- <h1>Hidden</h1> --','><script>const fake="<body>";</scr','ipt><div class="gokul-mobile-boot"><span data-gokul-launch-','ready="">Opening Gokul</span></div>'];
+ const parts=['<!doctype html><html><head><ti','tle>Gokul</title></head><body><!','-- <h1>Hidden</h1> --','><script>const fake="<body>";</scr','ipt><div hidden><div><span data-gokul-launch-ready="">Opening Gokul</span></div></div><div class="gokul-mobile-boot"><span data-gokul-launch-','ready="">Opening Gokul</span></div>'];
  for(const part of parts.slice(0,-1))stream.enqueue(new TextEncoder().encode(part));
  await new Promise(resolve=>setImmediate(resolve));
  assert.equal(f.timers.size,1);

@@ -359,9 +359,23 @@ function launchMarkupProbe() {
     const decoder = new TextDecoder();
     const tag = /^<\/?([a-z][\w:-]*)(?:[^"'<>]|"[^"]*"|'[^']*')*>/i;
     const headTags = new Set(["html", "body", "base", "link", "meta", "head"]);
-    const nonRendering = new Set(["script", "style", "title", "template", "noscript"]);
+    const nonRendering = new Set(["script", "style", "title", "noscript"]);
     const marker = '<span data-gokul-launch-ready="">Opening Gokul</span>';
+    const voidTags = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
+    const visualTags = new Set(["canvas", "embed", "hr", "iframe", "img", "svg", "video"]);
+    const attributes = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>]+)))?/g;
+    const hiddenStack = [];
     let pending = "", raw = "", inHead = false, hasBodyMarkup = false;
+
+    function hidesContent(name, openingTag) {
+        const attrs = new Map();
+        for (const [, key, doubleQuoted, singleQuoted, unquoted] of openingTag.slice(name.length + 1, -1).matchAll(attributes)) {
+            const normalized = key.toLowerCase();
+            if (!attrs.has(normalized)) attrs.set(normalized, doubleQuoted ?? singleQuoted ?? unquoted ?? "");
+        }
+        return name === "template" || attrs.has("hidden") || (name === "dialog" && !attrs.has("open"))
+            || /(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*(?:hidden|collapse))\s*(?:!important)?\s*(?:;|$)/i.test(attrs.get("style") ?? "");
+    }
 
     return {hasBodyMarkup: () => hasBodyMarkup, read(bytes) {
         pending += decoder.decode(bytes, {stream: true});
@@ -382,7 +396,7 @@ function launchMarkupProbe() {
             const next = pending[offset];
             if (/\s/.test(next)) { offset++; continue; }
             if (next !== "<") {
-                if (!inHead) hasBodyMarkup = true;
+                if (!inHead && !hiddenStack.length) hasBodyMarkup = true;
                 const end = pending.indexOf("<", offset);
                 offset = end < 0 ? pending.length : end;
                 continue;
@@ -402,8 +416,8 @@ function launchMarkupProbe() {
                 continue;
             }
 
-            if (!inHead && rest.startsWith(marker)) return true;
-            if (!inHead && marker.startsWith(rest)) break;
+            if (!inHead && !hiddenStack.length && rest.startsWith(marker)) return true;
+            if (!inHead && !hiddenStack.length && marker.startsWith(rest)) break;
 
             const match = tag.exec(rest);
             if (!match) break;
@@ -412,12 +426,22 @@ function launchMarkupProbe() {
             const closing = match[0][1] === "/";
             if (name === "head") inHead = !closing;
             if (name === "body" && !closing) inHead = false;
-            if (closing || headTags.has(name)) continue;
+            if (closing) {
+                const ancestor = hiddenStack.lastIndexOf(name);
+                if (ancestor >= 0) hiddenStack.length = ancestor;
+                continue;
+            }
             if (nonRendering.has(name)) {
                 raw = "</" + name + ">";
                 continue;
             }
-            if (!inHead) hasBodyMarkup = true;
+            if (inHead || (headTags.has(name) && name !== "body" && name !== "html")) continue;
+            const hidden = hiddenStack.length > 0 || hidesContent(name, match[0]);
+            if (hidden) {
+                if (!voidTags.has(name)) hiddenStack.push(name);
+            } else if (visualTags.has(name)) {
+                hasBodyMarkup = true;
+            }
         }
         pending = pending.slice(offset);
         // Do not keep buffering a malformed tag indefinitely.
