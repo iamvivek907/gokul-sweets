@@ -114,6 +114,27 @@ public class OccasionCatalogueController {
         }
     }
 
+    /** Creates or updates a branch's configured bulk package. */
+    @PostMapping("/api/admin/branches/{branchId}/occasion-catalogue/packages")
+    @PreAuthorize("hasAuthority('MENU_MANAGE')")
+    public void savePackage(
+            @PathVariable long branchId,
+            @Valid @RequestBody OccasionCatalogue.PackagePreset input) {
+        long started =
+                MethodTiming.start(
+                        OccasionCatalogueController.class,
+                        "savePackage(long,OccasionCatalogue.PackagePreset)");
+        try {
+            staff.requireBranchAccess(branchId);
+            catalogue.savePackage(branchId, input);
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    OccasionCatalogueController.class,
+                    "savePackage(long,OccasionCatalogue.PackagePreset)");
+        }
+    }
+
     /**
      * Handles {@code PUT /api/admin/branches/{branchId}/occasion-catalogue/branding} for occasion
      * catalogue.

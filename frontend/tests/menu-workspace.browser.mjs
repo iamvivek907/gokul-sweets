@@ -114,7 +114,15 @@ try {
       if(path.endsWith("/pickup-discovery")){
         capacityCalls++;assert.equal(req.method(),"GET");assert.equal(url.searchParams.get("days"),"8");
         if(capacityState==="error")return route.fulfill({status:503,headers,json:{message:"Unavailable"}});
-        return route.fulfill({headers,json:{dates:[{slots:capacityState==="ready"?[{normalAvailable:true}]:[]}]}});
+        const date=url.searchParams.get("startDate");
+        assert.match(date,/^\d{4}-\d{2}-\d{2}$/);
+        const ready=capacityState==="ready";
+        const slot={id:1,branchId:Number(path.split("/").at(-2)),slotDate:date,startTime:"12:00:00",endTime:"12:30:00",
+          active:true,capacity:10,bookedCount:0,remainingCapacity:10,priorityEnabled:false,
+          priorityCapacity:0,priorityBookedCount:0,priorityRemainingCapacity:0,priorityCharge:0};
+        const maximumDate=new Date(Date.parse(date)+7*86400000).toISOString().slice(0,10);
+        return route.fulfill({headers,json:{fulfilmentType:"PICKUP",today:date,maximumDate,
+          dates:[{date,available:ready,slots:ready?[{slot,normalAvailable:true,priorityAvailable:false,reason:null}]:[]}]}});
       }
       if (path === "/api/admin/categories" && req.method() === "POST") {
         const input = req.postDataJSON();

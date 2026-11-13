@@ -1,6 +1,6 @@
 import {getCartSnapshot,parseCart} from "@/lib/cartStorage";
 import {mealClaim} from "@/lib/cartMeals";
-import {apiClient} from "@/services/apiClient";
+import {apiClient,ApiError} from "@/services/apiClient";
 import type {CartItem,CartState} from "@/types/cart";
 import type {PickupSlot} from "@/types/pickup";
 
@@ -50,6 +50,18 @@ function expandMenuPreview(data: CartAvailability | CompactMenuAvailability): Ca
     })}))};
 }
 
+function readAvailability(data: CartAvailability | CompactMenuAvailability): CartAvailability {
+    const itemsValid=(items:ItemAvailability[]|undefined)=>items==null||Array.isArray(items)
+        &&items.every(item=>Number.isSafeInteger(item?.productId)&&typeof item.available==="boolean");
+    if(!data||!Array.isArray(data.dates))throw new Error("We couldn’t check pickup availability");
+    const expanded=expandMenuPreview(data);
+    if(!expanded.dates.every(day=>typeof day?.date==="string"&&itemsValid(day.items)&&Array.isArray(day.slots)
+        &&day.slots.every(slot=>Number.isSafeInteger(slot?.slot?.id)&&itemsValid(slot.issues)))){
+        throw new Error("We couldn’t check pickup availability");
+    }
+    return expanded;
+}
+
 export function availabilityItems(items: CartItem[], adjustedCart?: CartState) {
     const mapped: import("@/types/order").CreateOrderItemRequest[]=items.map(item => ({
         productId: item.product.id,
@@ -70,7 +82,7 @@ export async function checkCartAvailability(
     const data = await apiClient<CartAvailability | CompactMenuAvailability>(`/api/branches/${branchId}/availability${menuPreview ? "?menuPreview=true&compact=true&versioned=true" : ""}`, {
         method: "POST", signal, body: JSON.stringify({startDate, days, items: items.map(({productId,quantity,weightGrams})=>({productId,quantity,weightGrams})), fulfilmentType: "PICKUP"})
     });
-    return {...expandMenuPreview(data), receivedMonotonic: typeof performance === "undefined" ? 0 : performance.now()};
+    return {...readAvailability(data), receivedMonotonic: typeof performance === "undefined" ? 0 : performance.now()};
 }
 
 /** Server-relative boundary; older servers retain the existing periodic refresh fallback. */
@@ -81,8 +93,28 @@ export function menuPreviewDeadline(data: CartAvailability): number | null {
 }
 
 /** Branch capacity only; item validation follows on the selected date. */
-export function discoverPickupDates(branchId:number,startDate:string,days:number,signal?:AbortSignal) {
-    return apiClient<CartAvailability>(`/api/branches/${branchId}/pickup-discovery?startDate=${encodeURIComponent(startDate)}&days=${days}`,{signal});
+export async function discoverPickupDates(branchId:number,startDate:string,days:number,signal?:AbortSignal) {
+    return readAvailability(await apiClient<CartAvailability>(`/api/branches/${branchId}/pickup-discovery?startDate=${encodeURIComponent(startDate)}&days=${days}`,{signal}));
+}
+
+/** Retry a transient advisory failure once; never delay a superseded branch or pickup. */
+export async function retryMenuRead<T>(read:()=>Promise<T>,signal?:AbortSignal):Promise<T>{
+    try{return await read();}
+    catch(error){
+        signal?.throwIfAborted();
+        const transient=error instanceof TypeError
+            || typeof ApiError==="function"&&error instanceof ApiError&&[408,429,500,502,503,504].includes(error.status);
+        if(!transient)throw error;
+        const retryAfter=typeof ApiError==="function"&&error instanceof ApiError?error.retryAfterMs:null;
+        if(retryAfter!==null&&retryAfter>1500)throw error;
+        await new Promise<void>((resolve,reject)=>{
+            const abort=()=>{clearTimeout(timer);reject(signal?.reason);};
+            const timer=setTimeout(()=>{signal?.removeEventListener("abort",abort);resolve();},Math.max(180,retryAfter??0));
+            signal?.addEventListener("abort",abort,{once:true});
+        });
+        signal?.throwIfAborted();
+        return read();
+    }
 }
 
 /** Check the full menu without exceeding the endpoint's 100-item request limit.
@@ -99,7 +131,7 @@ export async function checkMenuAvailability(
         const batches = [items.slice(offset, offset + 100), items.slice(offset + 100, offset + 200)].filter(batch => batch.length);
         const complete = await Promise.all(batches.map(async batch => {
             signal?.throwIfAborted();
-            return checkCartAvailability(branchId, startDate, days, batch, signal, true);
+            return retryMenuRead(()=>checkCartAvailability(branchId, startDate, days, batch, signal, true),signal);
         }));
         responses.push(...complete);
     }

@@ -1,0 +1,9 @@
+.planner{color:#34252f}
+.chooser{margin-block:20px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.chooser button{min-height:58px;border:1px solid #e5d2dd;border-radius:14px;background:#fff9f6;padding:9px 10px;text-align:start;font-weight:750;color:#6d2341}
+.chooser button small{display:block;margin-top:3px;color:#644e59;font-size:.75rem;font-weight:500}
+.chooser button[aria-pressed=true]{background:#8f1838;color:#fff;border-color:#8f1838}
+.chooser button[aria-pressed=true] small{color:#fff0f4}
+.chooser button:focus-visible{outline:2px solid #8f1838;outline-offset:2px}
+.empty{margin-block:12px;padding:14px;border-radius:12px;background:#fbf0f4;color:#603548}
+:global(.future-storefront[data-customer-design=reference]) .planner .chooser button[aria-pressed=true]{background:#8f1838!important;color:#fff!important}

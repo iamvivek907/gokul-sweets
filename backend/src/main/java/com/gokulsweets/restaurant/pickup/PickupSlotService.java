@@ -409,6 +409,9 @@ public class PickupSlotService {
              * Existing passed slot should not
              * be editable.
              */
+            if (slot.getOccasionEnquiryId() != null)
+                throw new IllegalArgumentException(
+                        "Manage bulk pickup through its occasion quote.");
             pickupSlotValidationService.validateNotPassed(slot);
             /*
              * Validate new requested date/time.
@@ -567,6 +570,9 @@ public class PickupSlotService {
                                         return new IllegalArgumentException(
                                                 "Pickup slot not found: " + slotId);
                                     });
+            if (slot.getOccasionEnquiryId() != null)
+                throw new IllegalArgumentException(
+                        "Manage bulk pickup through its occasion quote.");
             pickupSlotValidationService.validateNotPassed(slot);
             slot.setActive(false);
             pickupSlotRepository.save(slot);

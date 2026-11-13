@@ -23,7 +23,12 @@ class SmartOrderingRulesTest {
     private final EnhancementProperties features = new EnhancementProperties();
     private final BranchPickupSettingsRepository settings =
             mock(BranchPickupSettingsRepository.class);
-    private final SmartOrderingRules rules = new SmartOrderingRules(features, settings, clock);
+    private final SmartOrderingRules rules =
+            new SmartOrderingRules(
+                    features,
+                    settings,
+                    clock,
+                    org.mockito.Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class));
 
     @Test
     void allFlagsDefaultOffAndSelectionRequiresAvailability() {
@@ -77,7 +82,12 @@ class SmartOrderingRulesTest {
             assertThat(exposed.inventoryAutomationV2()).isEqualTo(selected == 2);
             assertThat(exposed.customerHomeV2()).isEqualTo(selected == 3);
             assertThat(exposed.homepageCampaigns()).isEqualTo(selected == 4);
-            new SmartOrderingRules(independent, settings, clock)
+            new SmartOrderingRules(
+                            independent,
+                            settings,
+                            clock,
+                            org.mockito.Mockito.mock(
+                                    org.springframework.jdbc.core.JdbcTemplate.class))
                     .validateWindow(slot(LocalDate.now(clock).plusDays(1), LocalTime.NOON));
         }
         verify(settings, times(1)).findByBranchId(1L);
@@ -103,6 +113,36 @@ class SmartOrderingRulesTest {
         settings.setEnabled(false);
         assertThat(rules.windowReason(slot(LocalDate.now(clock), LocalTime.NOON), settings))
                 .contains("closed");
+    }
+
+    @Test
+    void rollingWindowOverridesManualLimitAndKeepsGlobalLimitAndBranchClosure() {
+        var jdbc = org.mockito.Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class);
+        var active = new SmartOrderingRules(features, settings, clock, jdbc);
+        var manual = new BranchPickupSettings();
+        manual.setAdvanceBookingDays(7);
+        when(jdbc.queryForList(anyString(), eq(Integer.class), eq(1L))).thenReturn(List.of(13));
+        assertThat(active.bookingDays(1L, manual)).isEqualTo(13);
+        assertThat(
+                        active.windowReason(
+                                slot(LocalDate.now(clock).plusDays(13), LocalTime.NOON), manual))
+                .isNull();
+        assertThat(
+                        active.windowReason(
+                                slot(LocalDate.now(clock).plusDays(14), LocalTime.NOON), manual))
+                .contains("window");
+        when(jdbc.queryForList(anyString(), eq(Integer.class), eq(1L))).thenReturn(List.of(59));
+        assertThat(active.bookingDays(1L, manual)).isEqualTo(features.getFutureOrderingDays());
+        manual.setEnabled(false);
+        assertThat(
+                        active.windowReason(
+                                slot(LocalDate.now(clock).plusDays(1), LocalTime.NOON), manual))
+                .contains("closed");
+        // Paused and absent automation both use the saved manual limit again.
+        when(jdbc.queryForList(anyString(), eq(Integer.class), eq(1L))).thenReturn(List.of());
+        assertThat(active.bookingDays(1L, manual)).isEqualTo(7);
+        when(jdbc.queryForList(anyString(), eq(Integer.class), eq(1L))).thenReturn(List.of(0));
+        assertThat(active.bookingDays(1L, manual)).isZero();
     }
 
     @Test
@@ -138,7 +178,12 @@ class SmartOrderingRulesTest {
     void leadTimeCrossesIndiaMidnightWithoutAddingAWholeDay() {
         var midnightClock =
                 Clock.fixed(Instant.parse("2026-09-22T18:25:00Z"), ZoneId.of("Asia/Kolkata"));
-        var midnightRules = new SmartOrderingRules(features, settings, midnightClock);
+        var midnightRules =
+                new SmartOrderingRules(
+                        features,
+                        settings,
+                        midnightClock,
+                        org.mockito.Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class));
         var policy = new BranchInventoryPolicy();
         policy.setBookingHorizonDays(3);
         policy.setProductionLeadMinutes(15);

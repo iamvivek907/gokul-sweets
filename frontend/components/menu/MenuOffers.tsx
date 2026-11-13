@@ -13,15 +13,20 @@ import type {CustomerSession} from "@/components/customer/CustomerIdentityPanel"
 import type {AvailableRebateResponse} from "@/types/rebate";
 import MenuDiscoverySheet from "./MenuDiscoverySheet";
 import OfferLabelIcon from "./OfferLabelIcon";
+import styles from "./MenuOfferShortcut.module.css";
 import {T} from "@/lib/language";
 type Offers={offers:AvailableRebateResponse[];spendTargets?:AvailableRebateResponse[]};
 const money=(amount:number)=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:2}).format(amount);
+const publicDiscount=(offer:PublicOffer)=>{
+ const tier=offer.tiers[0];
+ return tier?money(tier.rebateAmount):offer.rebateType==="PERCENTAGE"?`${offer.rebateValue}%`:money(offer.rebateValue??0);
+};
 const publicLabel=(offer:PublicOffer)=>{
  const tier=offer.tiers[0],minimum=tier?.minimumOrderAmount??offer.minimumOrderAmount;
- const discount=tier?money(tier.rebateAmount):offer.rebateType==="PERCENTAGE"?`${offer.rebateValue}%`:money(offer.rebateValue??0);
+ const discount=publicDiscount(offer);
  return `${discount} off${minimum>0?` above ${money(minimum)}`:""}${offer.rebateType==="PERCENTAGE"&&offer.maximumDiscountAmount?` · up to ${money(offer.maximumDiscountAmount)}`:""}`;
 };
-export default function MenuOffers({branchId,onTarget}:{branchId:number;onTarget:(target:AvailableRebateResponse|null)=>void}){
+export default function MenuOffers({branchId}:{branchId:number}){
  const cart=useCart(),pickup=usePickupIntent(branchId);
  const [session,setSession]=useState<CustomerSession|null|undefined>(undefined),[identity,setIdentity]=useState(0),[open,setOpen]=useState(false),[retry,setRetry]=useState(0);
  const catalog=usePublicMenuOffers(branchId,retry);
@@ -35,12 +40,15 @@ export default function MenuOffers({branchId,onTarget}:{branchId:number;onTarget
  const current=result?.key===key?result:null;
  const targetValues=JSON.stringify(current?.value?.spendTargets??[]);
  const target=useMemo(()=>usefulRebateTarget(JSON.parse(targetValues)),[targetValues]);
- useEffect(()=>{onTarget(target);return()=>onTarget(null);},[onTarget,target]);
  const offers=current?.value?.offers??[],targets=current?.value?.spendTargets??[];
  const best=offers.reduce<AvailableRebateResponse|null>((best,o)=>!best||o.payableAfterRebate<best.payableAfterRebate?o:best,null);
- const headline=best&&best.rebateAmount>0?`Save ${money(best.rebateAmount)} on this order`:target?`${money(target.nextSlabRebateAmount!)} off above ${money(target.nextSlabMinimumOrderAmount??0)}`:!current?.value&&publicOffers.length?publicLabel(publicOffers[0]):"Offers & savings";
+ const headline=best&&best.rebateAmount>0?`Save ${money(best.rebateAmount)} on this order`:target?`${money(target.nextSlabRebateAmount!)} off above ${money(target.nextSlabMinimumOrderAmount??0)}`:publicOffers.length?publicLabel(publicOffers[0]):"Offers & savings";
  const summary=catalog.failed?"Offers could not be checked. Try again.":!cart.items.length?(publicOffers.length?"Standard pickup · eligibility checked at checkout":"Add items to discover eligible savings"):!pickup.selection?"Choose pickup to check eligible offers":session===undefined?"Checking your offers…":session===null?"Offers could not be checked. Try again.":!contact?"Verify your phone at checkout to check your offers":!current?"Checking your offers…":!current.value?"Offers could not be checked. Try again.":offers.length?`${offers.length} eligible offer${offers.length===1?"":"s"} · best selected at checkout`:target?`Add ${money(target.amountNeededForNextSlab!)} in eligible items to unlock ${money(target.nextSlabRebateAmount!)} off`:"No eligible offers for this selection";
- return <section className="menu-offers" aria-label="Menu offers"><button id="menu-offers-open" type="button" onClick={()=>setOpen(true)} aria-haspopup="dialog"><span aria-hidden="true"><OfferLabelIcon /></span><span><strong><T text={headline}/></strong><small role="status"><T text={summary}/></small></span><span>{new Set([...publicOffers,...offers,...targets].map(o=>o.rebateId)).size||"View"} <T text="offers"/></span></button>
+ const discount=best&&best.rebateAmount>0?money(best.rebateAmount):target?money(target.nextSlabRebateAmount!):publicOffers[0]?publicDiscount(publicOffers[0]):null;
+ return <><button id="menu-offers-open" type="button" className={styles.shortcut} onClick={()=>setOpen(true)} aria-haspopup="dialog" aria-expanded={open} title={headline}>
+ <span className={styles.icon} aria-hidden="true"><OfferLabelIcon /></span>
+ <span className={styles.copy}><strong><T text="Offers"/></strong>{discount&&<small>{discount} <T text="off"/></small>}</span>
+ </button>
  {open&&<MenuDiscoverySheet title="Offers & savings" onClose={()=>setOpen(false)}><p role="status"><T text={summary}/></p>{(catalog.failed||session===null||current&&!current.value&&request)&&<button type="button" onClick={()=>{setSession(undefined);setResult(null);setRetry(v=>v+1);}}><T text="Retry offers"/></button>}{offers.map(o=><article className="menu-offer-card" key={o.rebateId}><strong className="menu-offer-name"><OfferLabelIcon />{o.name}</strong><p><T text="Save"/> {money(o.rebateAmount)} · {o.code}</p>{o.description&&<p>{o.description}</p>}<small><T text="Eligible now · best offer selected at checkout"/></small></article>)}{targets.map(o=><article className="menu-offer-card" key={`target-${o.rebateId}`}><strong className="menu-offer-name"><OfferLabelIcon />{o.name}</strong><p><T text="Add"/> {money(o.amountNeededForNextSlab??0)} <T text="in eligible items"/></p><p><T text="Unlock"/> {money(o.nextSlabRebateAmount??0)} <T text="off"/></p>{o.description&&<p>{o.description}</p>}<small><T text="Add eligible item value before tax. Estimate uses current loyalty savings; checkout checks the updated basket."/></small></article>)}{publicOffers.filter(o=>![...offers,...targets].some(known=>known.rebateId===o.rebateId)).map(o=><article className="menu-offer-card" key={`public-${o.rebateId}`}><strong className="menu-offer-name"><OfferLabelIcon />{o.name}</strong><p>{publicLabel(o)}</p>{o.description&&<p>{o.description}</p>}<small>{o.code} · <T text="Standard pickup. Eligibility and usage limits checked at checkout."/></small>{o.tiers.length>1&&<ul>{o.tiers.slice(1).map(t=><li key={t.minimumOrderAmount}>{money(t.rebateAmount)} <T text="off above"/> {money(t.minimumOrderAmount)}</li>)}</ul>}</article>)}{targets.length>0&&<button type="button" className="menu-offer-browse" onClick={()=>{setOpen(false);requestAnimationFrame(()=>document.getElementById("gokul-menu-items")?.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"instant":"smooth",block:"start"}));}}><T text="Browse items to reach an offer"/></button>}</MenuDiscoverySheet>}
- </section>;
+ </>;
 }

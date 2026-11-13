@@ -13,16 +13,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.UUID;
 
 /** Persisted pickup slot state. */
 @Entity
-@Table(
-        name = "pickup_slots",
-        uniqueConstraints = {
-            @UniqueConstraint(
-                    name = "uk_pickup_slots_branch_date_time",
-                    columnNames = {"branch_id", "slot_date", "start_time", "end_time"})
-        })
+@Table(name = "pickup_slots")
 @Getter
 @Setter
 public class PickupSlot {
@@ -30,6 +25,9 @@ public class PickupSlot {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(updatable = false)
+    private UUID occasionEnquiryId;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "branch_id", nullable = false)

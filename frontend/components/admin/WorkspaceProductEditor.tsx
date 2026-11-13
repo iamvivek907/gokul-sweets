@@ -72,6 +72,7 @@ export default function WorkspaceProductEditor({
       step: item?.weightStepGrams ?? 250,
       tax: item?.taxCategoryId ?? 0,
       assigned: [branch],
+      occasionOnly: false,
       available: item?.available ?? false,
       remove: false,
       quantity: String(item?.allocation?.approvedQuantity ?? ""),
@@ -95,6 +96,7 @@ export default function WorkspaceProductEditor({
   const [minimum, setMinimum] = useState(initialDraft.minimum);
   const [step, setStep] = useState(initialDraft.step);
   const [tax, setTax] = useState(initialDraft.tax);
+  const [occasionOnly, setOccasionOnly] = useState(initialDraft.occasionOnly);
   const [assigned, setAssigned] = useState(initialDraft.assigned);
   const [available, setAvailable] = useState(initialDraft.available);
   const [remove, setRemove] = useState(initialDraft.remove);
@@ -123,6 +125,7 @@ export default function WorkspaceProductEditor({
       step,
       tax,
       assigned,
+      occasionOnly,
       available,
       remove,
       quantity,
@@ -148,6 +151,7 @@ export default function WorkspaceProductEditor({
     step,
     tax,
     assigned,
+    occasionOnly,
     available,
     remove,
     quantity,
@@ -204,7 +208,7 @@ export default function WorkspaceProductEditor({
             const created = await workspaceRequest<{ productId: number }>(
               branch,
               "",
-              jsonRequest("POST", { details, branchIds: assigned }),
+              jsonRequest("POST", { details, branchIds: assigned, occasionOnly }),
             );
             productId = created.productId;
             setCreatedId(productId);
@@ -533,6 +537,11 @@ export default function WorkspaceProductEditor({
             <section>
               <h3>Photo & branch assignment</h3>
               <WorkspaceMediaEditor onChange={setFile} />
+              <label className="flex items-start gap-2">
+                <input type="checkbox" checked={occasionOnly} disabled={!!createdId}
+                  onChange={event=>setOccasionOnly(event.target.checked)} />
+                <span>Bulk orders only<span className="block text-sm">Hide from the daily menu from creation. Publish it for each branch in the occasion catalogue when ready.</span></span>
+              </label>
               <div className={styles.checklist}>
                 {branches.map((b) => (
                   <label key={b.id}>
@@ -605,6 +614,11 @@ export default function WorkspaceProductEditor({
           {mode === "photo" && (
             <>
               <WorkspaceMediaEditor onChange={setFile} />
+              <label className="flex items-start gap-2">
+                <input type="checkbox" checked={occasionOnly} disabled={!!createdId}
+                  onChange={event=>setOccasionOnly(event.target.checked)} />
+                <span>Bulk orders only<span className="block text-sm">Hide from the daily menu from creation. Publish it for each branch in the occasion catalogue when ready.</span></span>
+              </label>
               <label>
                 <span>
                   <input
