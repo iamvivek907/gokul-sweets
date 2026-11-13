@@ -19,6 +19,7 @@ public class RollingAutomationDiagnostics {
     private final Clock clock;
     private final EnhancementProperties features;
     private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
+    private static final Duration RUN_INACTIVITY_LIMIT = Duration.ofMinutes(10);
 
     /** One scheduled or staff-triggered execution, including rolled-back failures. */
     public record Run(
@@ -119,7 +120,7 @@ public class RollingAutomationDiagnostics {
                         + " status='RUNNING' AND COALESCE(last_progress_at,started_at)<?",
                     java.sql.Timestamp.from(clock.instant()),
                     branch,
-                    java.sql.Timestamp.from(clock.instant().minusSeconds(3600)));
+                    java.sql.Timestamp.from(clock.instant().minus(RUN_INACTIVITY_LIMIT)));
         } finally {
             MethodTiming.finish(
                     started, RollingAutomationDiagnostics.class, "expireStaleRuns(long)");
@@ -415,7 +416,7 @@ public class RollingAutomationDiagnostics {
                 }
             }
             var midnight = today.atStartOfDay(IST).toInstant();
-            var staleBefore = now.toInstant().minusSeconds(600);
+            var staleBefore = now.toInstant().minus(RUN_INACTIVITY_LIMIT);
             var execution =
                     jdbc.query(
                             """

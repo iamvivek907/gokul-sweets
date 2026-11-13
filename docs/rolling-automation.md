@@ -178,9 +178,10 @@ History records scheduled/manual triggers, authenticated staff username or syste
 start/finish times, result, created counts, elapsed time, lock wait and lock-held time. Keep the
 latest thirty completed runs per branch plus in-progress runs; the API returns at most thirty
 recent entries. Counts from committed dates survive restarts. Successful and failed date
-attempts both refresh run activity. Health warns after ten minutes without activity. The next
-invocation marks a run failed after an hour without activity. Both thresholds use the start time
-until the first date attempt finishes. Coverage health stays in progress while a run is active,
+attempts both refresh run activity. After ten minutes without activity, health marks the run
+interrupted and generation can be retried. The next attempt closes the interrupted run before
+starting. The inactivity check uses the start time until the first date attempt finishes.
+Coverage health stays in progress while a run is active,
 and the outcome banner follows completion order. Only one run can generate coverage per branch
 at a time, even across application instances.
 Earlier last-success timestamps remain valid after upgrade.

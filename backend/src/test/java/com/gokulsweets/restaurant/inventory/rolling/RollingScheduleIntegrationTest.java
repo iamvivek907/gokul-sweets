@@ -1259,7 +1259,7 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
 
         var laterAudit =
                 new RollingAutomationDiagnostics(
-                        jdbc, Clock.fixed(now.plusSeconds(3700), clock.getZone()), features);
+                        jdbc, Clock.fixed(now.plusSeconds(660), clock.getZone()), features);
         assertThat(
                         laterAudit
                                 .health(f.branch(), service.workspace(f.branch()), List.of(active))
@@ -1269,6 +1269,40 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
         var interrupted =
                 laterAudit.runs(f.branch()).stream()
                         .filter(run -> run.id() == id)
+                        .findFirst()
+                        .orElseThrow();
+        assertThat(interrupted.status()).isEqualTo("FAILED");
+        assertThat(interrupted.slotsCreated()).isEqualTo(4);
+        assertThat(interrupted.allocationsCreated()).isEqualTo(2);
+    }
+
+    @Test
+    void interruptedRunCanBeRetriedAsSoonAsHealthReportsIt() {
+        var f = fixture();
+        service.save(f.branch(), maximumPlan(-1, 2), "manager");
+        var now = clock.instant();
+        var audit = new RollingAutomationDiagnostics(jdbc, clock, features);
+        var abandoned =
+                new RollingAutomationDiagnostics(
+                        jdbc, Clock.fixed(now.minusSeconds(660), clock.getZone()), features);
+        long runId = abandoned.start(f.branch(), "SCHEDULED", "system");
+        audit.recordProgress(runId, 4, 2);
+
+        assertThat(service.inspect(f.branch()).health().status()).isEqualTo("RUNNING");
+        assertThatThrownBy(() -> service.reconcile(f.branch(), "MANUAL", "manager"))
+                .hasMessageContaining("Generation is already in progress");
+
+        abandoned.recordProgress(runId, 0, 0);
+        assertThat(service.inspect(f.branch()).health().interrupted()).isTrue();
+        service.reconcile(f.branch(), "MANUAL", "manager");
+
+        var workspace = service.inspect(f.branch());
+        assertThat(workspace.runs().getFirst().status()).isEqualTo("SUCCESS");
+        assertThat(workspace.health().interrupted()).isFalse();
+        assertThat(workspace.health().lastRunFailed()).isFalse();
+        var interrupted =
+                workspace.runs().stream()
+                        .filter(run -> run.id() == runId)
                         .findFirst()
                         .orElseThrow();
         assertThat(interrupted.status()).isEqualTo("FAILED");
