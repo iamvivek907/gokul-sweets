@@ -32,9 +32,33 @@ class AutomationFlagTest {
         var rule = new InventoryAutomationRule();
         rule.setBranchProduct(product);
         when(repository.findByActiveTrue()).thenReturn(List.of(rule));
+        var transactions = mock(org.springframework.transaction.support.TransactionTemplate.class);
+        doAnswer(
+                        call -> {
+                            ((java.util.function.Consumer<
+                                                    org.springframework.transaction
+                                                            .TransactionStatus>)
+                                            call.getArgument(0))
+                                    .accept(
+                                            mock(
+                                                    org.springframework.transaction
+                                                            .TransactionStatus.class));
+                            return null;
+                        })
+                .when(transactions)
+                .executeWithoutResult(any());
         var scheduler =
                 new InventoryAutomationScheduler(
-                        repository, generation, properties, clock, features);
+                        org.mockito.Mockito.mock(org.springframework.jdbc.core.JdbcTemplate.class),
+                        transactions,
+                        mock(
+                                com.gokulsweets.restaurant.inventory.rolling.RollingScheduleService
+                                        .class),
+                        repository,
+                        generation,
+                        properties,
+                        clock,
+                        features);
         scheduler.generateDailyAllocations();
         verify(generation)
                 .generate(

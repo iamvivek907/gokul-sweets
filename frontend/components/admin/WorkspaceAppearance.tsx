@@ -8,6 +8,8 @@ import {
 } from "@/lib/menuWorkspaceDraft";
 import WorkspaceDialog from "./WorkspaceDialog";
 import CampaignFramingEditor from "./CampaignFramingEditor";
+import {apiClient} from "@/services/apiClient";
+import type {MenuCategory,MenuProduct} from "@/types/menu";
 import { workspaceRequest, jsonRequest } from "@/services/menuWorkspaceApi";
 import { fromIndiaDateTimeInput, toIndiaDateTimeInput } from "@/lib/campaigns";
 import { campaignFrameStyle, type CampaignFrame } from "@/lib/campaignFraming";
@@ -29,7 +31,9 @@ export type MenuBanner = {
   posterUrl: string | null;
   frame: CampaignFrame;
 };
+export type MenuPairing = {seedProductId:number;suggestedProductId:number};
 export type AppearanceConfig = {
+  pairings?: MenuPairing[];
   banners: MenuBanner[];
   categories: { id: number; order: number; imageUrl: string | null }[];
 };
@@ -64,6 +68,7 @@ export default function WorkspaceAppearance({
   const [editing, setEditing] = useState<MenuBanner | null>(
     restoredDraft?.editing ?? null,
   );
+  const [pairingEditor,setPairingEditor]=useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [categoryEditor, setCategoryEditor] = useState(
@@ -152,6 +157,7 @@ export default function WorkspaceAppearance({
       setSnapshot(result);
       setEditing(null);
       setCategoryEditor(false);
+      setPairingEditor(false);
       setConfirm(false);
       onNotice(
         publish
@@ -285,6 +291,9 @@ export default function WorkspaceAppearance({
           >
             Category images & order
           </button>
+          <button type="button" disabled={busy||reloading||needsReload} onClick={()=>{setError("");setPairingEditor(true);}}>
+            Dish pairings
+          </button>
           <button
             className={styles.primary}
             disabled={busy || reloading || needsReload}
@@ -294,6 +303,8 @@ export default function WorkspaceAppearance({
           </button>
         </div>
       </div>
+      {pairingEditor&&<PairingEditor branch={branch} pairs={config.pairings??[]} error={error} busy={busy||reloading||needsReload}
+        onClose={()=>setPairingEditor(false)} onSave={pairings=>void save({...config,pairings})}/>}
       <div className={styles.groupGrid}>
         {config.banners.map((b) => (
           <article className={styles.product} key={b.key}>
@@ -311,7 +322,7 @@ export default function WorkspaceAppearance({
           </article>
         ))}
       </div>
-      {error && !editing && !categoryEditor && !confirm && (
+      {error && !editing && !categoryEditor && !pairingEditor && !confirm && (
         <p role="alert" className={styles.error}>
           {error}
         </p>
@@ -671,4 +682,39 @@ export default function WorkspaceAppearance({
       )}
     </section>
   );
+}
+
+function PairingEditor({branch,pairs,busy,error,onClose,onSave}:{branch:number;pairs:MenuPairing[];busy:boolean;error:string;onClose:()=>void;onSave:(pairs:MenuPairing[])=>void}){
+  const [draft,setDraft]=useState(pairs);
+  const [catalog,setCatalog]=useState<MenuProduct[]|null>(null);
+  const [failed,setFailed]=useState(false);
+  const [revision,retry]=useState(0);
+  const [seed,setSeed]=useState(0),[suggestion,setSuggestion]=useState(0);
+  useEffect(()=>{
+    const controller=new AbortController();
+    void apiClient<MenuCategory[]>(`/api/menu?branchId=${branch}`,{signal:controller.signal})
+      .then(categories=>{if(!controller.signal.aborted)setCatalog(categories.flatMap(category=>category.products).sort((a,b)=>a.name.localeCompare(b.name)));})
+      .catch(()=>{if(!controller.signal.aborted)setFailed(true);});
+    return()=>controller.abort();
+  },[branch,revision]);
+  const name=(id:number)=>catalog?.find(product=>product.id===id)?.name??`Dish #${id}`;
+  const canAdd=!!seed&&!!suggestion&&seed!==suggestion&&draft.length<100&&!draft.some(pair=>pair.seedProductId===seed&&pair.suggestedProductId===suggestion);
+  return <WorkspaceDialog title="Dish pairings" scope="Selected branch" busy={busy} onClose={onClose} footer={<button type="button" className={styles.primary} disabled={busy} onClick={()=>onSave(draft)}>Save pairings draft</button>}>
+    {error&&<p className={styles.error} role="alert">{error}</p>}
+    <p>Choose which dishes this branch should suggest together. Pairings appear only when the suggested dish can be ordered. Save the draft, then use Review &amp; publish to make it live.</p>
+    {failed?<button type="button" onClick={()=>{setFailed(false);retry(value=>value+1);}}>Retry loading dishes</button>:!catalog&&<p role="status">Loading dishes…</p>}
+    <div className={styles.row}>
+      <label>When a customer adds <select disabled={!catalog||busy} value={seed} onChange={event=>setSeed(Number(event.target.value))}>
+        <option value={0}>Choose dish</option>{catalog?.map(product=><option key={product.id} value={product.id}>{product.name} · {product.categoryName}</option>)}
+      </select></label>
+      <label>Suggest <select disabled={!catalog||busy} value={suggestion} onChange={event=>setSuggestion(Number(event.target.value))}>
+        <option value={0}>Choose dish</option>{catalog?.filter(product=>product.id!==seed).map(product=><option key={product.id} value={product.id}>{product.name} · {product.categoryName}</option>)}
+      </select></label>
+      <button type="button" disabled={!canAdd||busy} onClick={()=>{setDraft(value=>[...value,{seedProductId:seed,suggestedProductId:suggestion}]);setSuggestion(0);}}>Add pairing</button>
+    </div>
+    <ul>{draft.map((pair,index)=><li key={`${pair.seedProductId}-${pair.suggestedProductId}`} className={styles.row}>
+      <span>{name(pair.seedProductId)} → {name(pair.suggestedProductId)}</span>
+      <button type="button" aria-label={`Remove pairing: ${name(pair.seedProductId)} and ${name(pair.suggestedProductId)}`} disabled={busy} onClick={()=>setDraft(value=>value.filter((_,position)=>position!==index))}>Remove</button>
+    </li>)}</ul>
+  </WorkspaceDialog>;
 }

@@ -135,15 +135,17 @@ export function parseCart(value: string): CartState {
 }
 
 
-export function saveCart(cart: CartState): void {
+export function saveCart(cart: CartState): string {
     if (typeof window === "undefined") {
-        return;
+        return "";
     }
 
     cart=reconcileCartMeals(cart);
     if (cart.items.length && cart.branchId !== null) setMenuPickupMode(cart.branchId, false);
-    window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+    const snapshot = JSON.stringify(cart);
+    window.localStorage.setItem(CART_STORAGE_KEY, snapshot);
     window.dispatchEvent(new Event(CART_CHANGE_EVENT));
+    return snapshot;
 }
 
 

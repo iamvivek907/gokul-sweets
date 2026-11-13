@@ -64,7 +64,13 @@ try{
   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-branch')).id),2,'celebration tab selects its own branch');
   await page.goto(`${base}/occasions`);await page.getByLabel('Gulab Jamun quantity').waitFor();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
   assert.equal(await page.locator('.mobile-occasion-navigation').isVisible(),compact);
-  assert.equal(await page.locator('.occasion-product').evaluate(e=>getComputedStyle(e).display),compact?'block':themed?'flex':'block');
+  const occasionCard=page.locator('.occasion-product');
+  if(compact){
+   const card=await occasionCard.boundingBox(),image=await occasionCard.locator('img').boundingBox();
+   const title=await occasionCard.getByRole('heading',{name:'Gulab Jamun',exact:true}).boundingBox();
+   const quantity=await occasionCard.getByLabel('Gulab Jamun quantity').boundingBox();
+   assert.ok(card&&image&&title&&quantity&&image.width<=90&&title.y<image.y+image.height&&quantity.y>=image.y+image.height,'compact card keeps the thumbnail beside the title and controls below it');
+  }
   if(compact){for(const control of await page.locator('#occasion-plan input:not([type=checkbox]),#occasion-plan select').all()){const b=await control.boundingBox();assert.ok(b.x>=0&&b.x+b.width<=width,'bulk-order inputs fit the viewport');}}
   await page.getByLabel('Gulab Jamun quantity').fill('2.5');
   await page.getByLabel('Gulab Jamun unit').selectOption('PIECE');

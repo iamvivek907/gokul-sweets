@@ -175,6 +175,6 @@ function Storefront({features}: {features: StorefrontFeatures}) {
         </section>}
         </div>
         <div className={cart.itemCount ? "h-20" : ""} />
-        <FloatingCartButton itemCount={cart.itemCount} total={cart.subtotal} />
+        <FloatingCartButton />
     </AppShell>;
 }

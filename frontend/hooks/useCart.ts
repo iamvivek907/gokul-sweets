@@ -29,6 +29,7 @@ interface UseCartResult {
     meals?: import("@/types/meal").CartMeal[];
     mealNotice?: string;
     items: CartItem[];
+    snapshot: string;
     branchId: number | null;
     itemCount: number;
     subtotal: number;
@@ -38,19 +39,21 @@ interface UseCartResult {
         branchId: number,
         weightGrams?: number
     ) => AddToCartResult;
-    increaseQuantity: (productId: number) => void;
-    decreaseQuantity: (productId: number) => void;
+    increaseQuantity: (productId: number, expectedBranchId?: number) => void;
+    decreaseQuantity: (productId: number, expectedBranchId?: number) => void;
     setItemWeight: (
         productId: number,
-        weightGrams: number
-    ) => void;
-    removeItem: (productId: number) => void;
-    clearCart: () => void;
+        weightGrams: number,
+        expectedSnapshot?: string
+    ) => boolean;
+    removeItem: (productId: number, expectedSnapshot?: string) => boolean;
+    clearCart: (expectedSnapshot?: string) => boolean;
     replaceCartForBranch: (
         product: MenuProduct,
         branchId: number,
-        weightGrams?: number
-    ) => void;
+        weightGrams: number | undefined,
+        expectedSnapshot: string
+    ) => boolean;
 }
 
 
@@ -113,6 +116,7 @@ export function useCart(): UseCartResult {
         selectedBranchId: number,
         requestedWeightGrams?: number
     ): AddToCartResult {
+        const cart = parseCart(getCartSnapshot());
 
         if (
             cart.branchId !== null
@@ -176,12 +180,14 @@ export function useCart(): UseCartResult {
         return "added";
     }
 
-    function increaseQuantity(productId: number): void {
-        if (cart.branchId === null) {
+    function increaseQuantity(productId: number, expectedBranchId = cart.branchId ?? undefined): void {
+        const currentCart = parseCart(getCartSnapshot());
+        // A control from before a cross-tab branch change cannot edit the new cart.
+        if (currentCart.branchId === null || (expectedBranchId !== undefined && currentCart.branchId !== expectedBranchId)) {
             return;
         }
 
-        const updatedItems = cart.items.map(item =>
+        const updatedItems = currentCart.items.map(item =>
             item.product.id !== productId
                 ? item
                 : item.product.saleMode === "WEIGHT"
@@ -197,16 +203,28 @@ export function useCart(): UseCartResult {
                     }
         );
 
-        saveCart({...cart,branchId: cart.branchId, items: updatedItems});
+        saveCart({...currentCart, items: updatedItems});
     }
 
-    function decreaseQuantity(productId: number): void {
-        if(cart.meals?.length){const item=standaloneCartItems(cart).find(i=>i.product.id===productId);if(!item)return;const step=item.product.saleMode==="WEIGHT"?weightStep(item.product):1;const q=item.product.saleMode==="WEIGHT"?item.weightGrams??0:item.quantity;saveCart(editStandalone(cart,productId,q-step<(item.product.saleMode==="WEIGHT"?minimumWeight(item.product):1)?{remove:true}:{delta:-step}));return;}
-        if (cart.branchId === null) {
+    function decreaseQuantity(productId: number, expectedBranchId = cart.branchId ?? undefined): void {
+        const currentCart = parseCart(getCartSnapshot());
+        if (currentCart.branchId === null || (expectedBranchId !== undefined && currentCart.branchId !== expectedBranchId)) {
             return;
         }
 
-        const updatedItems = cart.items
+        if (currentCart.meals?.length) {
+            const item = standaloneCartItems(currentCart).find(line => line.product.id === productId);
+            if (!item) return;
+            const weighted = item.product.saleMode === "WEIGHT";
+            const step = weighted ? weightStep(item.product) : 1;
+            const amount = weighted ? item.weightGrams ?? 0 : item.quantity;
+            const minimum = weighted ? minimumWeight(item.product) : 1;
+            saveCart(editStandalone(currentCart, productId, amount - step < minimum ? {remove: true} : {delta: -step}));
+            return;
+        }
+
+        if (!currentCart.items.some(item => item.product.id === productId)) return;
+        const updatedItems = currentCart.items
             .map(item => {
                 if (item.product.id !== productId) {
                     return item;
@@ -234,117 +252,50 @@ export function useCart(): UseCartResult {
             return;
         }
 
-        saveCart({...cart,branchId: cart.branchId, items: updatedItems});
+        saveCart({...currentCart, items: updatedItems});
     }
 
-    function setItemWeight(
-        productId: number,
-        requestedWeightGrams: number
-    ): void {
+    function setItemWeight(productId: number, requestedWeightGrams: number, expectedSnapshot = serializedCart): boolean {
+        const snapshot = getCartSnapshot();
+        if (snapshot !== expectedSnapshot) return false;
+        const current = parseCart(snapshot);
+        if (current.branchId === null) return false;
+        const item = standaloneCartItems(current).find(line => line.product.id === productId);
+        if (item?.product.saleMode !== "WEIGHT") return false;
 
-        if (
-            cart.branchId === null
-        ) {
+        const minimum = minimumWeight(item.product);
+        if (!Number.isInteger(requestedWeightGrams) || requestedWeightGrams < minimum
+            || (requestedWeightGrams - minimum) % weightStep(item.product) !== 0) return false;
 
-            return;
-        }
-
-
-        const existingItem =
-            cart.items.find(
-                item =>
-                    item.product.id === productId
-            );
-
-
-        if (
-            !existingItem
-            ||
-            existingItem.product.saleMode !== "WEIGHT"
-        ) {
-
-            return;
-        }
-
-
-        const minimum =
-            minimumWeight(
-                existingItem.product
-            );
-
-
-        const step =
-            weightStep(
-                existingItem.product
-            );
-
-
-        if (
-            !Number.isInteger(
-                requestedWeightGrams
-            )
-            ||
-            requestedWeightGrams < minimum
-            ||
-            (
-                requestedWeightGrams
-                -
-                minimum
-            )
-            %
-            step !== 0
-        ) {
-
-            return;
-        }
-
-
-        const updatedItems =
-            cart.items.map(
-                item =>
-                    item.product.id === productId
-                        ? {
-                            ...item,
-                            weightGrams:
-                                requestedWeightGrams + (cart.meals?.length ? (existingItem.weightGrams??0)-(standaloneCartItems(cart).find(i=>i.product.id===productId)?.weightGrams??0) : 0)
-                        }
-                        : item
-            );
-
-
-        saveCart(
-            {...cart,
-                branchId:
-                    cart.branchId,
-
-                items:
-                    updatedItems
-            }
-        );
+        saveCart(editStandalone(current, productId, {weight: requestedWeightGrams}));
+        return true;
     }
 
-    function removeItem(productId: number): void {
-        if(cart.meals?.length){saveCart(editStandalone(cart,productId,{remove:true}));return;}
-        const updatedItems =
-            cart.items.filter(item => item.product.id !== productId);
-
-        if (updatedItems.length === 0) {
-            clearStoredCart();
-            return;
-        }
-
-        saveCart({...cart,branchId: cart.branchId, items: updatedItems});
+    function removeItem(productId: number, expectedSnapshot = serializedCart): boolean {
+        const snapshot = getCartSnapshot();
+        if (snapshot !== expectedSnapshot) return false;
+        const current = parseCart(snapshot);
+        if (current.branchId === null) return false;
+        const next = editStandalone(current, productId, {remove: true});
+        if (next === current) return false;
+        if (next.items.length) saveCart(next);
+        else clearStoredCart();
+        return true;
     }
 
-    function clearCart(): void {
+    function clearCart(expectedSnapshot?: string): boolean {
+        if (expectedSnapshot !== undefined && getCartSnapshot() !== expectedSnapshot) return false;
         clearStoredCart();
+        return true;
     }
 
     function replaceCartForBranch(
         product: MenuProduct,
         selectedBranchId: number,
-        requestedWeightGrams?: number
-    ): void {
+        requestedWeightGrams: number | undefined,
+        expectedSnapshot: string
+    ): boolean {
+        if (getCartSnapshot() !== expectedSnapshot) return false;
         saveCart({
             branchId: selectedBranchId,
             items: [
@@ -358,11 +309,13 @@ export function useCart(): UseCartResult {
                 }
             ]
         });
+        return true;
     }
 
     return {
         meals:cart.meals,mealNotice:cart.mealNotice,
         items: cart.items,
+        snapshot: serializedCart,
         branchId: cart.branchId,
         itemCount,
         subtotal,

@@ -48,8 +48,15 @@ try{for(const [width,themed] of [[320,true],[390,true],[640,true],[1280,true],[3
  });
  await context.addInitScript(({branch,date,slot})=>{localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date}));localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify({date,slot,pickupType:'NORMAL'}));},{branch,date,slot});
 
+ await page.addInitScript(()=>{
+  if(location.pathname==='/menu'){
+   history.replaceState({...history.state,gokulLaunchRetry:{url:location.href,attempt:2},testHistoryState:'keep'},"");
+  }
+ });
  releaseOffers();releasePairings();
  await page.goto(`${base}/menu`);
+ await page.locator('.gokul-mobile-launch[data-launch-initialized="true"]').waitFor({state:'attached'});
+ assert.deepEqual(await page.evaluate(()=>[history.state?.gokulLaunchRetry??null,history.state?.testHistoryState]),[null,'keep'],'successful launch clears only the spent retry count');
  if(width<=640){
   await page.locator('.gokul-mobile-launch[open]').waitFor();
   const logo=page.locator('.gokul-mobile-launch .brand-loading-wordmark');
@@ -104,7 +111,8 @@ try{for(const [width,themed] of [[320,true],[390,true],[640,true],[1280,true],[3
   await close.click();await sheet.waitFor({state:'hidden'});await floating.click();await sheet.waitFor();
   assert.ok((await sheet.boundingBox()).width<width,'category panel has side margins');
   if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/category-panel-${width}.png`});
-  await page.keyboard.press('Escape');await sheet.waitFor({state:'hidden'});assert.equal(await floating.evaluate(n=>n===document.activeElement),true);
+  await page.keyboard.press('Escape');await sheet.waitFor({state:'hidden'});
+  await page.waitForFunction(()=>document.activeElement?.classList.contains('menu-floating-category-trigger'));
   const y=await page.evaluate(()=>scrollY);await floating.click();
   await sheet.getByRole('button',{name:/Dairy/}).click();await page.locator('#gokul-product-3').waitFor();
   assert.equal(await page.locator('#gokul-product-1').count(),0);assert.equal(await page.locator('#gokul-product-7').count(),0);

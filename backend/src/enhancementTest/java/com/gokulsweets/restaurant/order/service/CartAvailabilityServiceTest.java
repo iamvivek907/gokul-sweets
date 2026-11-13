@@ -77,7 +77,12 @@ class CartAvailabilityServiceTest {
                         features,
                         inventory,
                         validation,
-                        new SmartOrderingRules(features, settings, clock),
+                        new SmartOrderingRules(
+                                features,
+                                settings,
+                                clock,
+                                org.mockito.Mockito.mock(
+                                        org.springframework.jdbc.core.JdbcTemplate.class)),
                         policies,
                         allocations,
                         new InventoryAvailabilityService(),

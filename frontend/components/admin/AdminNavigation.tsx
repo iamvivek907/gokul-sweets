@@ -38,7 +38,8 @@ export const adminGroups: {label: string; items: Item[]}[] = [
     ]},
     {label: "Branch operations", items: [
         {href: "/admin/branches", label: "Branches & settings", permissions: ["BRANCH_MANAGE"]},
-        {href: "/admin/pickup-scheduling", label: "Pickup scheduling", permissions: ["BRANCH_MANAGE"]}
+        {href: "/admin/pickup-scheduling", label: "Pickup scheduling", permissions: ["BRANCH_MANAGE"]},
+        {href: "/admin/rolling-automation", label: "Automatic slots & inventory", permissions: ["BRANCH_MANAGE"]}
     ]},
     {label: "Inventory", items: [
         {href: "/admin/menu/workspace", label: "Menu & inventory workspace", permissions: ["MENU_MANAGE"]},

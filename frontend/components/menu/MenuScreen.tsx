@@ -1,4 +1,6 @@
 "use client";
+import {getCartSnapshot,parseCart} from "@/lib/cartStorage";
+import {getMatchingStoredBranchSnapshot,getStoredBranchSnapshot} from "@/lib/branchStorage";
 import {standaloneCartItems} from "@/lib/cartMeals";
 import MealShortcut from "@/components/meal/MealShortcut";
 import {useBranchMeals} from "@/hooks/useBranchMeals";
@@ -16,11 +18,11 @@ import RetailSweetRail from "./RetailSweetRail";
 import MenuExperience from "./MenuExperience";
 import SavedDishesHelp from "./SavedDishesHelp";
 import {useMenuFavourites} from "@/hooks/useMenuFavourites";
-import {splitMenuLead} from "@/lib/mobileMenu";
 import MenuCampaignBanners from "./MenuCampaignBanners";
 import {useBranchMenuAppearance} from "@/hooks/useBranchMenuAppearance";
 import MenuCategorySection from "./MenuCategorySection";
 import MenuOffers from "./MenuOffers";
+import {OPEN_ORDERING_TOUR} from "@/lib/orderingTour";
 import FloatingMenuCategories from "./FloatingMenuCategories";
 const MobileMenuPickup=dynamic(()=>import("./MobileMenuPickup"));
 import MobileMenuSuggestions from "./MobileMenuSuggestions";
@@ -33,7 +35,7 @@ import {apiClient} from "@/services/apiClient";
 import {matchesMobileFilters,mobileMenuRows,type PortionGroup} from "@/lib/mobileMenu";
 import {progressiveBatches} from "@/lib/progressiveBatches";
 import {readMenuBrowse,writeMenuBrowse,browserMenuStorage,type MenuBrowseState} from "@/lib/menuBrowseState";
-import {matchesMenuSearch} from "@/lib/menuSearch";
+import {matchesMenuSearch,menuSearchRank,normalizeMenuSearch} from "@/lib/menuSearch";
 import MobileMenuFilters from "./MobileMenuFilters";
 import {T,useTranslation} from "@/lib/language";
 import {groupMenuProducts} from "@/lib/menuGroups";
@@ -45,8 +47,9 @@ import NewBranchItems from "@/components/menu/NewBranchItems";
 import {useDateAvailability} from "@/components/menu/PickupContext";
 
 import {
-    useCallback,
+    type ReactNode,
     useEffect,
+    useLayoutEffect,
     useMemo,
     useRef,
     useState
@@ -87,7 +90,6 @@ import {
     useCart
 } from "@/hooks/useCart";
 
-import type {AvailableRebateResponse} from "@/types/rebate";
 import type {
     MenuCategory,
     MenuProduct
@@ -121,14 +123,14 @@ export default function MenuScreen() {
     const groupedMenu=mobileFeatures?.contextualStorefrontV2===true&&(mobileFeatures.futuristicStorefrontV2===true||mobileFeatures.checkoutExperienceV2===true);
     const appearance = useBranchMenuAppearance(branch?.id ?? null);
     const branchMeals=useBranchMeals(groupedMenu?branch?.id:undefined);
-    const appearanceOrder = Object.fromEntries((appearance?.categories ?? []).map(c => [c.id, c.order]));
+    const appearanceOrder = useMemo(()=>Object.fromEntries((appearance?.categories ?? []).map(c => [c.id, c.order])),[appearance]);
 
     const {
         items,
         meals,
         branchId: cartBranchId,
+        snapshot: cartSnapshot,
         itemCount,
-        subtotal,
         addItem,
         increaseQuantity,
         decreaseQuantity,
@@ -222,7 +224,7 @@ export default function MenuScreen() {
         cartNotice,
         setCartNotice
     ] =
-        useState<string | null>(
+        useState<{message:string;success:boolean} | null>(
             null
         );
 
@@ -263,13 +265,10 @@ export default function MenuScreen() {
     );
 
 
-    function showCartNotice(
-        productName: string
-    ) {
+    function showCartNotice(productName:string) {showCartMessage(`✓ ${productName} added to cart`,true);}
 
-        setCartNotice(
-            `${productName} added to cart`
-        );
+    function showCartMessage(message:string,success=false) {
+        setCartNotice({message,success});
 
 
         if (
@@ -722,13 +721,13 @@ export default function MenuScreen() {
     },[branch,restoredBrowse]);
     const [portionSnapshot,setPortionSnapshot]=useState<{branchId:number;groups:PortionGroup[]}|null>(null);
     const portionGroups=useMemo(()=>portionSnapshot?.branchId===branch?.id?portionSnapshot?.groups??[]:[],[portionSnapshot,branch?.id]);
-    useEffect(()=>{if(!groupedMenu||!branch)return;const controller=new AbortController();void apiClient<{groups:PortionGroup[]}>(`/api/menu/portion-groups?branchId=${branch.id}`,{signal:controller.signal}).then(value=>{if(!controller.signal.aborted)setPortionSnapshot({branchId:branch.id,groups:value.groups??[]});}).catch(()=>{});return()=>controller.abort();},[groupedMenu,branch]);
+    useEffect(()=>{if(!groupedMenu||!branch)return;const controller=new AbortController();void apiClient<{groups:PortionGroup[]}>(`/api/menu/portion-groups?branchId=${branch.id}`,{signal:controller.signal}).then(value=>{if(!controller.signal.aborted)setPortionSnapshot({branchId:branch.id,groups:Array.isArray(value?.groups)?value.groups.filter(group=>typeof group?.key==="string"&&typeof group.title==="string"&&Array.isArray(group.choices)&&group.choices.every(choice=>Number.isSafeInteger(choice?.productId)&&typeof choice.label==="string")):[]});}).catch(()=>{});return()=>controller.abort();},[groupedMenu,branch]);
     const pickupCheck = useDateAvailability(allProducts);
     const pickupChecking = !!pickupCheck.features?.smartAvailability && (pickupCheck.pickupRequired || pickupCheck.findingSoonest || !pickupCheck.items || !!pickupCheck.error || !!pickupCheck.automaticError);
     const pickupStatusMessage = pickupCheck.error || pickupCheck.automaticError ? "Pickup check failed. Please retry."
-        : pickupCheck.findingSoonest ? "Finding soonest pickup…"
-        : pickupCheck.pickupRequired ? "Choose pickup time to add" : "Checking pickup";
-    const pickupAllows = (id:number) => !pickupCheck.features?.smartAvailability || !!pickupCheck.intent.selection && pickupCheck.intent.pickupRaw === getPickupSlotSnapshot() && pickupIsFresh(pickupCheck.intent.selection,new Date()) && !pickupCheck.findingSoonest && !pickupChecking && pickupCheck.items?.find(item=>item.productId===id)?.available === true;
+        : pickupCheck.pickupRequired&&!pickupCheck.findingSoonest ? "Choose pickup time to add" : "";
+    const pickupStockById=useMemo(()=>new Map(pickupCheck.items?.map(item=>[item.productId,item])),[pickupCheck.items]);
+    const pickupAllows = (id:number) => !pickupCheck.features?.smartAvailability || !!pickupCheck.intent.selection && pickupCheck.intent.pickupRaw === getPickupSlotSnapshot() && pickupIsFresh(pickupCheck.intent.selection,new Date()) && !pickupCheck.findingSoonest && !pickupChecking && pickupStockById.get(id)?.available === true;
     const [availableOnly,setAvailableOnly]=useState(false);
     const filterByPickup = availableOnly && pickupCheck.features?.smartAvailability === true;
     // The menu may keep showing an earlier preview while cart quantities refresh.
@@ -795,6 +794,26 @@ export default function MenuScreen() {
         );
 
 
+    const menuOrderableIds = useMemo(() => pickupCheck.features?.smartAvailability
+        ? pickupChecking ? null : new Set(pickupCheck.items?.filter(item=>item.available).map(item=>item.productId))
+        : new Set(allProducts.filter(product=>product.available).map(product=>product.id)),
+    [pickupCheck.features?.smartAvailability,pickupCheck.items,pickupChecking,allProducts]);
+    const menuSections=useMemo(()=>{
+        const sections=phoneMenu&&retailBrowse?retailCollections(categories,filteredProducts):groupMenuProducts(categories,filteredProducts);
+        if(!groupedMenu)return sections.sort((a,b)=>(appearanceOrder[a.id]??10000)-(appearanceOrder[b.id]??10000));
+        const query=normalizeMenuSearch(search);
+        const searchRanks=new Map(filteredProducts.map(product=>[product.id,menuSearchRank(product.name,query)]));
+        const relevance=(product:MenuProduct)=>searchRanks.get(product.id)??0;
+        const orderRank=(product:MenuProduct)=>menuOrderableIds&&(!product.available||!menuOrderableIds.has(product.id))?1:0;
+        const ranked=sections.map(section=>{
+            section.products.sort((a,b)=>relevance(a)-relevance(b)||orderRank(a)-orderRank(b));
+            return {section,match:relevance(section.products[0]),blocked:!section.products.some(product=>orderRank(product)===0)};
+        });
+        // A precise search stays above a looser match, even when it needs another pickup.
+        return ranked.sort((a,b)=>a.match-b.match||Number(a.blocked)-Number(b.blocked)
+            || (appearanceOrder[a.section.id]??10000)-(appearanceOrder[b.section.id]??10000)).map(value=>value.section);
+    },[phoneMenu,retailBrowse,categories,filteredProducts,groupedMenu,appearanceOrder,search,menuOrderableIds]);
+
     useEffect(()=>{if(!branch||!new URLSearchParams(window.location.search).has("mealEdit"))return;queueMicrotask(()=>{setSearch("");setSelectedCategoryId(null);setMobileCategories([]);setMaximumPrice(null);setPortionsOnly(false);setBrowseCategory(null);setSavedOnly(false);const url=new URL(location.href);url.searchParams.delete("saved");url.searchParams.delete("category");history.replaceState(history.state,"",url);});},[branch]);
 
     const [browseScroll,setBrowseScroll]=useState<{branchId:number;id:number;revision:number}|null>(null);
@@ -826,6 +845,32 @@ export default function MenuScreen() {
         return()=>cancelAnimationFrame(frame);
     },[phoneMenu,browseScroll,branch?.id,filteredProducts]);
 
+    const [searchDestination,setSearchDestination]=useState<{branchId:number;productId:number}|null>(null);
+    function goToSearchDish(product:MenuProduct){
+        if(!branch)return;
+        clearFilters();
+        searchEditedBranch.current=branch.id;
+        setSearch(product.name);
+        setSearchDestination({branchId:branch.id,productId:product.id});
+    }
+    useLayoutEffect(()=>{
+        if(!searchDestination||searchDestination.branchId!==branch?.id)return;
+        let timer:ReturnType<typeof setTimeout>|undefined;
+        let target:HTMLElement|null=null;
+        const frame=requestAnimationFrame(()=>{
+            const anchor=document.getElementById(`gokul-product-${searchDestination.productId}`);
+            target=anchor?.closest<HTMLElement>("[data-menu-product-card]")??null;
+            if(!target)return;
+            const category=target.closest(".menu-category-disclosure");
+            if(category instanceof HTMLDetailsElement)category.open=true;
+            target.setAttribute("data-search-arrival","");
+            target.focus({preventScroll:true});
+            target.scrollIntoView({block:"center",behavior:"instant"});
+            timer=setTimeout(()=>target?.removeAttribute("data-search-arrival"),1700);
+        });
+        return()=>{cancelAnimationFrame(frame);clearTimeout(timer);target?.removeAttribute("data-search-arrival");};
+    },[searchDestination,branch?.id]);
+
     const hasActiveFilters =
         filterByPickup ||
         (groupedMenu&&savedOnly) ||
@@ -833,21 +878,64 @@ export default function MenuScreen() {
         ||
         (phoneMenu ? (!!(mobileCategories??(effectiveCategoryId===null?[]:[effectiveCategoryId])).length || maximumPrice!==null || portionsOnly) : effectiveCategoryId !== null);
 
-    const guardedIncrease = (id:number) => {if(pickupAllows(id))increaseQuantity(id);};
-    const pickupGrid = (products:MenuProduct[]) => <ProductGrid pairingSeed={pairingSeed} pairing={retailBrowse?null:pairing}
+    function fitsKnownPickupStock(id:number,weightGrams?:number) {
+        if(!pickupCheck.features?.smartAvailability)return true;
+        const limit=pickupStockById.get(id)?.availableQuantity;
+        if(limit==null||!Number.isFinite(limit))return true;
+        const cart=parseCart(getCartSnapshot());
+        const line=cart.branchId===branch?.id?cart.items.find(item=>item.product.id===id):undefined;
+        if(weightGrams!==undefined){
+            const included=line&&cart.meals?.length
+                ? (line.weightGrams??0)-(standaloneCartItems(cart).find(item=>item.product.id===id)?.weightGrams??0)
+                : 0;
+            return included+weightGrams<=limit;
+        }
+        const amount=line?.product.saleMode==="WEIGHT"?(line.weightGrams??line.product.minimumWeightGrams??250)+(line.product.weightStepGrams??50):(line?.quantity??0)+1;
+        return amount<=limit;
+    }
+
+    function validateMenuBranch(branchId: number): string | null {
+        const snapshot = getMatchingStoredBranchSnapshot(branchId);
+        if (snapshot === null) showCartMessage("Your branch or pickup changed. Review it and try again.");
+        return snapshot;
+    }
+
+    const guardedIncrease = (id:number) => {
+        try {
+            if(!branch||validateMenuBranch(branch.id)===null||!pickupAllows(id))return;
+            if(!fitsKnownPickupStock(id)){showCartMessage("No more available for this pickup.");return;}
+            increaseQuantity(id,branch.id);
+        }
+        catch {showCartMessage("Couldn’t update your cart. Try again.");}
+    };
+    const guardedDecrease = (id:number) => {
+        if(!branch)return;
+        try {
+            if(validateMenuBranch(branch.id)===null)return;
+            decreaseQuantity(id,branch.id);
+        }
+        catch {showCartMessage("Couldn’t update your cart. Try again.");}
+    };
+    const [mealShelfHost,setMealShelfHost]=useState<HTMLDivElement|null>(null);
+    const pickupGrid = (products:MenuProduct[],afterLeadingRows?:ReactNode) => <ProductGrid afterLeadingRows={afterLeadingRows} pairingSeed={pairingSeed} pairing={retailBrowse?null:pairing}
         portionGroups={groupedMenu?portionGroups:undefined} catalogProducts={catalogForResults} compactGroups={phoneMenu}
         refined={pickupCheck.features?.contextualStorefrontV2 === true} pickupItems={pickupCheck.items}
         pickupChecking={pickupChecking} pickupStatusMessage={pickupStatusMessage} dateAware={!!pickupCheck.features?.smartAvailability} products={products}
         ratingSummaries={ratingSummaries} ratingsLoading={ratingsLoading} quantities={productQuantities} weights={productWeights}
-        onIncrease={guardedIncrease} onDecrease={decreaseQuantity} onAdd={handleAddToCart}/>;
-    const [menuOffer,setMenuOffer]=useState<{key:string;target:AvailableRebateResponse|null}|null>(null);
-    const offerContext=JSON.stringify([branch?.id,items,pickupCheck.intent.selection]);
-    const onMenuTarget=useCallback((target:AvailableRebateResponse|null)=>setMenuOffer({key:offerContext,target}),[offerContext]);
+        onIncrease={guardedIncrease} onDecrease={guardedDecrease} onAdd={handleAddToCart}/>;
     const [lastAdded,setLastAdded]=useState<number|null>(null);
     const pairingSeed=lastAdded??items.at(-1)?.product.id;
-    const pairing=phoneMenu&&mobileFeatures?.pickupAddOns&&branch&&items.some(i=>i.product.id===pairingSeed)&&!filterByPickup&&filteredProducts.some(p=>p.id===pairingSeed)?<div className="mobile-menu-pairing-slot"><MobileMenuSuggestions seedName={allProducts.find(p=>p.id===pairingSeed)?.name} branchId={branch.id} products={allProducts} groups={portionGroups} pickupItems={pickupCheck.items}/></div>:null;
+    const basketPickup = useMemo(()=>{
+        if(!pickupCheck.features?.smartAvailability||!pickupCheck.intent.selection)return "unknown";
+        if(pickupCheck.error||pickupCheck.automaticError)return "failed";
+        const decisions=new Map(pickupCheck.items?.map(item=>[item.productId,item.available]));
+        if(pickupCheck.selectionUnavailable||items.some(item=>decisions.get(item.product.id)===false))return "blocked";
+        return pickupCheck.data&&!pickupChecking&&items.every(item=>decisions.get(item.product.id)===true)?"ready":"unknown";
+    },[pickupCheck.features?.smartAvailability,pickupCheck.intent.selection,pickupCheck.items,pickupCheck.selectionUnavailable,pickupCheck.data,pickupCheck.error,pickupCheck.automaticError,pickupChecking,items]);
+    const pairing=phoneMenu&&mobileFeatures?.pickupAddOns&&branch&&items.some(i=>i.product.id===pairingSeed)&&!filterByPickup&&filteredProducts.some(p=>p.id===pairingSeed)?<div className="mobile-menu-pairing-slot"><MobileMenuSuggestions seedProduct={allProducts.find(p=>p.id===pairingSeed)} pairings={appearance?.pairings} onPairingAdded={()=>setLastAdded(pairingSeed??null)} branchId={branch.id} products={allProducts} groups={portionGroups} pickupItems={pickupCheck.items} basketPickup={basketPickup}/></div>:null;
 
     const weightPickup = useRef("");
+    const [weightNotice,setWeightNotice]=useState<string|null>(null);
     function handleAddToCart(
         product: MenuProduct
     ) {
@@ -855,6 +943,7 @@ export default function MenuScreen() {
         if (!product.available || !pickupAllows(product.id)) return;
         if (product.saleMode === "WEIGHT") {
             weightPickup.current=getPickupSlotSnapshot();
+            setWeightNotice(null);
             setWeightProduct(product);
             return;
         }
@@ -863,7 +952,12 @@ export default function MenuScreen() {
     }
 
 
-    function commitAddToCart(
+    function commitAddToCart(product:MenuProduct,weightGrams?:number) {
+        try {writeMenuCart(product,weightGrams);}
+        catch {showCartMessage("Couldn’t update your cart. Try again.");}
+    }
+
+    function writeMenuCart(
         product: MenuProduct,
         weightGrams?: number
     ) {
@@ -886,12 +980,15 @@ export default function MenuScreen() {
             }
         });
 
-        if (weightGrams && pickupCheck.features?.smartAvailability && weightPickup.current!==getPickupSlotSnapshot()) {setCartNotice("Pickup changed. Review the displayed time before adding.");return;}
-        const liveProduct=categories.flatMap(category=>category.products).find(item=>item.id===product.id);
-        if(!liveProduct?.available || !pickupAllows(product.id)){setWeightProduct(null);setCartNotice(liveProduct?.serviceAvailability?.message??"This item is currently unavailable.");return;}
+        if (weightGrams && pickupCheck.features?.smartAvailability && weightPickup.current!==getPickupSlotSnapshot()) {showCartMessage("Pickup changed. Review the displayed time before adding.");return;}
+        const liveProduct=allProducts.find(item=>item.id===product.id);
+        if(!liveProduct?.available || !pickupAllows(product.id)){setWeightProduct(null);showCartMessage(liveProduct?.serviceAvailability?.message??"This item is currently unavailable.");return;}
+        if(!fitsKnownPickupStock(product.id,weightGrams)){showCartMessage("No more available for this pickup.");return;}
+        const selectedBranch = validateMenuBranch(branch.id);
+        if (selectedBranch === null) return;
         const result =
             addItem(
-                product,
+                liveProduct,
                 branch.id,
                 weightGrams
             );
@@ -914,29 +1011,22 @@ export default function MenuScreen() {
             result === "branch-mismatch"
         ) {
 
-            const confirmed =
-                window.confirm(
-                    "Your cart contains items from another branch. "
-                    + "Clear the existing cart and start a new order from "
-                    + branch.name
-                    + "?"
-                );
-
-
-            if (
-                !confirmed
-            ) {
-
+            if (getCartSnapshot() !== cartSnapshot) {
+                showCartMessage("Your cart changed. Review it and try again.");
                 return;
             }
 
+            const confirmedPickup = getPickupSlotSnapshot();
+            if (!window.confirm(translate("Your cart contains items from another branch. Clear it and start a new order from {branch}?").replace("{branch}", branch.name))) return;
 
-            replaceCartForBranch(
-                product,
-                branch.id,
-                weightGrams
-            );
-
+            if (getStoredBranchSnapshot() !== selectedBranch || getPickupSlotSnapshot() !== confirmedPickup) {
+                showCartMessage("Your branch or pickup changed. Review it and try again.");
+                return;
+            }
+            if (!replaceCartForBranch(liveProduct, branch.id, weightGrams, cartSnapshot)) {
+                showCartMessage("Your cart changed. Review it and try again.");
+                return;
+            }
 
             setLastAdded(product.id);
             showCartNotice(
@@ -950,6 +1040,21 @@ export default function MenuScreen() {
         product: MenuProduct,
         weightGrams: number
     ) {
+        const live=allProducts.find(item=>item.id===product.id);
+        if(live?.available&&live.saleMode==="WEIGHT"){
+            if(live.price!==product.price||live.minimumWeightGrams!==product.minimumWeightGrams||live.weightStepGrams!==product.weightStepGrams){
+                setWeightProduct(live);
+                setWeightNotice("This item changed. Review the price and quantity, then confirm again.");
+                return;
+            }
+            if(!fitsKnownPickupStock(product.id,weightGrams)){
+                setWeightNotice("Choose a smaller amount for this pickup.");
+                return;
+            }
+        }else if(live?.available){
+            setWeightNotice("This item changed. Close this window and select it again.");
+            return;
+        }
         setWeightProduct(null);
         commitAddToCart(product, weightGrams);
     }
@@ -1297,7 +1402,8 @@ export default function MenuScreen() {
                 {refreshError&&<aside className="menu-refresh-notice" role="status"><T text={refreshError}/><button type="button" onClick={retryMenu}><T text="Try again"/></button></aside>}
                 {groupedMenu&&!!appearance?.banners.length&&<div className="menu-leading-campaign"><MenuCampaignBanners {...campaignControls} banners={appearance.banners} categories={categories} onSelect={id => {jumpMenuCategory(id);setBrowseCategory({branchId:branch.id,id});}} compact={phoneMenu}/></div>}
                 <MenuToolbar enabled={phoneMenu}>
-                {mobileFeatures?.smartAvailability&&<MobileMenuPickup compactHeader={phoneMenu} key={branch.id} branchId={branch.id} products={allProducts} today={pickupCheck.today} days={mobileFeatures.futureOrderingDays??30} selection={pickupCheck.intent.selection} date={pickupCheck.intent.date} expired={pickupCheck.intent.expired} selectionUnavailable={pickupCheck.selectionUnavailable} noPickupMessage={pickupCheck.noPickupMessage} availabilityError={pickupCheck.automaticError??pickupCheck.error} onRetry={pickupCheck.retry} automatic={pickupCheck.intent.automatic} findingSoonest={pickupCheck.findingSoonest} onChoosingChange={pickupCheck.setChoosing}/>}
+                {!mobileFeatures?.smartAvailability&&(mobileFeatures?.futuristicStorefrontV2||mobileFeatures?.checkoutExperienceV2)&&<button type="button" className="menu-pickup-help ordering-tour-replay" aria-label={translate("How to order")} onClick={()=>window.dispatchEvent(new Event(OPEN_ORDERING_TOUR))}><span aria-hidden="true">?</span></button>}
+                {mobileFeatures?.smartAvailability&&<MobileMenuPickup showHelp={!!(mobileFeatures?.futuristicStorefrontV2||mobileFeatures?.checkoutExperienceV2)} compactHeader={phoneMenu} key={branch.id} branchId={branch.id} products={allProducts} today={pickupCheck.today} days={mobileFeatures.futureOrderingDays??30} selection={pickupCheck.intent.selection} date={pickupCheck.intent.date} expired={pickupCheck.intent.expired} selectionUnavailable={pickupCheck.selectionUnavailable} noPickupMessage={pickupCheck.noPickupMessage} availabilityError={pickupCheck.automaticError??pickupCheck.error} onRetry={pickupCheck.retry} automatic={pickupCheck.intent.automatic} onChoosingChange={pickupCheck.setChoosing}/>}
 
                 <div
                     className="gokul-menu-tools
@@ -1312,7 +1418,9 @@ export default function MenuScreen() {
                     "
                 >
 
-                    <MenuSearch enhanced={groupedMenu} products={allProducts} branchId={branch.id}
+                    <MenuSearch key={branch.id} enhanced={groupedMenu} products={allProducts} branchId={branch.id} topOnTap={phoneMenu}
+                        orderableIds={menuOrderableIds}
+                        onSelectProduct={groupedMenu?goToSearchDish:undefined}
                         premium={groupedMenu}
                         refined={pickupCheck.features?.contextualStorefrontV2 === true}
                         value={
@@ -1320,6 +1428,7 @@ export default function MenuScreen() {
                         }
                         onChange={value => {
                             if(restoredBrowse!==branch.id)searchEditedBranch.current=branch.id;
+                            setSearchDestination(null);
                             setSearch(value);
                         }}
                     />
@@ -1327,18 +1436,15 @@ export default function MenuScreen() {
 
                     {groupedMenu&&!phoneMenu&&<button type="button" className="menu-saved-filter" aria-pressed={savedOnly} onClick={()=>changeSavedFilter(!savedOnly)}><T text="Saved"/></button>}
                     {groupedMenu&&savedOnly&&<SavedDishesHelp/>}
-                    {!isLoading
-                        &&
-                        !error
-                        &&
-                        categories.length > 0
+                    {((!isLoading && !error && categories.length > 0)
+                        || (phoneMenu && mobileFeatures?.pickupAddOns))
                         && (
                             <div
                                 className={phoneMenu ? "mobile-menu-category-entry" : "mt-4"}
                             >
 
                                 {!phoneMenu&&pickupFilter&&<label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={availableOnly} onChange={event=>setAvailableOnly(event.target.checked)}/><T text="Available at selected pickup time"/></label>}
-                                {phoneMenu?<MobileMenuFilters pickupFilter={pickupFilter} mealAction={visibleMeals.length?<MealShortcut onClick={()=>{if(!filterByPickup)clearFilters();requestAnimationFrame(()=>{const target=document.getElementById("menu-meals");const disclosure=target?.closest("details");if(disclosure)disclosure.open=true;target?.scrollIntoView({block:"start",behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"instant":"smooth"});target?.focus({preventScroll:true});});}}/>:undefined} allSelected={!savedOnly} endAction={<button className="menu-saved-filter" type="button" aria-pressed={savedOnly} onClick={()=>changeSavedFilter(!savedOnly)}><T text="Saved"/></button>} activeId={activeBrowseId} onBrowse={browseMenu} offersAvailable={!!mobileFeatures?.pickupAddOns} categories={categories} selected={mobileCategories??(effectiveCategoryId===null?[]:[effectiveCategoryId])} onCategories={ids=>{setBrowseCategory(null);setBrowseScroll(null);setMobileCategories(ids);}} maximum={maximumPrice} onMaximum={setMaximumPrice} portions={portionsOnly} onPortions={setPortionsOnly} onResetSearch={()=>{if(search)setSearch("");}}/>:<CategoryTabs
+                                {phoneMenu?<MobileMenuFilters pickupFilter={pickupFilter} mealAction={visibleMeals.length?<MealShortcut onClick={()=>{if(!filterByPickup)clearFilters();requestAnimationFrame(()=>{const target=document.getElementById("menu-meals");const disclosure=target?.closest("details");if(disclosure)disclosure.open=true;target?.scrollIntoView({block:"start",behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"instant":"smooth"});target?.focus({preventScroll:true});});}}/>:undefined} allSelected={!savedOnly} endAction={<button className="menu-saved-filter" type="button" aria-pressed={savedOnly} onClick={()=>changeSavedFilter(!savedOnly)}><T text="Saved"/></button>} activeId={activeBrowseId} onBrowse={browseMenu} offerAction={mobileFeatures?.pickupAddOns?<MenuOffers key={branch.id} branchId={branch.id}/>:undefined} categories={categories} selected={mobileCategories??(effectiveCategoryId===null?[]:[effectiveCategoryId])} onCategories={ids=>{setBrowseCategory(null);setBrowseScroll(null);setMobileCategories(ids);}} maximum={maximumPrice} onMaximum={setMaximumPrice} portions={portionsOnly} onPortions={setPortionsOnly} onResetSearch={()=>{if(search)setSearch("");}}/>:<CategoryTabs
                                     categories={
                                         categories
                                     }
@@ -1359,7 +1465,6 @@ export default function MenuScreen() {
                 {!phoneMenu && !groupedMenu && <BranchMenuAppearance {...campaignControls} config={appearance} categories={categories} onSelect={id=>jumpMenuCategory(id)}/>}
 
 
-                {phoneMenu&&mobileFeatures?.pickupAddOns&&<MenuOffers branchId={branch.id} onTarget={onMenuTarget}/>}
 
                 <div
                     id="gokul-menu-items"
@@ -1389,7 +1494,11 @@ export default function MenuScreen() {
                         )}
 
 
-                    {!isLoading&&!error&&groupedMenu&&visibleMeals.length>0&&filteredProducts.length===0&&<MealCollection key={branch.id} branchId={branch.id} products={allProducts} meals={visibleMeals} smartAvailability={mobileFeatures?.smartAvailability===true} pickupItems={pickupCheck.items} pickupChecking={pickupChecking} pickupSelected={!!pickupCheck.intent.selection} pickupFailed={!!(pickupCheck.error||pickupCheck.automaticError)} onRetryPickup={pickupCheck.retry}/>}
+                    {groupedMenu&&<MealCollection key={branch.id} branchId={branch.id} products={allProducts}
+                        meals={!isLoading&&!error?visibleMeals:[]} shelfHost={filteredProducts.length>0?mealShelfHost:undefined}
+                        smartAvailability={mobileFeatures?.smartAvailability===true} pickupItems={pickupCheck.items} stockRevision={pickupCheck.stockRevision}
+                        pickupChecking={pickupChecking} pickupSelected={!!pickupCheck.intent.selection}
+                        pickupFailed={!!(pickupCheck.error||pickupCheck.automaticError)} onRetryPickup={pickupCheck.retry}/>}
 
                     {!isLoading
                         &&
@@ -1495,7 +1604,7 @@ export default function MenuScreen() {
 
                                 {phoneMenu&&retailBrowse&&<h3 className="menu-retail-collection-title"><T text="Everyday favourites"/></h3>}
                                 {pickupCheck.features?.contextualStorefrontV2 ? <div>
-                                    {(phoneMenu&&retailBrowse?retailCollections(categories,filteredProducts):groupMenuProducts(categories,filteredProducts)).sort((a,b)=>(appearanceOrder[a.id]??10000)-(appearanceOrder[b.id]??10000)).map((group,index)=><MenuCategorySection key={phoneMenu?`${group.id}:${activeBrowse?.id??"all"}:${retailBrowse?"retail":"menu"}`:group.id} id={group.id} name={group.name} displayName={phoneMenu&&activeBrowse&&menuFamily(activeBrowse.name)==="Sweets"&&group.id===activeBrowse.id?"Sweets you’ll love":undefined} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} description={group.description} collapsible={phoneMenu}>{groupedMenu&&index===0?<>{pickupGrid(splitMenuLead(group.products,portionGroups).lead)}{visibleMeals.length>0&&<MealCollection key={branch.id} branchId={branch.id} products={allProducts} meals={visibleMeals} smartAvailability={mobileFeatures?.smartAvailability===true} pickupItems={pickupCheck.items} pickupChecking={pickupChecking} pickupSelected={!!pickupCheck.intent.selection} pickupFailed={!!(pickupCheck.error||pickupCheck.automaticError)} onRetryPickup={pickupCheck.retry}/>} {pickupGrid(splitMenuLead(group.products,portionGroups).rest)}</>:pickupGrid(group.products)}</MenuCategorySection>)}
+                                    {menuSections.map((group,index)=><MenuCategorySection key={phoneMenu?`${group.id}:${activeBrowse?.id??"all"}:${retailBrowse?"retail":"menu"}`:group.id} id={group.id} name={group.name} displayName={phoneMenu&&activeBrowse&&menuFamily(activeBrowse.name)==="Sweets"&&group.id===activeBrowse.id?"Sweets you’ll love":undefined} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} description={group.description} collapsible={phoneMenu}>{pickupGrid(group.products,groupedMenu&&index===0&&visibleMeals.length>0?<div ref={setMealShelfHost}/>:undefined)}</MenuCategorySection>)}
                                 </div> : (
                                 <ProductGrid
                                     pairingSeed={pairingSeed}
@@ -1525,7 +1634,7 @@ export default function MenuScreen() {
                                         guardedIncrease
                                     }
                                     onDecrease={
-                                        decreaseQuantity
+                                        guardedDecrease
                                     }
                                     onAdd={
                                         handleAddToCart
@@ -1649,7 +1758,7 @@ export default function MenuScreen() {
                     <div
                         role="status"
                         aria-live="polite"
-                        className={`${phoneMenu ? "menu-cart-announcement" : ""}
+                        className={`${phoneMenu && cartNotice.success ? "menu-cart-announcement" : ""}
                             fixed
                             bottom-40
                             left-1/2
@@ -1667,21 +1776,13 @@ export default function MenuScreen() {
                             shadow-lg
                         `}
                     >
-                        ✓ {cartNotice}
+                        <T text={cartNotice.message}/>
                     </div>
                 )}
 
 
             {(mobileFeatures?.futuristicStorefrontV2===true||mobileFeatures?.checkoutExperienceV2===true)&&mobileFeatures?.contextualStorefrontV2===true&&!error&&categories.length>0&&<FloatingMenuCategories key={branch.id} categories={categories} selectedId={phoneMenu?(mobileCategories?.length===1?mobileCategories[0]:undefined):(effectiveCategoryId??undefined)} hasCart={itemCount>0} onSelect={jumpMenuCategory}/>}
-            <FloatingCartButton
-                offerEnabled={phoneMenu&&!!mobileFeatures?.pickupAddOns} offerTarget={phoneMenu&&menuOffer?.key===offerContext?menuOffer.target:null}
-                itemCount={
-                    itemCount
-                }
-                total={
-                    subtotal
-                }
-            />
+            <FloatingCartButton />
 
 
             {weightProduct
@@ -1689,6 +1790,7 @@ export default function MenuScreen() {
                     <WeightSelectorSheet
                         key={weightProduct.id}
                         product={weightProduct}
+                        notice={weightNotice}
                         currentWeightGrams={
                             productWeights[weightProduct.id]
                             ?? null

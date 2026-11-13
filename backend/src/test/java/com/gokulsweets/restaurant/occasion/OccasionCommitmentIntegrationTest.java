@@ -21,6 +21,7 @@ import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.UUID;
@@ -76,6 +77,49 @@ class OccasionCommitmentIntegrationTest {
     }
 
     @Test
+    void providerDeadlineRejectionDoesNotLeaveBalancePending() {
+        var fixture = paidDeposit();
+        boolean enquiriesEnabled = features.isOccasionEnquiries();
+        boolean paymentsEnabled = features.isOccasionPayments();
+        try {
+            features.setOccasionEnquiries(true);
+            features.setOccasionPayments(true);
+            when(phonePe.createPayment(anyString(), any(), anyString(), any(Instant.class)))
+                    .thenThrow(new PhonePeClient.CheckoutDeadlineException())
+                    .thenAnswer(
+                            invocation ->
+                                    new PhonePeClient.CreatePaymentResponse(
+                                            "provider-retry",
+                                            invocation.getArgument(0),
+                                            "PENDING",
+                                            "https://pay.example/checkout",
+                                            null,
+                                            null));
+            assertThatThrownBy(
+                            () ->
+                                    commitments.beginBalance(
+                                            ConsentEnvironment.DEV,
+                                            fixture.subject(),
+                                            fixture.enquiry()))
+                    .hasMessageContaining("not enough time to open payment");
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT status FROM occasion_payment_attempts WHERE"
+                                            + " enquiry_id=? AND stage='BALANCE'",
+                                    String.class,
+                                    fixture.enquiry()))
+                    .isEqualTo("FAILED");
+            var retry =
+                    commitments.beginBalance(
+                            ConsentEnvironment.DEV, fixture.subject(), fixture.enquiry());
+            assertThat(retry.paymentUrl()).isEqualTo("https://pay.example/checkout");
+        } finally {
+            features.setOccasionEnquiries(enquiriesEnabled);
+            features.setOccasionPayments(paymentsEnabled);
+        }
+    }
+
+    @Test
     void balanceRetryUsesOneCheckoutAndVerifiedPaymentConfirmsOnce() {
         var fixture = paidDeposit();
         boolean enquiries = features.isOccasionEnquiries(),
@@ -83,8 +127,19 @@ class OccasionCommitmentIntegrationTest {
         try {
             features.setOccasionEnquiries(true);
             features.setOccasionPayments(true);
+            jdbc.update(
+                    "UPDATE occasion_enquiries SET balance_due_at=? WHERE id=?",
+                    Timestamp.from(clock.instant().plusSeconds(360)),
+                    fixture.enquiry());
             when(phonePe.createPayment(
-                            anyString(), eq(new BigDecimal("800.00")), anyString(), eq(600)))
+                            anyString(),
+                            eq(new BigDecimal("800.00")),
+                            anyString(),
+                            argThat(
+                                    (Instant deadline) ->
+                                            deadline.isAfter(clock.instant())
+                                                    && !deadline.isAfter(
+                                                            clock.instant().plusSeconds(360)))))
                     .thenAnswer(
                             invocation ->
                                     new PhonePeClient.CreatePaymentResponse(
@@ -101,7 +156,16 @@ class OccasionCommitmentIntegrationTest {
                     commitments.beginBalance(
                             ConsentEnvironment.DEV, fixture.subject(), fixture.enquiry());
             assertThat(retry.attemptId()).isEqualTo(first.attemptId());
-            verify(phonePe, times(1)).createPayment(anyString(), any(), anyString(), eq(600));
+            verify(phonePe, times(1))
+                    .createPayment(
+                            anyString(),
+                            any(),
+                            anyString(),
+                            argThat(
+                                    (Instant deadline) ->
+                                            deadline.isAfter(clock.instant())
+                                                    && !deadline.isAfter(
+                                                            clock.instant().plusSeconds(360))));
             String merchant = merchant(first.attemptId());
             commitments.verifiedWebhook(
                     merchant, "checkout.order.completed", "COMPLETED", "transaction-1");
@@ -280,7 +344,14 @@ VALUES (?, ?, 'APPROVED', 'PIECE', 100, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     Timestamp.valueOf(date.toLocalDate().atTime(12, 0)),
                     bp);
             when(phonePe.createPayment(
-                            anyString(), eq(new BigDecimal("200.00")), anyString(), eq(600)))
+                            anyString(),
+                            eq(new BigDecimal("200.00")),
+                            anyString(),
+                            argThat(
+                                    (Instant deadline) ->
+                                            deadline.isAfter(clock.instant())
+                                                    && !deadline.isAfter(
+                                                            clock.instant().plusSeconds(600)))))
                     .thenAnswer(
                             invocation ->
                                     new PhonePeClient.CreatePaymentResponse(
@@ -307,7 +378,16 @@ VALUES (?, ?, 'APPROVED', 'PIECE', 100, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                                     BigDecimal.class,
                                     bp))
                     .isEqualByComparingTo("10");
-            verify(phonePe).createPayment(anyString(), any(), anyString(), eq(600));
+            verify(phonePe)
+                    .createPayment(
+                            anyString(),
+                            any(),
+                            anyString(),
+                            argThat(
+                                    (Instant deadline) ->
+                                            deadline.isAfter(clock.instant())
+                                                    && !deadline.isAfter(
+                                                            clock.instant().plusSeconds(600))));
         } finally {
             features.setOccasionEnquiries(oldEnquiries);
             features.setOccasionPayments(oldPayments);
@@ -377,7 +457,14 @@ VALUES (?, ?, 'APPROVED', 'PIECE', 100, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     jdbc.queryForObject(
                             "SELECT count(*) FROM inventory_daily_allocations", Integer.class);
             when(phonePe.createPayment(
-                            anyString(), eq(new BigDecimal("1000.00")), anyString(), eq(600)))
+                            anyString(),
+                            eq(new BigDecimal("1000.00")),
+                            anyString(),
+                            argThat(
+                                    (Instant deadline) ->
+                                            deadline.isAfter(clock.instant())
+                                                    && !deadline.isAfter(
+                                                            clock.instant().plusSeconds(600)))))
                     .thenAnswer(
                             invocation ->
                                     new PhonePeClient.CreatePaymentResponse(
@@ -387,9 +474,28 @@ VALUES (?, ?, 'APPROVED', 'PIECE', 100, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                                             "https://pay.example/bulk",
                                             null,
                                             null));
+            assertThatThrownBy(
+                            () ->
+                                    commitments.beginDeposit(
+                                            ConsentEnvironment.DEV,
+                                            fixture.subject(),
+                                            fixture.enquiry(),
+                                            slot))
+                    .hasMessageContaining("Accept the approved bulk pickup appointment");
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT booked_count FROM pickup_slots WHERE id = ?",
+                                    Integer.class,
+                                    slot))
+                    .isZero();
             var checkout =
                     commitments.beginDeposit(
-                            ConsentEnvironment.DEV, fixture.subject(), fixture.enquiry(), slot);
+                            ConsentEnvironment.DEV,
+                            fixture.subject(),
+                            fixture.enquiry(),
+                            0,
+                            false,
+                            date.atTime(12, 0));
             assertThat(
                             jdbc.queryForObject(
                                     "SELECT state FROM occasion_production_allocations WHERE"
@@ -563,7 +669,7 @@ VALUES (?, ?, 'APPROVED', 'PIECE', 100, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                             "SELECT pickup_slot_id FROM occasion_enquiries WHERE id = ?",
                             Long.class,
                             fixture.enquiry());
-            jdbc.update("UPDATE pickup_slots SET booked_count = 0 WHERE id = ?", slot);
+            jdbc.update("UPDATE pickup_slots SET booked_count = capacity WHERE id = ?", slot);
             Date date =
                     jdbc.queryForObject(
                             "SELECT service_date FROM occasion_enquiries WHERE id = ?",
@@ -576,9 +682,16 @@ VALUES (?, ?, 10, 'PIECE', ?, 'PLANNED', 'manager')
 """,
                     fixture.enquiry(),
                     fixture.product(),
-                    Timestamp.valueOf(date.toLocalDate().atTime(11, 0)));
+                    Timestamp.valueOf(date.toLocalDate().atTime(12, 0)));
             when(phonePe.createPayment(
-                            anyString(), eq(new BigDecimal("200.00")), anyString(), eq(600)))
+                            anyString(),
+                            eq(new BigDecimal("200.00")),
+                            anyString(),
+                            argThat(
+                                    (Instant deadline) ->
+                                            deadline.isAfter(clock.instant())
+                                                    && !deadline.isAfter(
+                                                            clock.instant().plusSeconds(600)))))
                     .thenAnswer(
                             invocation ->
                                     new PhonePeClient.CreatePaymentResponse(
@@ -588,9 +701,65 @@ VALUES (?, ?, 10, 'PIECE', ?, 'PLANNED', 'manager')
                                             "https://pay.example/bulk",
                                             null,
                                             null));
+            var nearPickup =
+                    java.time.LocalDateTime.now(clock.withZone(ZoneId.of("Asia/Kolkata")))
+                            .plusMinutes(5)
+                            .withNano(0);
+            jdbc.update(
+                    "UPDATE occasion_enquiries SET service_date=? WHERE id=?",
+                    nearPickup.toLocalDate(),
+                    fixture.enquiry());
+            jdbc.update(
+                    "UPDATE occasion_production_allocations SET expected_ready_at=? WHERE"
+                            + " enquiry_id=?",
+                    Timestamp.valueOf(nearPickup),
+                    fixture.enquiry());
+            assertThatThrownBy(
+                            () ->
+                                    commitments.beginDeposit(
+                                            ConsentEnvironment.DEV,
+                                            fixture.subject(),
+                                            fixture.enquiry(),
+                                            0,
+                                            false,
+                                            nearPickup))
+                    .hasMessageContaining("not enough time to pay before bulk pickup");
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT count(*) FROM pickup_slots WHERE occasion_enquiry_id=?",
+                                    Integer.class,
+                                    fixture.enquiry()))
+                    .isZero();
+            jdbc.update(
+                    "UPDATE occasion_enquiries SET service_date=? WHERE id=?",
+                    date,
+                    fixture.enquiry());
+            jdbc.update(
+                    "UPDATE occasion_production_allocations SET expected_ready_at=? WHERE"
+                            + " enquiry_id=?",
+                    Timestamp.valueOf(date.toLocalDate().atTime(12, 0)),
+                    fixture.enquiry());
             var checkout =
                     commitments.beginDeposit(
-                            ConsentEnvironment.DEV, fixture.subject(), fixture.enquiry(), slot);
+                            ConsentEnvironment.DEV,
+                            fixture.subject(),
+                            fixture.enquiry(),
+                            0,
+                            false,
+                            date.toLocalDate().atTime(12, 0));
+            Long appointment =
+                    jdbc.queryForObject(
+                            "SELECT id FROM pickup_slots WHERE occasion_enquiry_id = ? AND NOT"
+                                    + " active",
+                            Long.class,
+                            fixture.enquiry());
+            assertThat(appointment).isNotNull().isNotEqualTo(slot);
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT booked_count FROM pickup_slots WHERE id = ?",
+                                    Integer.class,
+                                    slot))
+                    .isEqualTo(10);
             commitments.verifiedWebhook(
                     merchant(checkout.attemptId()), "checkout.order.failed", "FAILED", null);
             commitments.verifiedWebhook(
@@ -606,7 +775,7 @@ VALUES (?, ?, 10, 'PIECE', ?, 'PLANNED', 'manager')
                             jdbc.queryForObject(
                                     "SELECT booked_count FROM pickup_slots WHERE id = ?",
                                     Integer.class,
-                                    slot))
+                                    appointment))
                     .isZero();
             assertThat(
                             jdbc.queryForObject(
@@ -650,7 +819,14 @@ VALUES (?, ?, 10, 'PIECE', ?, 'COMMITTED', 'manager')
                     fixture.product(),
                     Timestamp.valueOf(date.toLocalDate().atTime(11, 0)));
             when(phonePe.createPayment(
-                            anyString(), eq(new BigDecimal("800.00")), anyString(), eq(600)))
+                            anyString(),
+                            eq(new BigDecimal("800.00")),
+                            anyString(),
+                            argThat(
+                                    (Instant deadline) ->
+                                            deadline.isAfter(clock.instant())
+                                                    && !deadline.isAfter(
+                                                            clock.instant().plusSeconds(600)))))
                     .thenAnswer(
                             invocation ->
                                     new PhonePeClient.CreatePaymentResponse(
@@ -763,7 +939,14 @@ VALUES (?, ?, 10, 'PIECE', ?, 'COMMITTED', 'manager')
                     fixture.product(),
                     Timestamp.valueOf(date.toLocalDate().atTime(11, 0)));
             when(phonePe.createPayment(
-                            anyString(), eq(new BigDecimal("800.00")), anyString(), eq(600)))
+                            anyString(),
+                            eq(new BigDecimal("800.00")),
+                            anyString(),
+                            argThat(
+                                    (Instant deadline) ->
+                                            deadline.isAfter(clock.instant())
+                                                    && !deadline.isAfter(
+                                                            clock.instant().plusSeconds(600)))))
                     .thenAnswer(
                             invocation ->
                                     new PhonePeClient.CreatePaymentResponse(
@@ -842,8 +1025,9 @@ VALUES (?, ?, 10, 'PIECE', ?, 'COMMITTED', 'manager')
         try {
             features.setOccasionBulkProduction(true);
             jdbc.update(
-                    "INSERT INTO branch_products(branch_id,product_id,occasion_only)"
-                            + " VALUES(?,?,true)",
+                    "INSERT INTO"
+                        + " branch_products(branch_id,product_id,occasion_only,occasion_published)"
+                        + " VALUES(?,?,true,true)",
                     f.branch(),
                     f.product());
             jdbc.update(
@@ -1052,6 +1236,14 @@ VALUES (?, ?, 10, 'PIECE', ?, 'COMMITTED', 'manager')
                     "INSERT INTO branch_products(branch_id,product_id) VALUES(?,?)",
                     f.branch(),
                     f.product());
+            assertThat(catalogue.catalogue(f.branch(), false).sweets()).isEmpty();
+            assertThat(catalogue.catalogue(f.branch(), true).sweets())
+                    .anyMatch(sweet -> sweet.id() == f.product() && !sweet.published());
+            jdbc.update(
+                    "UPDATE branch_products SET occasion_published = true WHERE branch_id=? AND"
+                            + " product_id=?",
+                    f.branch(),
+                    f.product());
             var photos =
                     java.util.List.of(
                             "https://images.example.invalid/outer.jpg",
@@ -1093,6 +1285,39 @@ VALUES (?, ?, 10, 'PIECE', ?, 'COMMITTED', 'manager')
             assertThat(live.sweets().getFirst().categoryName()).isEqualTo("Occasion category");
             assertThat(live.boxes().getFirst().imageUrls()).containsExactlyElementsOf(photos);
             assertThat(live.branding().published()).isTrue();
+            var preset =
+                    new OccasionCatalogue.PackagePreset(
+                            null,
+                            box.id(),
+                            "Celebration box",
+                            "A filled box",
+                            photos.getFirst(),
+                            java.util.List.of(new OccasionCatalogue.Recipe(f.product(), 4)),
+                            true);
+            var oversized =
+                    new OccasionCatalogue.PackagePreset(
+                            null,
+                            box.id(),
+                            "Too many items",
+                            "",
+                            photos.getFirst(),
+                            java.util.stream.LongStream.rangeClosed(1, 31)
+                                    .mapToObj(id -> new OccasionCatalogue.Recipe(id, 1))
+                                    .toList(),
+                            true);
+            assertThatThrownBy(() -> catalogue.savePackage(f.branch(), oversized))
+                    .hasMessageContaining("at most 30 different items");
+            catalogue.savePackage(f.branch(), preset);
+            assertThat(catalogue.catalogue(f.branch(), false).packages())
+                    .singleElement()
+                    .satisfies(item -> assertThat(item.recipe()).isEqualTo(preset.recipe()));
+            jdbc.update(
+                    "UPDATE branch_products SET occasion_published=false WHERE branch_id=? AND"
+                            + " product_id=?",
+                    f.branch(),
+                    f.product());
+            assertThat(catalogue.catalogue(f.branch(), false).packages()).isEmpty();
+            assertThat(catalogue.catalogue(f.branch(), true).packages()).hasSize(1);
             assertThatThrownBy(
                             () ->
                                     catalogue.saveBox(
@@ -1318,7 +1543,14 @@ VALUES (?, ?, 10, 'PIECE', ?, 'COMMITTED', 'manager')
                     "UPDATE occasion_payment_attempts SET amount=2910 WHERE enquiry_id=?",
                     f.enquiry());
             when(phonePe.createPayment(
-                            anyString(), eq(new BigDecimal("8940.00")), anyString(), eq(600)))
+                            anyString(),
+                            eq(new BigDecimal("8940.00")),
+                            anyString(),
+                            argThat(
+                                    (Instant deadline) ->
+                                            deadline.isAfter(clock.instant())
+                                                    && !deadline.isAfter(
+                                                            clock.instant().plusSeconds(600)))))
                     .thenAnswer(
                             invocation ->
                                     new PhonePeClient.CreatePaymentResponse(

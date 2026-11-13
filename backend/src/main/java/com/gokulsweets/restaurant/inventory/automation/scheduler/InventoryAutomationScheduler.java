@@ -29,6 +29,11 @@ public class InventoryAutomationScheduler {
     @org.springframework.beans.factory.annotation.Value("${gokul.jobs.worker-enabled:false}")
     private boolean dedicatedImportWorker;
 
+    private final org.springframework.jdbc.core.JdbcTemplate rollingJdbc;
+    private final org.springframework.transaction.support.TransactionTemplate rollingTransactions;
+    private final com.gokulsweets.restaurant.inventory.rolling.RollingScheduleService
+            rollingSchedules;
+
     private final InventoryAutomationRuleRepository ruleRepository;
 
     private final InventoryAutomationGenerationService generationService;
@@ -56,19 +61,37 @@ public class InventoryAutomationScheduler {
                     .forEach(
                             branchId -> {
                                 try {
-                                    generationService.generate(
-                                            branchId,
-                                            today,
-                                            today.plusDays(
-                                                    features.isInventoryAutomationV2()
-                                                            ? Math.min(
-                                                                    features
-                                                                            .getFutureOrderingDays(),
-                                                                    properties.getMaximumRunDays()
-                                                                            - 1L)
-                                                            : properties.getMaximumRunDays() - 1L),
-                                            InventoryAutomationTrigger.SCHEDULED,
-                                            properties.getSystemActor());
+                                    rollingTransactions.executeWithoutResult(
+                                            state -> {
+                                                rollingJdbc.query(
+                                                        "SELECT id FROM branches WHERE id=? FOR"
+                                                                + " UPDATE",
+                                                        rs -> {
+                                                            while (rs.next()) {
+                                                                /* Acquire branch ownership lock. */
+                                                            }
+                                                            return null;
+                                                        },
+                                                        branchId);
+                                                if (rollingSchedules.ownsInventory(branchId))
+                                                    return;
+                                                generationService.generate(
+                                                        branchId,
+                                                        today,
+                                                        today.plusDays(
+                                                                features.isInventoryAutomationV2()
+                                                                        ? Math.min(
+                                                                                features
+                                                                                        .getFutureOrderingDays(),
+                                                                                properties
+                                                                                                .getMaximumRunDays()
+                                                                                        - 1L)
+                                                                        : properties
+                                                                                        .getMaximumRunDays()
+                                                                                - 1L),
+                                                        InventoryAutomationTrigger.SCHEDULED,
+                                                        properties.getSystemActor());
+                                            });
                                 } catch (Exception exception) {
                                     log.error(
                                             "Scheduled inventory automation failed: branchId={}",

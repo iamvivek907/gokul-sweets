@@ -1,11 +1,13 @@
 "use client";
 import {
+  useCallback,
   useEffect,
   useId,
   useRef,
   useState,
   useSyncExternalStore,
 } from "react";
+import { flushSync } from "react-dom";
 import Image from "next/image";
 import MenuDiscoverySheet from "./MenuDiscoverySheet";
 import { T, useLanguage, useTranslation } from "@/lib/language";
@@ -36,6 +38,8 @@ const subscribe = (changed: () => void) => {
 };
 interface MenuSearchProps {
   detached?: boolean;
+  topOnTap?: boolean;
+  onSelectProduct?: (product:MenuProduct)=>void;
   onSubmit?: (value:string)=>void;
   onDismiss?: ()=>void;
   enhanced?: boolean;
@@ -44,10 +48,15 @@ interface MenuSearchProps {
   value: string;
   onChange: (value: string) => void;
   products?: MenuProduct[];
+  orderableIds?: ReadonlySet<number>|null;
   branchId?: number;
 }
+type SearchOption = {text:string;product?:MenuProduct};
+const optionKey = ({text,product}:SearchOption)=>product?.id??text;
 export default function MenuSearch({
   detached = false,
+  topOnTap = false,
+  onSelectProduct,
   onSubmit,
   onDismiss,
   enhanced = false,
@@ -56,6 +65,7 @@ export default function MenuSearch({
   value,
   onChange,
   products = [],
+  orderableIds,
   branchId = 0,
 }: MenuSearchProps) {
   const enabled = enhanced && refined,
@@ -64,17 +74,22 @@ export default function MenuSearch({
     listId = useId(),
     raw = useSyncExternalStore(subscribe, read, server);
   const [focused, setFocused] = useState(false),
-    [active, setActive] = useState(-1);
+    [active, setActive] = useState<string|number|null>(null);
   const [overlay,setOverlay]=useState(false),[draft,setDraft]=useState(value);
   const [searchTrigger,setSearchTrigger]=useState<HTMLElement|null>(null);
+  const restoreSearchFocus=useRef(true);
   const inputId=detached ? `menu-search-${listId}` : "gokul-menu-search";
+  const openSearch=useCallback((trigger:HTMLElement|null)=>{
+    restoreSearchFocus.current=true;
+    // Keep the native keyboard focus inside the original tap on iOS.
+    flushSync(()=>{setFocused(false);setSearchTrigger(trigger);setDraft(value);setOverlay(true);});
+  },[value]);
   useEffect(()=>{
-    if(detached){const frame=requestAnimationFrame(()=>document.getElementById(inputId)?.focus({preventScroll:true}));return()=>cancelAnimationFrame(frame);}
-    if(!premium)return;
-    const open=(event:Event)=>{setSearchTrigger((event as CustomEvent<HTMLElement>).detail??document.activeElement as HTMLElement|null);setDraft(value);setOverlay(true);};
+    if(detached||!premium)return;
+    const open=(event:Event)=>openSearch((event as CustomEvent<HTMLElement>).detail??document.activeElement as HTMLElement|null);
     window.addEventListener('gokul-menu-search-open',open);
     return()=>window.removeEventListener('gokul-menu-search-open',open);
-  },[detached,premium,value,inputId]);
+  },[detached,premium,openSearch]);
   const surface = useRef<HTMLDivElement>(null),
     pointerActive = useRef(false);
   const [hintIndex,setHintIndex]=useState(0);
@@ -108,7 +123,7 @@ export default function MenuSearch({
     return()=>{if(timer)clearInterval(timer);observer.disconnect();motion.removeEventListener('change',sync);document.removeEventListener('visibilitychange',sync);};
   },[premium,overlay,focused,value,exampleKey]);
   function clearSearch(){
-    onChange('');setActive(-1);setFocused(true);
+    onChange('');setActive(null);setFocused(true);
     surface.current?.querySelector('input')?.focus({preventScroll:true});
   }
   function highlight(text:string){
@@ -146,26 +161,32 @@ export default function MenuSearch({
   }
   const history = recentSearches(raw, branchId),
     recent = !value.trim() && history.length > 0;
-  const options =
+  const options:SearchOption[] =
     enabled && focused
       ? recent
-        ? history.slice(0, 4)
-        : menuSearchSuggestions(products, value)
+        ? history.slice(0, 4).map(text=>({text}))
+        : menuSearchSuggestions(products,value,product=>orderableIds?.has(product.id)??false)
+            .map(product=>({text:product.name,product}))
       : [];
   const expanded = options.length > 0,
-    activeIndex = Math.min(active, options.length - 1);
+    activeIndex = options.findIndex(option=>optionKey(option)===active);
   function remember(text: string) {
     try {
       if (rememberMenuSearch(localStorage, branchId, text))
         window.dispatchEvent(new Event(MENU_PREFERENCE_EVENT));
     } catch {}
   }
-  function choose(text: string) {
-    onChange(text);
-    onSubmit?.(text);
+  function choose({text,product}:SearchOption) {
+    if(product&&onSelectProduct){
+      surface.current?.querySelector("input")?.blur();
+      onSelectProduct(product);
+    }else{
+      onChange(text);
+      onSubmit?.(text);
+    }
     remember(text);
     setFocused(false);
-    setActive(-1);
+    setActive(null);
   }
   useEffect(() => {
     if (
@@ -186,7 +207,7 @@ export default function MenuSearch({
   }, [value, branchId, products, enabled, detached]);
   return (
     <>
-    <div ref={surface} className={`menu-search relative w-full ${premium?"menu-search-premium":""}`}>
+    <div ref={surface} tabIndex={topOnTap&&!detached?-1:undefined} className={`menu-search relative w-full ${premium?"menu-search-premium":""}`}>
       {refined && (
         <label
           htmlFor={inputId}
@@ -231,7 +252,10 @@ export default function MenuSearch({
           autoComplete="off"
           maxLength={60}
           value={value}
+          enterKeyHint="search"
           onFocus={() => setFocused(true)}
+          onMouseDown={topOnTap&&!detached?event=>event.preventDefault():undefined}
+          onClick={topOnTap&&!detached?()=>openSearch(surface.current):undefined}
           onBlur={(event) => {
             if (
               !pointerActive.current &&
@@ -243,29 +267,29 @@ export default function MenuSearch({
           }}
           onChange={(e) => {
             onChange(e.target.value);
-            setActive(-1);
+            setActive(null);
             setFocused(true);
           }}
           onKeyDown={(event) => {
             if (event.key === "Escape") {
               if(onDismiss){event.preventDefault();event.stopPropagation();onDismiss();}
               setFocused(false);
-              setActive(-1);
+              setActive(null);
             } else if (
               expanded &&
               (event.key === "ArrowDown" || event.key === "ArrowUp")
             ) {
               event.preventDefault();
-              setActive((index) =>
-                index < 0
+              setActive(optionKey(options[
+                activeIndex < 0
                   ? event.key === "ArrowDown"
                     ? 0
                     : options.length - 1
-                  : (index +
+                  : (activeIndex +
                       (event.key === "ArrowDown" ? 1 : -1) +
                       options.length) %
-                    options.length,
-              );
+                  options.length
+              ]));
             } else if (event.key === "Enter") {
               event.preventDefault();
               if (expanded && activeIndex >= 0) choose(options[activeIndex]);
@@ -299,18 +323,20 @@ export default function MenuSearch({
             role="listbox"
             aria-label={t(recent ? "Recent searches" : "Menu suggestions")}
           >
-            {options.map((text, index) => {
-              const product=products.find(product=>product.name===text);
-              return <li key={text} role="presentation">
+            {options.map((option, index) => {
+              const {text,product}=option;
+              const duplicate=product&&options.some(other=>other!==option&&other.text===text);
+              const label=duplicate&&product.categoryName?`${text} · ${product.categoryName}`:text;
+              return <li key={optionKey(option)} role="presentation">
                 <button
                   type="button"
                   role="option"
-                  aria-label={premium?text:undefined}
+                  aria-label={premium?label:undefined}
                   id={`${listId}-${index}`}
                   aria-selected={index === activeIndex}
                   tabIndex={-1}
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => choose(text)}
+                  onClick={() => choose(option)}
                 >
                   {premium?<>
                     <span className="menu-search-result-icon" aria-hidden="true">
@@ -345,9 +371,12 @@ export default function MenuSearch({
         </div>
       )}
     </div>
-    {overlay&&<MenuDiscoverySheet returnFocusId="gokul-menu-header-search" restoreFocus={searchTrigger} title="Search the menu" className="menu-search-dialog" onClose={()=>setOverlay(false)}>
-      <p className="menu-search-hint"><T text="Find a dish without losing your place."/></p>
-      <MenuSearch detached enhanced={enhanced} refined={refined} premium={premium} value={draft} onChange={setDraft} products={products} branchId={branchId} onSubmit={submitOverlay} onDismiss={()=>setOverlay(false)}/>
+    {overlay&&<MenuDiscoverySheet returnFocusId={searchTrigger?.id} restoreFocus={searchTrigger} restoreFocusOnClose={restoreSearchFocus} initialFocusSelector="input[type=search]" fitVisualViewport title="Search the menu" className="menu-search-dialog" onClose={()=>setOverlay(false)}>
+      <MenuSearch detached enhanced={enhanced} refined={refined} premium={premium} value={draft} onChange={setDraft} products={products} orderableIds={orderableIds} branchId={branchId} onSubmit={submitOverlay} onDismiss={()=>setOverlay(false)} onSelectProduct={onSelectProduct?product=>{
+        restoreSearchFocus.current=false;
+        setOverlay(false);
+        onSelectProduct(product);
+      }:undefined}/>
       <button type="button" className="menu-search-show-results" onClick={()=>submitOverlay(draft)}><T text="Show results"/></button>
     </MenuDiscoverySheet>}
     </>

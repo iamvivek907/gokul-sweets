@@ -101,7 +101,7 @@ test("search handles Hindi, spelling and transpositions locally without broadeni
   for (const q of ["tea", "fish", "x".repeat(10000)])
     assert.equal(search.matchesMenuSearch(p, q), false, q.slice(0, 10));
   assert.deepEqual(
-    search.menuSearchSuggestions([p, { name: "Paneer Roll" }], "pnaeer"),
+    search.menuSearchSuggestions([p, { name: "Paneer Roll" }], "pnaeer").map(product=>product.name),
     ["Paneer Roll", "Paneer Samosa"],
   );
 });

@@ -6,8 +6,9 @@ import {T} from "@/lib/language";
 import MenuDiscoverySheet from "./MenuDiscoverySheet";
 
 export default function FloatingMenuCategories({categories,selectedId,hasCart,onSelect}:{categories:MenuCategory[];selectedId?:number;hasCart:boolean;onSelect:(id:number|null)=>void}) {
-    const features=useStorefrontFeatures(),modern=!!(features?.futuristicStorefrontV2||features?.checkoutExperienceV2),panelId=useId();
-    const [open,setOpen]=useState(false),[cartHeight,setCartHeight]=useState(0),[bottom,setBottom]=useState(68);
+    const features=useStorefrontFeatures(),modern=!!(features?.futuristicStorefrontV2||features?.checkoutExperienceV2),panelId=useId(),triggerId=`${panelId}-trigger`;
+    const [opener,setOpener]=useState<HTMLButtonElement|null>(null),[cartHeight,setCartHeight]=useState(0),[bottom,setBottom]=useState(68);
+    const open=opener!==null;
     const triggerRef=useRef<HTMLButtonElement>(null);
     const [triggerSize,setTriggerSize]=useState({width:136,height:48});
     useEffect(()=>{
@@ -28,13 +29,13 @@ export default function FloatingMenuCategories({categories,selectedId,hasCart,on
         queueMicrotask(update);
         return()=>{mutations.disconnect();observer.disconnect();window.removeEventListener("resize",update);};
     },[hasCart]);
-    function select(id:number|null){setOpen(false);onSelect(id);}
+    function select(id:number|null){setOpener(null);onSelect(id);}
     return <div className="menu-floating-categories" style={{"--category-trigger-width":`${triggerSize.width}px`,"--category-trigger-height":`${triggerSize.height}px`,"--floating-cart-height":`${cartHeight}px`,"--floating-menu-bottom":`${bottom}px`} as CSSProperties}>
-        <button ref={triggerRef} type="button" className="menu-floating-category-trigger" aria-haspopup="dialog" aria-expanded={open} aria-controls={panelId} style={open&&modern?{visibility:"hidden"}:undefined} onClick={()=>setOpen(true)}>
+        <button ref={triggerRef} id={triggerId} type="button" className="menu-floating-category-trigger" aria-haspopup="dialog" aria-expanded={open} aria-controls={panelId} style={open&&modern?{visibility:"hidden"}:undefined} onClick={event=>setOpener(event.currentTarget)}>
             <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
             <T text="Categories" />
         </button>
-        {open&&<MenuDiscoverySheet title="Jump to a category" hideClose={modern} footer={modern?(close=><button className="menu-category-close" type="button" onClick={close}><T text="Close"/></button>):undefined} onClose={()=>setOpen(false)} className={`menu-floating-category-sheet ${modern?"menu-category-anchored":""}`}>
+        {open&&<MenuDiscoverySheet title="Jump to a category" returnFocusId={triggerId} restoreFocus={opener} hideClose={modern} footer={modern?(close=><button className="menu-category-close" type="button" onClick={close}><T text="Close"/></button>):undefined} onClose={()=>setOpener(null)} className={`menu-floating-category-sheet ${modern?"menu-category-anchored":""}`}>
 
             <nav id={panelId} aria-label="Jump to menu category">
                 <button type="button" aria-current={selectedId==null?"true":undefined} onClick={()=>select(null)}><T text="All items" /><span>{categories.reduce((total,category)=>total+category.products.length,0)}</span></button>

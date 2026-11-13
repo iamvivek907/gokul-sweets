@@ -130,7 +130,10 @@ public class OccasionEnquiryController {
      * @param pickupSlotId the pickup slot id
      * @param estimateAccepted the estimate accepted
      */
-    public record DepositChoice(long pickupSlotId, boolean estimateAccepted) {}
+    public record DepositChoice(
+            long pickupSlotId,
+            boolean estimateAccepted,
+            java.time.LocalDateTime acceptedPickupAt) {}
 
     /**
      * Handles {@code POST /api/occasion-enquiries/{id}/deposit} for occasion enquiry.
@@ -154,7 +157,8 @@ public class OccasionEnquiryController {
                     subject(request),
                     id,
                     choice.pickupSlotId(),
-                    choice.estimateAccepted());
+                    choice.estimateAccepted(),
+                    choice.acceptedPickupAt());
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
@@ -262,6 +266,21 @@ public class OccasionEnquiryController {
                     __gokulMethodStartedNanos,
                     OccasionEnquiryController.class,
                     "staffList(long,java.time.LocalDate,UUID)");
+        }
+    }
+
+    /** Lists requests awaiting a quote or decline for an authorized branch. */
+    @GetMapping("/api/admin/branches/{branchId}/occasion-enquiries/review-queue")
+    @PreAuthorize("hasAuthority('ORDER_VIEW')")
+    public OccasionEnquiryService.ReviewQueue reviewQueue(
+            @PathVariable long branchId, @RequestParam(required = false) UUID after) {
+        final long started =
+                MethodTiming.start(OccasionEnquiryController.class, "reviewQueue(long,UUID)");
+        try {
+            staff.requireBranchAccess(branchId);
+            return service.reviewQueue(environment(), branchId, after);
+        } finally {
+            MethodTiming.finish(started, OccasionEnquiryController.class, "reviewQueue(long,UUID)");
         }
     }
 

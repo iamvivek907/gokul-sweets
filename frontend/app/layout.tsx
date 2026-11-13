@@ -3,7 +3,7 @@ import type {
     Viewport
 } from "next";
 
-import {appleStartupImages, criticalBootCss} from "@/lib/pwaStartup";
+import {appleStartupImages, criticalBootCss, liveLaunchRecoveryScript} from "@/lib/pwaStartup";
 
 import "./globals.css";
 import "@/components/layout/customer-ease.css";
@@ -59,7 +59,7 @@ export default function RootLayout({
             lang="en"
             data-scroll-behavior="smooth"
         >
-            <head><style dangerouslySetInnerHTML={{__html: criticalBootCss}} />{API_BASE_URL.startsWith("https://")&&<link rel="preconnect" href={new URL(API_BASE_URL).origin} crossOrigin="anonymous"/>}</head>
+            <head><style dangerouslySetInnerHTML={{__html: criticalBootCss}} /><script dangerouslySetInnerHTML={{__html: liveLaunchRecoveryScript}} />{API_BASE_URL.startsWith("https://")&&<link rel="preconnect" href={new URL(API_BASE_URL).origin} crossOrigin="anonymous"/>}</head>
             <body>
                 <AppProviders>
                     {children}

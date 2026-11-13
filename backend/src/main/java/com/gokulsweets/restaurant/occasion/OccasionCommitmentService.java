@@ -202,10 +202,32 @@ public class OccasionCommitmentService {
             UUID id,
             long pickupSlotId,
             boolean estimateAccepted) {
-        final long __gokulMethodStartedNanos =
+        long started =
                 MethodTiming.start(
                         OccasionCommitmentService.class,
                         "beginDeposit(ConsentEnvironment,UUID,UUID,long,boolean)");
+        try {
+            return beginDeposit(environment, subject, id, pickupSlotId, estimateAccepted, null);
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    OccasionCommitmentService.class,
+                    "beginDeposit(ConsentEnvironment,UUID,UUID,long,boolean)");
+        }
+    }
+
+    /** Accepts a quote-owned appointment or a legacy retail slot. */
+    public Checkout beginDeposit(
+            ConsentEnvironment environment,
+            UUID subject,
+            UUID id,
+            long pickupSlotId,
+            boolean estimateAccepted,
+            LocalDateTime acceptedPickupAt) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        OccasionCommitmentService.class,
+                        "beginDeposit(ConsentEnvironment,UUID,UUID,long,boolean,LocalDateTime)");
         try {
             requireEnabled();
             Start start =
@@ -290,38 +312,6 @@ public class OccasionCommitmentService {
                                             "QUOTED",
                                             "Accepted actual packed-weight pricing at agreed rates;"
                                                     + " advance credited toward final invoice");
-                                Instant serviceStart =
-                                        jdbc.query(
-                                                """
-SELECT slot_date, start_time FROM pickup_slots
-WHERE id = ? AND branch_id = ? AND slot_date = ? AND active
-""",
-                                                rs ->
-                                                        rs.next()
-                                                                ? LocalDateTime.of(
-                                                                                rs.getDate(1)
-                                                                                        .toLocalDate(),
-                                                                                rs.getTime(2)
-                                                                                        .toLocalTime())
-                                                                        .atZone(IST)
-                                                                        .toInstant()
-                                                                : null,
-                                                pickupSlotId,
-                                                enquiry.branchId(),
-                                                java.sql.Date.valueOf(enquiry.date()));
-                                if (serviceStart == null || !serviceStart.isAfter(clock.instant()))
-                                    throw conflict(
-                                            "Choose an available future pickup time for this branch"
-                                                    + " and date.");
-                                // The standard order path takes its slot lock before allocation
-                                // locks; keep that order.
-                                try {
-                                    pickupSlots.reserveNormalCapacity(pickupSlotId);
-                                } catch (IllegalStateException unavailable) {
-                                    throw conflict(
-                                            "That pickup time is full. Choose another time.");
-                                }
-                                Instant earliestHoldExpiry;
                                 Integer dedicated =
                                         jdbc.queryForObject(
                                                 "SELECT count(*) FROM"
@@ -329,7 +319,101 @@ WHERE id = ? AND branch_id = ? AND slot_date = ? AND active
                                                         + " enquiry_id = ?",
                                                 Integer.class,
                                                 id);
-                                if (dedicated != null && dedicated > 0) {
+                                boolean bulk = dedicated != null && dedicated > 0;
+                                Instant bulkPaymentExpiry = null;
+                                long reservedSlotId;
+                                Instant serviceStart;
+                                if (bulk && acceptedPickupAt == null)
+                                    throw conflict("Accept the approved bulk pickup appointment.");
+                                if (acceptedPickupAt != null) {
+                                    if (pickupSlotId != 0 || !features.isOccasionBulkProduction())
+                                        throw conflict(
+                                                "This bulk pickup appointment is unavailable.");
+                                    LocalDateTime proposed =
+                                            jdbc.queryForObject(
+                                                    """
+SELECT max(a.expected_ready_at) FROM occasion_production_allocations a
+JOIN occasion_enquiries e ON e.id = a.enquiry_id
+JOIN branches b ON b.id = e.branch_id AND b.active AND b.operational
+WHERE a.enquiry_id = ? AND a.state = 'PLANNED'
+""",
+                                                    LocalDateTime.class,
+                                                    id);
+                                    if (!acceptedPickupAt.equals(proposed)
+                                            || !proposed.toLocalDate().equals(enquiry.date())
+                                            || !proposed.atZone(IST)
+                                                    .toInstant()
+                                                    .isAfter(clock.instant()))
+                                        throw conflict(
+                                                "The bulk pickup time changed or expired. Refresh"
+                                                        + " the quote.");
+                                    serviceStart = proposed.atZone(IST).toInstant();
+                                    bulkPaymentExpiry = clock.instant().plus(PAYMENT_WINDOW);
+                                    if (!bulkPaymentExpiry.isBefore(serviceStart))
+                                        throw conflict(
+                                                "There is not enough time to pay before bulk"
+                                                        + " pickup. Ask the branch for a later"
+                                                        + " appointment.");
+                                    LocalTime startTime = proposed.toLocalTime();
+                                    LocalTime endTime =
+                                            startTime.isBefore(LocalTime.of(23, 30))
+                                                    ? startTime.plusMinutes(30)
+                                                    : LocalTime.of(23, 59, 59);
+                                    if (!endTime.isAfter(startTime))
+                                        throw conflict(
+                                                "Ask the branch to propose an earlier pickup"
+                                                        + " time.");
+                                    reservedSlotId =
+                                            Objects.requireNonNull(
+                                                    jdbc.queryForObject(
+                                                            """
+INSERT INTO pickup_slots(branch_id, slot_date, start_time, end_time,
+    capacity, booked_count, active, occasion_enquiry_id)
+VALUES (?, ?, ?, ?, 1, 1, FALSE, ?) RETURNING id
+""",
+                                                            Long.class,
+                                                            enquiry.branchId(),
+                                                            enquiry.date(),
+                                                            startTime,
+                                                            endTime,
+                                                            id));
+                                } else {
+                                    reservedSlotId = pickupSlotId;
+                                    serviceStart =
+                                            jdbc.query(
+                                                    """
+SELECT slot_date, start_time FROM pickup_slots
+WHERE id = ? AND branch_id = ? AND slot_date = ? AND active
+""",
+                                                    rs ->
+                                                            rs.next()
+                                                                    ? LocalDateTime.of(
+                                                                                    rs.getDate(1)
+                                                                                            .toLocalDate(),
+                                                                                    rs.getTime(2)
+                                                                                            .toLocalTime())
+                                                                            .atZone(IST)
+                                                                            .toInstant()
+                                                                    : null,
+                                                    pickupSlotId,
+                                                    enquiry.branchId(),
+                                                    java.sql.Date.valueOf(enquiry.date()));
+                                    if (serviceStart == null
+                                            || !serviceStart.isAfter(clock.instant()))
+                                        throw conflict(
+                                                "Choose an available future pickup time for this"
+                                                        + " branch and date.");
+                                    // The standard order path takes its slot lock before allocation
+                                    // locks; keep that order.
+                                    try {
+                                        pickupSlots.reserveNormalCapacity(reservedSlotId);
+                                    } catch (IllegalStateException unavailable) {
+                                        throw conflict(
+                                                "That pickup time is full. Choose another time.");
+                                    }
+                                }
+                                Instant earliestHoldExpiry;
+                                if (bulk) {
                                     if (!features.isOccasionBulkProduction())
                                         throw conflict(
                                                 "Bulk checkout is paused. Contact the branch.");
@@ -488,7 +572,10 @@ WHERE i.enquiry_id = ? AND bp.available AND p.active ORDER BY bp.id
                                                 key);
                                     }
                                 }
-                                Instant paymentExpiry = clock.instant().plus(PAYMENT_WINDOW);
+                                Instant paymentExpiry =
+                                        bulkPaymentExpiry == null
+                                                ? clock.instant().plus(PAYMENT_WINDOW)
+                                                : bulkPaymentExpiry;
                                 if (earliestHoldExpiry == null
                                         || !earliestHoldExpiry.isAfter(
                                                 paymentExpiry.plusSeconds(30)))
@@ -516,7 +603,7 @@ VALUES (?, ?, ?, 'DEPOSIT', 'PENDING', ?, ?, ?)
 UPDATE occasion_enquiries SET status = 'PAYMENT_PENDING', pickup_slot_id = ?,
     hold_expires_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
 """,
-                                        pickupSlotId,
+                                        reservedSlotId,
                                         Timestamp.from(earliestHoldExpiry),
                                         id);
                                 event(
@@ -543,7 +630,7 @@ UPDATE occasion_enquiries SET status = 'PAYMENT_PENDING', pickup_slot_id = ?,
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
                     OccasionCommitmentService.class,
-                    "beginDeposit(ConsentEnvironment,UUID,UUID,long,boolean)");
+                    "beginDeposit(ConsentEnvironment,UUID,UUID,long,boolean,LocalDateTime)");
         }
     }
 
@@ -583,15 +670,19 @@ UPDATE occasion_enquiries SET status = 'PAYMENT_PENDING', pickup_slot_id = ?,
                                     throw conflict(
                                             "The deposit must be verified before paying the"
                                                     + " balance.");
-                                if (enquiry.balanceDue() != null
-                                        && !enquiry.balanceDue().isAfter(clock.instant()))
-                                    throw conflict(
-                                            "The balance deadline passed. Contact the branch to"
-                                                    + " review this booking.");
                                 Attempt existing = pendingAttempt(id, "BALANCE");
                                 if (existing != null
                                         && existing.expiresAt().isAfter(clock.instant()))
                                     return new Start(existing, false);
+                                if (enquiry.balanceDue() != null
+                                        && Duration.between(clock.instant(), enquiry.balanceDue())
+                                                        .toSeconds()
+                                                < PhonePeClient.MIN_EXPIRY_SECONDS
+                                                        + phonePeProperties
+                                                                .getRequestTimeoutSeconds())
+                                    throw conflict(
+                                            "There is not enough time to pay the balance. Contact"
+                                                    + " the branch to review this booking.");
                                 if (existing != null)
                                     jdbc.update(
                                             "UPDATE occasion_payment_attempts SET status ="
@@ -788,8 +879,7 @@ ORDER BY created_at DESC, id DESC LIMIT 1
             if (attempt.url() != null) return response(attempt);
             // An uncertain provider response must remain pending for status reconciliation; never
             // create a second charge.
-            if (attempt.expiresAt().isBefore(clock.instant()))
-                throw conflict("The payment window ended. Refresh the status.");
+
             String storefront = phonePeProperties.getRedirectUrl().replaceAll("/checkout/?$", "");
             String redirect =
                     storefront
@@ -797,9 +887,18 @@ ORDER BY created_at DESC, id DESC LIMIT 1
                             + attempt.enquiryId()
                             + "&payment="
                             + attempt.id();
-            var created =
-                    phonePe.createPayment(
-                            attempt.merchantOrderId(), attempt.amount(), redirect, 600);
+            PhonePeClient.CreatePaymentResponse created;
+            try {
+                created =
+                        phonePe.createPayment(
+                                attempt.merchantOrderId(),
+                                attempt.amount(),
+                                redirect,
+                                attempt.expiresAt());
+            } catch (PhonePeClient.CheckoutDeadlineException rejected) {
+                failed(attempt.merchantOrderId());
+                throw conflict("There is not enough time to open payment. Contact the branch.");
+            }
             if (created.redirectUrl() == null || created.orderId() == null)
                 throw new ResponseStatusException(
                         HttpStatus.SERVICE_UNAVAILABLE, "Payment provider did not start checkout.");

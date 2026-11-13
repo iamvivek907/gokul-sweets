@@ -31,9 +31,9 @@ try { for(const scenario of ['guest-retry','resume','expiry','cadence','refresh-
  await context.addInitScript(branch=>localStorage.setItem('gokul-selected-branch',JSON.stringify(branch)),branch);
  if(scenario==='cadence')await page.clock.install();
  await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
- const strip=page.locator('#menu-offers-open');
+ const strip=page.locator('.menu-browse-chips #menu-offers-open');
+ assert.equal(await page.locator('.menu-offers').count(),0,'offers use only the shortcut');
  if(scenario==='guest-retry') {
-  await strip.getByText('Offers could not be checked. Try again.',{exact:true}).waitFor();
   await strip.click();const sheet=page.getByRole('dialog',{name:'Offers & savings',exact:true});
   await sheet.getByRole('button',{name:'Retry offers',exact:true}).waitFor();fail=false;
   await sheet.getByRole('button',{name:'Retry offers',exact:true}).click();
@@ -41,14 +41,14 @@ try { for(const scenario of ['guest-retry','resume','expiry','cadence','refresh-
   assert.equal(await sheet.getByRole('button',{name:'Retry offers',exact:true}).count(),0);
   assert.ok(reads>=2,'guest can recover a failed catalogue');
  } else {
-  await strip.getByText('₹20.00 off above ₹200.00',{exact:true}).waitFor();
+  await strip.getByText('₹20.00 off',{exact:true}).waitFor();
   const productY=(await page.locator('#gokul-product-1').boundingBox()).y;
   if(scenario==='expiry') {
-   available=false;await strip.getByText('₹20.00 off above ₹200.00',{exact:true}).waitFor({state:'hidden',timeout:10000});
+   available=false;await strip.getByText('₹20.00 off',{exact:true}).waitFor({state:'hidden',timeout:10000});
    assert.ok(reads>=2,'expiry triggers a fresh catalogue read');
   } else if(scenario==='cadence') {
    available=false;await page.clock.fastForward(60001);
-   await strip.getByText('₹20.00 off above ₹200.00',{exact:true}).waitFor({state:'hidden'});
+   await strip.getByText('₹20.00 off',{exact:true}).waitFor({state:'hidden'});
    assert.ok(reads>=2,'visible menu rechecks within one minute');
   } else {
    hold=true;available=false;fail=scenario==='refresh-failure';const before=reads;
