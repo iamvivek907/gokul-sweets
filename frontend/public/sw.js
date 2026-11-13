@@ -25,6 +25,7 @@ const OFFLINE_URL =
     "/offline";
 
 const LAUNCH_WAIT_MS = 8000;
+const LAUNCH_CACHE_WAIT_MS = 350;
 
 const STATIC_ASSETS = [
     "/",
@@ -158,9 +159,13 @@ self.addEventListener(
             "navigate"
         ) {
 
-            event.respondWith(isStorefrontLaunch(url)
-                ? launchNavigation(request, url)
-                : networkFirstNavigation(request));
+            if (isStorefrontLaunch(url)) {
+                const launch = launchNavigation(request, url);
+                event.respondWith(launch.then(result => result.response));
+                event.waitUntil(launch.then(result => result.cacheWrite).catch(() => {}));
+            } else {
+                event.respondWith(networkFirstNavigation(request));
+            }
 
             return;
         }
@@ -349,24 +354,82 @@ function isStorefrontLaunch(url) {
         && /^(?:\/|\/menu\/?|\/branches(?:\/[1-9]\d*)?\/?)$/.test(url.pathname);
 }
 
-async function launchNavigation(request, url) {
-    const controller = new AbortController();
+async function openLaunchDocument(request, signal) {
+    const response = await fetch(request, {signal});
+    if (response.status >= 500) {
+        void response.body?.cancel().catch(() => {});
+        return null;
+    }
+    if (!response.ok || !response.body) return response;
+
+    // Peek at a clone so the original response keeps its URL, headers, and streaming body.
+    const reader = response.clone().body.getReader();
+    try {
+        let first;
+        do {
+            first = await reader.read();
+        } while (!first.done && !first.value.byteLength);
+        if (first.done) {
+            void response.body.cancel().catch(() => {});
+            return null;
+        }
+        return response;
+    } finally {
+        // A tee branch's cancel promise can wait for the browser to consume the original.
+        void reader.cancel().catch(() => {});
+    }
+}
+
+async function cachedLaunch(request) {
     let timer;
     try {
-        const deadline = new Promise((_, reject) => {
-            timer = setTimeout(() => {
-                reject(new Error("Storefront launch timed out"));
-                controller.abort();
-            }, LAUNCH_WAIT_MS);
-        });
-        const response = await Promise.race([fetch(request, {signal: controller.signal}), deadline]);
-        if (response.status < 500) return response;
+        const lookup = async () => {
+            const page = await caches.match(request, {cacheName: PAGE_CACHE}).catch(() => null);
+            return page ?? await caches.match(request, {cacheName: STATIC_CACHE});
+        };
+        const cached = await Promise.race([
+            lookup(),
+            new Promise(resolve => { timer = setTimeout(() => resolve(null), LAUNCH_CACHE_WAIT_MS); })
+        ]);
+        return cached?.ok ? cached : null;
     } catch {
-        // A failed fetch or a slow server must not leave the launch screen blank.
+        return null;
     } finally {
         clearTimeout(timer);
     }
-    return launchRecoveryPage(url, request.headers.get("accept-language"));
+}
+
+async function cacheLaunch(request, response) {
+    const cache = await caches.open(PAGE_CACHE);
+    await cache.put(request, response);
+}
+
+async function launchNavigation(request, url) {
+    const controller = new AbortController();
+    let timer, response;
+    try {
+        const deadline = new Promise(resolve => {
+            timer = setTimeout(() => {
+                resolve(null);
+                controller.abort();
+            }, LAUNCH_WAIT_MS);
+        });
+        response = await Promise.race([openLaunchDocument(request, controller.signal), deadline]);
+    } catch {
+        // A network or body failure may still have an exact saved page.
+        controller.abort();
+    } finally {
+        clearTimeout(timer);
+    }
+
+    if (response) {
+        const cacheable = response.ok && !response.redirected
+            && response.headers.get("content-type")?.includes("text/html")
+            && !/\bno-store\b/i.test(response.headers.get("cache-control") ?? "");
+        const cacheWrite = cacheable ? cacheLaunch(request, response.clone()).catch(() => {}) : undefined;
+        return {response, cacheWrite};
+    }
+    return {response: await cachedLaunch(request) ?? launchRecoveryPage(url, request.headers.get("accept-language"))};
 }
 
 // Each attempt is a real navigation so redirects, headers and streaming HTML are preserved.

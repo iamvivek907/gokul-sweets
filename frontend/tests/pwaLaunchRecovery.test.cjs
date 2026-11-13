@@ -13,7 +13,7 @@ function fixture(fetch,caches={}) {
  return {timers,navigate(path,language="en-IN",method="GET"){
   let response;
   handlers.get("fetch")({request:{url:new URL(path,origin).href,method,mode:"navigate",headers:new Headers({"Accept-Language":language})},
-   respondWith:value=>{response=value;}});
+   respondWith:value=>{response=value;},waitUntil:promise=>{this.background=promise;}});
   return response;
  }};
 }
@@ -77,6 +77,68 @@ test("a page responding after five seconds still gets its normal launch",async()
  deliver(app);
  assert.equal(await pending,app);
  assert.equal(f.timers.size,0);
+});
+
+test("headers without HTML do not clear the launch deadline",async()=>{
+ let signal;
+ const f=fixture((_request,options)=>{
+  signal=options.signal;
+  const body=new ReadableStream({start(controller){
+   signal.addEventListener("abort",()=>controller.error(signal.reason),{once:true});
+  }});
+  return Promise.resolve(new Response(body));
+ });
+ const pending=f.navigate("/menu");
+ await new Promise(resolve=>setImmediate(resolve));
+ const [{callback,ms}]=f.timers.values();
+ assert.equal(ms,8000);
+ callback();
+ assert.equal((await pending).status,503);
+ assert.equal(signal.aborted,true);
+ assert.equal(f.timers.size,0);
+});
+
+test("a first HTML chunk releases the original response without waiting for the rest",async()=>{
+ let stream;
+ const first=new TextEncoder().encode("<h1>Gokul</h1>");
+ const app=new Response(new ReadableStream({start(controller){stream=controller;}}),{headers:{"cache-control":"no-store"}});
+ const f=fixture(async()=>app);
+ const pending=f.navigate("/menu");
+ stream.enqueue(first);
+ assert.equal(await pending,app);
+ assert.equal(f.timers.size,0);
+ stream.enqueue(new TextEncoder().encode("<p>Ready</p>"));
+ stream.close();
+ assert.equal(await app.text(),"<h1>Gokul</h1><p>Ready</p>");
+});
+
+test("exact cached storefront pages remain usable during outages",async()=>{
+ const cached=new Response("<h1>Saved menu</h1>");
+ const reads=[];
+ const f=fixture(async()=>new Response("Unavailable",{status:503}),{match:async(request,{cacheName})=>{
+  reads.push([request.url,cacheName]);
+  return cached;
+ }});
+ assert.equal(await f.navigate("/menu?from=home"),cached);
+ assert.deepEqual(reads,[[origin+"/menu?from=home","gokul-pages-v3"]]);
+});
+
+test("cache writes are opportunistic and a stalled cache read cannot hide recovery",async()=>{
+ const app=new Response("<h1>New menu</h1>",{headers:{"content-type":"text/html"}});
+ const f=fixture(async()=>app,{open:async()=>({put:async(_request,copy)=>{
+  assert.equal(await copy.text(),"<h1>New menu</h1>");
+  throw Error("Cache quota");
+ }})});
+ assert.equal(await f.navigate("/menu"),app);
+ await f.background;
+
+ const stalled=fixture(async()=>{throw TypeError("Offline");},{match:()=>new Promise(()=>{})});
+ const pending=stalled.navigate("/menu");
+ await new Promise(resolve=>setImmediate(resolve));
+ const [{callback,ms}]=stalled.timers.values();
+ assert.equal(ms,350);
+ callback();
+ assert.equal((await pending).status,503);
 });
 
 function retryDocument(script,{state=null,type="navigate",denyState=false}={}){
