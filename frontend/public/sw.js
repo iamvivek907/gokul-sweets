@@ -366,19 +366,23 @@ function launchMarkupProbe() {
     const visualTags = new Set(["canvas", "embed", "hr", "iframe", "img", "svg", "video"]);
     const attributes = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>]+)))?/g;
     const hiddenStack = [];
-    let pending = "", raw = "", inHead = false, hasBodyMarkup = false;
+    let pending = "", raw = "", inHead = false, hasBodyMarkup = false, hasBootScreen = false;
 
-    function hidesContent(name, openingTag) {
+    function readAttributes(name, openingTag) {
         const attrs = new Map();
         for (const [, key, doubleQuoted, singleQuoted, unquoted] of openingTag.slice(name.length + 1, -1).matchAll(attributes)) {
             const normalized = key.toLowerCase();
             if (!attrs.has(normalized)) attrs.set(normalized, doubleQuoted ?? singleQuoted ?? unquoted ?? "");
         }
+        return attrs;
+    }
+
+    function hidesContent(name, attrs) {
         return name === "template" || attrs.has("hidden") || (name === "dialog" && !attrs.has("open"))
             || /(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*(?:hidden|collapse))\s*(?:!important)?\s*(?:;|$)/i.test(attrs.get("style") ?? "");
     }
 
-    return {hasBodyMarkup: () => hasBodyMarkup, read(bytes) {
+    return {isLegacyPage: () => hasBodyMarkup && !hasBootScreen, read(bytes) {
         pending += decoder.decode(bytes, {stream: true});
         let offset = 0;
         while (offset < pending.length) {
@@ -437,7 +441,9 @@ function launchMarkupProbe() {
                 continue;
             }
             if (inHead || (headTags.has(name) && name !== "body" && name !== "html")) continue;
-            const hidden = hiddenStack.length > 0 || hidesContent(name, match[0]);
+            const attrs = readAttributes(name, match[0]);
+            if (attrs.has("data-gokul-storefront-boot")) hasBootScreen = true;
+            const hidden = hiddenStack.length > 0 || hidesContent(name, attrs);
             if (hidden) {
                 if (!voidTags.has(name)) hiddenStack.push(name);
             } else if (visualTags.has(name)) {
@@ -451,8 +457,7 @@ function launchMarkupProbe() {
     }};
 }
 
-async function openLaunchDocument(request, signal) {
-    const response = await fetch(request, {signal});
+async function checkLaunchDocument(response) {
     if (response.status >= 500) {
         void response.body?.cancel().catch(() => {});
         return null;
@@ -468,7 +473,7 @@ async function openLaunchDocument(request, signal) {
             const chunk = await reader.read();
             if (chunk.done) {
                 // A complete older storefront document may not carry the marker yet.
-                if (markup?.hasBodyMarkup()) return response;
+                if (markup?.isLegacyPage()) return response;
                 void response.body.cancel().catch(() => {});
                 return null;
             }
@@ -485,7 +490,12 @@ async function cachedLaunch(request) {
     try {
         const lookup = async () => {
             const page = await caches.match(request, {cacheName: PAGE_CACHE}).catch(() => null);
-            return page ?? await caches.match(request, {cacheName: STATIC_CACHE});
+            if (page?.ok) {
+                const usable = await checkLaunchDocument(page).catch(() => null);
+                if (usable) return usable;
+            }
+            const fallback = await caches.match(request, {cacheName: STATIC_CACHE});
+            return fallback?.ok ? await checkLaunchDocument(fallback) : null;
         };
         const cached = await Promise.race([
             lookup(),
@@ -514,7 +524,7 @@ async function launchNavigation(request, url) {
                 controller.abort();
             }, LAUNCH_WAIT_MS);
         });
-        response = await Promise.race([openLaunchDocument(request, controller.signal), deadline]);
+        response = await Promise.race([fetch(request, {signal: controller.signal}).then(checkLaunchDocument), deadline]);
     } catch {
         // A network or body failure may still have an exact saved page.
         controller.abort();

@@ -173,6 +173,20 @@ test("split HTML markup releases the original stream as soon as the opening scre
  assert.equal(await app.text(),parts.join("")+"<p>Ready</p>");
 });
 
+test("a clean EOF before the retry link rejects the new opening screen and never caches it",async()=>{
+ const incomplete='<html><body><div data-gokul-storefront-boot=""><span>Opening Gokul</span>';
+ const html=()=>new Response(incomplete,{headers:{"content-type":"text/html"}});
+ let writes=0,requests=0;
+ const f=fixture(async()=>++requests===1?html():new Response("Unavailable",{status:503}),{
+  open:async()=>({put:async()=>{writes++;}}),
+  match:async(_request,{cacheName})=>cacheName==="gokul-pages-v3"&&requests>1?html():undefined
+ });
+ assert.equal((await f.navigate("/menu")).status,503);
+ await f.background;
+ assert.equal(writes,0);
+ assert.equal((await f.navigate("/menu")).status,503,"reject a truncated page cached by an earlier worker");
+});
+
 test("a complete HTML document without a launch marker still opens during rollout",async()=>{
  const app=new Response("<!doctype html><html><body><h1>Previous app build</h1></body></html>",{headers:{"content-type":"text/html"}});
  const f=fixture(async()=>app);
@@ -181,7 +195,7 @@ test("a complete HTML document without a launch marker still opens during rollou
 });
 
 test("exact cached storefront pages remain usable during outages",async()=>{
- const cached=new Response("<h1>Saved menu</h1>");
+ const cached=new Response("<h1>Saved menu</h1>",{headers:{"content-type":"text/html"}});
  const reads=[];
  const f=fixture(async()=>new Response("Unavailable",{status:503}),{match:async(request,{cacheName})=>{
   reads.push([request.url,cacheName]);
