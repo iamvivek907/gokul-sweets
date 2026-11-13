@@ -1130,7 +1130,7 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
                 day ->
                         jdbc.queryForMap(
                                 "SELECT * FROM inventory_daily_allocations WHERE"
-                                    + " branch_product_id=? AND service_date=?",
+                                        + " branch_product_id=? AND service_date=?",
                                 f.product(),
                                 day);
         try {
@@ -1171,6 +1171,55 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
         } finally {
             cleanupCommittedReadinessFixture(f);
         }
+    }
+
+    @Test
+    void reconciliationUsesTheCurrentServiceDateAfterMidnight() {
+        var f = fixture();
+        var zone = ZoneId.of("Asia/Kolkata");
+        var today = LocalDate.of(2026, 1, 2);
+        var midnight = today.atStartOfDay(zone).toInstant();
+        var crossingMidnight = org.mockito.Mockito.mock(Clock.class);
+        org.mockito.Mockito.when(crossingMidnight.withZone(zone)).thenReturn(crossingMidnight);
+        org.mockito.Mockito.when(crossingMidnight.getZone()).thenReturn(zone);
+        org.mockito.Mockito.when(crossingMidnight.instant())
+                .thenReturn(midnight.minusSeconds(1), midnight);
+        var rolling =
+                new RollingScheduleService(
+                        jdbc,
+                        concurrentTransaction(),
+                        inventory,
+                        crossingMidnight,
+                        features,
+                        new RollingAutomationDiagnostics(jdbc, clock, features));
+        service.save(
+                f.branch(),
+                new RollingScheduleService.Plan(
+                        true,
+                        LocalTime.of(10, 0),
+                        LocalTime.of(11, 0),
+                        30,
+                        5,
+                        2,
+                        127,
+                        -1,
+                        List.of(
+                                new RollingScheduleService.Template(
+                                        f.policy(), BigDecimal.TEN, false))),
+                "manager");
+        jdbc.update(
+                "UPDATE branch_inventory_policies SET booking_horizon_days=0 WHERE id=?",
+                f.policy());
+
+        rolling.reconcile(f.branch());
+
+        assertThat(
+                        jdbc.queryForList(
+                                "SELECT DISTINCT slot_date FROM pickup_slots WHERE branch_id=?",
+                                java.sql.Date.class,
+                                f.branch()))
+                .containsExactly(java.sql.Date.valueOf(today));
+        assertThat(allocation(f, today)).containsEntry("status", "DRAFT");
     }
 
     @Test

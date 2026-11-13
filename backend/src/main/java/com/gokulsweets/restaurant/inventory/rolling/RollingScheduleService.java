@@ -681,7 +681,7 @@ WHERE bp.branch_id=? ORDER BY p.id FOR NO KEY UPDATE OF p
                 String summary =
                         (completed
                                         ? "Generation stopped. Completed dates were kept; the"
-                                              + " failed date was rolled back."
+                                                + " failed date was rolled back."
                                         : "Generation failed; new branch changes were rolled back.")
                                 + " Review setup and retry. Cause: "
                                 + (failure instanceof ResponseStatusException response
@@ -690,7 +690,7 @@ WHERE bp.branch_id=? ORDER BY p.id FOR NO KEY UPDATE OF p
                 try {
                     jdbc.update(
                             "UPDATE rolling_branch_schedules SET"
-                                + " last_attempt_at=now(),last_message=? WHERE branch_id=?",
+                                    + " last_attempt_at=now(),last_message=? WHERE branch_id=?",
                             summary,
                             branchId);
                     diagnostics.finish(
@@ -777,7 +777,9 @@ WHERE bp.branch_id=? ORDER BY p.id FOR NO KEY UPDATE OF p
                         "UPDATE rolling_branch_schedules SET last_attempt_at=now()"
                                 + " WHERE branch_id=?",
                         branchId);
-            var day = reconcileCoverage(branchId, today, offset, config, plan, lockedPolicies);
+            var day =
+                    reconcileCoverage(
+                            branchId, today.plusDays(offset), config, plan, lockedPolicies);
             if (offset == run.days - 1) {
                 var total = new Coverage();
                 total.add(previous);
@@ -800,15 +802,14 @@ WHERE bp.branch_id=? ORDER BY p.id FOR NO KEY UPDATE OF p
     /** Reconciles the selected date using the current locked branch and policies. */
     private Coverage reconcileCoverage(
             long branchId,
-            LocalDate today,
-            int offset,
+            LocalDate date,
             Workspace config,
             Plan plan,
             List<Policy> lockedPolicies) {
         final long started =
                 MethodTiming.start(
                         RollingScheduleService.class,
-                        "reconcileCoverage(long,LocalDate,int,Workspace,Plan,List<Policy>)");
+                        "reconcileCoverage(long,LocalDate,Workspace,Plan,List<Policy>)");
         try {
             LocalDateTime now = LocalDateTime.now(clock.withZone(IST));
             var coverage = new Coverage();
@@ -833,7 +834,9 @@ WHERE bp.branch_id=? ORDER BY p.id FOR NO KEY UPDATE OF p
             coverage.selectedPolicies = effectiveTemplates.size();
             coverage.maximumModeSkips = maximumModeSkips;
             coverage.policyMaximum = plan.usePolicyMaximum();
-            LocalDate date = today.plusDays(offset);
+            LocalDate today = now.toLocalDate();
+            long daysAhead = java.time.temporal.ChronoUnit.DAYS.between(today, date);
+            if (daysAhead < 0) return coverage;
             if ((plan.weekdays() & (1 << (date.getDayOfWeek().getValue() - 1))) == 0)
                 return coverage;
             jdbc.update(
@@ -945,8 +948,8 @@ AND occasion_enquiry_id IS NULL AND (slot_date<>? OR start_time>?)
                     if (readinessCandidates.contains(policy.branchProductId())
                             && template.autoApprove()
                             && policy.readyStockRequired()
-                            && offset <= policy.bookingDays()
-                            && offset <= features.getFutureOrderingDays()) {
+                            && daysAhead <= policy.bookingDays()
+                            && daysAhead <= features.getFutureOrderingDays()) {
                         var recovery = publishUntouchedReadiness(policy, date);
                         if (recovery == ReadinessRecovery.PUBLISHED) coverage.readinessPublished++;
                         if (recovery == ReadinessRecovery.UNIT_MISMATCH)
@@ -956,7 +959,8 @@ AND occasion_enquiry_id IS NULL AND (slot_date<>? OR start_time>?)
                     coverage.retained++;
                     continue;
                 }
-                if (offset > policy.bookingDays() || offset > features.getFutureOrderingDays()) {
+                if (daysAhead > policy.bookingDays()
+                        || daysAhead > features.getFutureOrderingDays()) {
                     coverage.outsideWindow++;
                     coverage.retained++;
                     continue;
@@ -1011,7 +1015,7 @@ ON CONFLICT(branch_product_id,service_date) DO NOTHING
             MethodTiming.finish(
                     started,
                     RollingScheduleService.class,
-                    "reconcileCoverage(long,LocalDate,int,Workspace,Plan,List<Policy>)");
+                    "reconcileCoverage(long,LocalDate,Workspace,Plan,List<Policy>)");
         }
     }
 
