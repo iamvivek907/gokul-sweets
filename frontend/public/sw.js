@@ -24,7 +24,7 @@ let pendingImageWrites = 0;
 const OFFLINE_URL =
     "/offline";
 
-const LAUNCH_WAIT_MS = 4000;
+const LAUNCH_WAIT_MS = 8000;
 
 const STATIC_ASSETS = [
     "/",
@@ -369,6 +369,42 @@ async function launchNavigation(request, url) {
     return launchRecoveryPage(url, request.headers.get("accept-language"));
 }
 
+// Each attempt is a real navigation so redirects, headers and streaming HTML are preserved.
+const LAUNCH_RETRY_SCRIPT = `(() => {
+    const key = "gokulLaunchRetry";
+    const delays = [650, 1200];
+    const previous = history.state?.[key];
+    const continuing = performance.getEntriesByType("navigation")[0]?.type === "reload"
+        && previous?.url === location.href
+        && Number.isInteger(previous.attempt) && previous.attempt >= 0;
+    const attempt = continuing ? previous.attempt : 0;
+    function clearRetry() {
+        try {
+            const state = {...history.state};
+            delete state[key];
+            history.replaceState(state, "");
+        } catch {}
+    }
+    document.addEventListener("click", event => {
+        if (event.target?.closest?.("#launch-manual-retry")) clearRetry();
+    });
+    if (attempt >= delays.length) return;
+    try {
+        history.replaceState({...history.state, [key]: {
+            url: location.href, attempt: attempt + 1
+        }}, "");
+    } catch {
+        // Keep the manual link usable if the browser won't preserve the retry budget.
+        return;
+    }
+    document.documentElement.classList.add("retrying");
+    const timer = setTimeout(() => location.reload(), delays[attempt]);
+    addEventListener("pagehide", () => clearTimeout(timer), {once: true});
+    addEventListener("pageshow", event => {
+        if (event.persisted) document.documentElement.classList.remove("retrying");
+    });
+})();`;
+
 function launchRecoveryPage(url, language) {
     // Render a complete document from the worker, even after old app assets are evicted.
     const hindi = /^hi(?:[-,;\s]|$)/i.test(language ?? "");
@@ -377,6 +413,9 @@ function launchRecoveryPage(url, language) {
         ? "पेज अभी नहीं खुल सका। अपना इंटरनेट कनेक्शन जाँचें और फिर कोशिश करें।"
         : "This page couldn’t load. Check your connection and try again.";
     const retry = hindi ? "फिर कोशिश करें" : "Try again";
+    const reconnecting = hindi ? "Gokul से फिर जुड़ रहे हैं" : "Reconnecting to Gokul";
+    const loading = hindi ? "पेज खोलने की कोशिश जारी है।" : "We’re still working to open your page.";
+    const nonce = crypto.randomUUID();
     const href = url.href.replace(/[&"<>'`]/g, char => ({
         "&": "&amp;", '"': "&quot;", "<": "&lt;", ">": "&gt;", "'": "&#39;", "`": "&#96;"
     })[char]);
@@ -398,17 +437,37 @@ h1{margin:0;font-size:clamp(1.25rem,5vw,1.65rem);line-height:1.3}
 a{display:inline-flex;justify-content:center;align-items:center;min-height:48px;padding:.65rem 1.65rem;border-radius:2rem;background:#fff1d7;color:#631430;font-weight:700;text-decoration:none}
 a:hover{background:#ffe2b2}
 a:focus-visible{outline:3px solid #ffcf89;outline-offset:4px}
+.progress,.retrying .failure{display:none}
+.retrying .progress{display:block}
+.icons{display:flex;justify-content:center;align-items:center;gap:.75rem;margin:0 auto 1.3rem;color:#ffd49a}
+.icons svg{width:3rem;height:3rem;padding:.65rem;border:1px solid #ffd49a6b;border-radius:50%;animation:launch-pulse 1.6s ease-in-out infinite}
+.icons svg:nth-child(2){animation-delay:.18s}
+.icons svg:nth-child(3){animation-delay:.36s}
+@keyframes launch-pulse{0%,75%,100%{transform:translateY(0);opacity:.68}35%{transform:translateY(-.35rem);opacity:1}}
+@media(prefers-reduced-motion:reduce){.icons svg{animation:none}}
 </style>
-<main aria-labelledby="recovery-title">
+<script nonce="${nonce}">${LAUNCH_RETRY_SCRIPT}</script>
+<main aria-label="Gokul">
   <p class="brand">Gokul</p><span class="rule" aria-hidden="true"></span>
-  <h1 id="recovery-title">${title}</h1>
-  <p class="message">${message}</p>
-  <a href="${href}">${retry}</a>
+  <div class="progress" role="status">
+    <div class="icons" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-5 9 5-9 5-9-5zm0 0v7l9 5 9-5V9m-9 5v7"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 9a14 14 0 0 1 18 0M6 12a9 9 0 0 1 12 0m-9 3a4.5 4.5 0 0 1 6 0"/><circle cx="12" cy="19" r="1" fill="currentColor" stroke="none"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h12l2 12H4L6 8zm3 1V6a3 3 0 0 1 6 0v3"/></svg>
+    </div>
+    <h1>${reconnecting}</h1>
+    <p class="message">${loading}</p>
+  </div>
+  <div class="failure">
+    <h1>${title}</h1>
+    <p class="message">${message}</p>
+    <a id="launch-manual-retry" href="${href}">${retry}</a>
+  </div>
 </main>
 </html>`, {status: 503, headers: {
         "Content-Type": "text/html; charset=utf-8",
         "Cache-Control": "no-store",
-        "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'",
+        "Content-Security-Policy": `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; base-uri 'none'`,
         "Referrer-Policy": "no-referrer"
     }});
 }

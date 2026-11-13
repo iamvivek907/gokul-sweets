@@ -6,7 +6,7 @@ function fixture(fetch,caches={}) {
  let next=0;
  vm.runInNewContext(worker,{
   self:{location:{origin},addEventListener:(name,handler)=>handlers.set(name,handler)},
-  fetch,caches,URL,Response,Request,AbortController,
+  fetch,caches,URL,Response,Request,AbortController,crypto,
   setTimeout:(callback,ms)=>{const id=++next;timers.set(id,{callback,ms});return id;},
   clearTimeout:id=>timers.delete(id)
  });
@@ -31,7 +31,7 @@ test("a stalled launch recovers by the deadline even without cached files",async
  const pending=f.navigate("/menu?from=home&label=%22Gokul%22");
  assert.equal(f.timers.size,1);
  const [{callback,ms}]=f.timers.values();
- assert.equal(ms,4000);
+ assert.equal(ms,8000);
  callback();
  const response=await pending;
  assert.equal(signal.aborted,true);
@@ -40,7 +40,11 @@ test("a stalled launch recovers by the deadline even without cached files",async
  const html=await response.text();
  assert.match(html,/Let’s get you back to Gokul/);
  assert.match(html,/href="https:\/\/gokulsweets\.in\/menu\?from=home&amp;label=%22Gokul%22">Try again/);
- assert.doesNotMatch(html,/<script|<link|<img/i);
+ const nonce=html.match(/<script nonce="([^"]+)">/)[1];
+ assert.match(response.headers.get("content-security-policy"),new RegExp("nonce-"+nonce));
+ assert.doesNotMatch(html,/<script[^>]+src=|<link|<img/i);
+ assert.match(html,/Reconnecting to Gokul/);
+ assert.match(html,/prefers-reduced-motion:reduce/);
  assert.equal(f.timers.size,0);
 });
 test("offline and server errors return usable recovery immediately, while expected HTTP statuses pass through",async()=>{
@@ -62,4 +66,53 @@ test("checkout and staff navigations keep their existing response behavior",asyn
   assert.equal(f.timers.size,0);
  }
  assert.equal(f.navigate("/menu","en","POST"),undefined);
+});
+
+test("a page responding after five seconds still gets its normal launch",async()=>{
+ let deliver;
+ const f=fixture(()=>new Promise(resolve=>{deliver=resolve;}));
+ const pending=f.navigate("/menu");
+ assert.ok([...f.timers.values()].every(({ms})=>ms>5000));
+ const app=new Response("Normal launch animation");
+ deliver(app);
+ assert.equal(await pending,app);
+ assert.equal(f.timers.size,0);
+});
+
+function retryDocument(script,{state=null,type="navigate",denyState=false}={}){
+ const timers=[],listeners={},classes=[];
+ const history={state,replaceState(next){if(denyState)throw Error("Unavailable");this.state=next;}};
+ const location={href:origin+"/menu?from=home",reload(){location.reloads++;},reloads:0};
+ const document={addEventListener:(name,handler)=>{listeners[name]=handler;},documentElement:{classList:{add:value=>classes.push(value),remove:value=>classes.splice(classes.indexOf(value),1)}}};
+ vm.runInNewContext(script,{history,location,document,performance:{getEntriesByType:()=>[{type}]},
+  setTimeout:(handler,ms)=>{timers.push({handler,ms});return timers.length;},clearTimeout:id=>{timers[id-1].cleared=true;},
+  addEventListener:(name,handler)=>{listeners[name]=handler;}});
+ return {history,location,timers,classes,listeners};
+}
+
+test("two failed automatic reloads end in a manual retry without a reload loop",async()=>{
+ const f=fixture(async()=>new Response("Unavailable",{status:503}));
+ const html=await(await f.navigate("/menu?from=home")).text();
+ const script=html.match(/<script nonce="[^"]+">([\s\S]+)<\/script>/)[1];
+ const initial=retryDocument(script,{state:{unrelated:true}});
+ assert.deepEqual(initial.classes,["retrying"]);
+ assert.equal(initial.timers[0].ms,650);
+ initial.timers[0].handler();
+ assert.equal(initial.location.reloads,1);
+ const second=retryDocument(script,{state:initial.history.state,type:"reload"});
+ assert.equal(second.timers[0].ms,1200);
+ second.timers[0].handler();
+ assert.equal(second.location.reloads,1);
+ const exhausted=retryDocument(script,{state:second.history.state,type:"reload"});
+ assert.deepEqual(exhausted.classes,[]);
+ assert.equal(exhausted.timers.length,0);
+ exhausted.listeners.click({target:{closest:()=>true}});
+ assert.equal(exhausted.history.state.gokulLaunchRetry,undefined);
+ assert.equal(exhausted.history.state.unrelated,true);
+ assert.equal(retryDocument(script,{state:exhausted.history.state}).timers.length,1);
+ assert.equal(retryDocument(script,{denyState:true}).timers.length,0);
+ second.listeners.pagehide();
+ assert.equal(second.timers[0].cleared,true);
+ second.listeners.pageshow({persisted:true});
+ assert.deepEqual(second.classes,[]);
 });

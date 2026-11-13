@@ -4,7 +4,7 @@ The approved launch uses a deep burgundy gradient, ivory existing wordmark, mute
 
 ## Installed app launch recovery
 
-An active service worker gives storefront document launches four seconds to return a network response. If the request stalls, fails, or returns a server error, show the burgundy Gokul recovery screen with a Retry link to the original page. The screen uses no external assets or app scripts and works after the browser evicts cached pages. Keep the installed app identity, native launch artwork, cart, and checkout behavior unchanged.
+An active service worker gives storefront document launches eight seconds to return a network response. If the request stalls, fails, or returns a server error, show the burgundy Gokul recovery screen with animated icons and make two bounded attempts to reopen the same page. Show the manual Try again link only after both attempts fail, or immediately if the browser cannot preserve the retry state. Normal documents retain their network response and redirects. App startup animation and hydration do not trigger retries after a successful response. The recovery screen needs no external assets or app bundles, respects reduced motion, and works after the browser evicts cached pages. Keep the installed app identity, native launch artwork, cart, and checkout behavior unchanged.
 
 ## November 3 quiet order reminder
 
