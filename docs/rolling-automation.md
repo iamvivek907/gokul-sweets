@@ -71,11 +71,14 @@ old future slots when the horizon shrinks. Review those through manual schedulin
 
 ## Recovery and operations
 
-The worker runs once daily at midnight (12:00 AM) in Asia/Kolkata. There is no startup
+The worker starts once daily at midnight (12:00 AM) in Asia/Kolkata on a dedicated
+thread. It processes one batch at a time so other scheduled jobs can run. There is no startup
 run or interval polling. Configuration changes after that run wait until the next daily
 run unless an admin triggers Generate missing coverage now using saved settings.
-Branch reconciliation is transactional: a failure rolls back its new slots and allocations,
-records a failure message, and can be retried manually or at the next daily run. Other branches continue independently.
+Each service date commits its slots, allocations, ledger entries and run progress together.
+A failure specific to one date rolls back that date and generation checks the remaining dates.
+The run reports failed dates for a manual retry or the next daily run. A changed plan or an
+ineligible branch stops the run. Other branches continue independently.
 Last-attempt, last-success and summary fields are shown in the admin page.
 Reload saved settings refreshes execution diagnostics and discards the edits present when clicked.
 Editing and writes are blocked until reload settles; obsolete responses are ignored. Failed reloads
@@ -174,15 +177,19 @@ access disable retry. Paused plans do not raise overdue alerts.
 History records scheduled/manual triggers, authenticated staff username or system actor,
 start/finish times, result, created counts, elapsed time, lock wait and lock-held time. Keep the
 latest thirty completed runs per branch plus in-progress runs; the API returns at most thirty
-recent entries. Failures are recorded after branch rollback. RUNNING entries older than an hour
-are marked failed on the next invocation; health warns after ten minutes. Earlier last-success
-timestamps remain valid after upgrade.
+recent entries. Counts from committed dates survive restarts. Successful and failed date
+attempts both refresh run activity. After ten minutes without activity, health marks the run
+interrupted and generation can be retried. The next attempt closes the interrupted run before
+starting. The inactivity check uses the start time until the first date attempt finishes.
+Coverage health stays in progress while a run is active,
+and the outcome banner follows completion order. Only one run can generate coverage per branch
+at a time, even across application instances.
+Earlier last-success timestamps remain valid after upgrade.
 
-Generation retains an atomic branch transaction with a five-minute transaction deadline bounding
-its database work and lock waits. Existing allocations and bookings are preserved. Timings identify
-whether a branch needs smaller recoverable batches; this change does not introduce partial commits
-or repeated generation attempts. The schedule mutex permits run-audit foreign keys while continuing
-to serialize schedule writers and protect overlapping intervals.
+Each date transaction has a five-minute deadline. Run timing sums the branch lock wait and hold
+times across dates. The worker rechecks the saved plan version under the branch lock before each
+date and stops if the plan changed. The schedule mutex continues to serialize slot writers and
+protect overlapping intervals.
 
 V154 records a separate enabled-since timestamp, preserved on ordinary saves and while paused, and reset only when
 automation is paused and enabled again. Existing enabled plans receive their last known saved
@@ -249,14 +256,14 @@ Readiness recovery skips historical allocations whose stored inventory unit diff
 current policy unit, before calling the readiness service. It never converts or relabels existing
 quantities. The run summary counts skipped mismatches; coverage reports attention with bounded
 per-dish/date examples showing both units. Other compatible allocations and new dates continue
-normally, so one outdated gram/piece allocation cannot roll back the branch's generation.
+normally, so one outdated gram/piece allocation cannot roll back the date's generation.
 
 
-Policy edits are serialized with a running rolling job: the branch transaction locks configured
+Policy edits are serialized with a running rolling job: each date transaction locks configured
 policy rows in ID order before reading its workspace, and retains those locks through allocation
 and readiness writes. An edit committed first is visible to the job's unit check; an edit that
-arrives later waits until the job completes. The existing five-minute transaction limit bounds
-the job's database work and lock waits. Product policies are not rewritten by the job. Policies inserted after the lock scan are deferred
+arrives later waits until that date commits or rolls back. The five-minute transaction limit bounds
+each date's database work and lock waits. Product policies are not rewritten by the job. Policies inserted after the lock scan are deferred
 to the next daily or manual check rather than used without a policy lock.
 
 

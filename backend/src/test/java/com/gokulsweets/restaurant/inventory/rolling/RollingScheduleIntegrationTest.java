@@ -781,7 +781,7 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
                 java.util.concurrent.Callable<Void> job =
                         () -> {
                             start.await();
-                            service.reconcile(f.branch());
+                            service.reconcile(f.branch(), "SCHEDULED", "system");
                             return null;
                         };
                 var first = workers.submit(job);
@@ -1122,6 +1122,274 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
     @Test
     @Transactional(
             propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void failureKeepsItsClaimWhenTheBranchSummaryCannotBeSaved() {
+        long branch =
+                jdbc.queryForObject(
+                        "INSERT INTO branches(code,name) VALUES(?,'Atomic failure test') RETURNING"
+                                + " id",
+                        Long.class,
+                        "ROLL-ATOMIC-" + UUID.randomUUID());
+        try {
+            service.save(branch, maximumPlan(-1, 2), "manager");
+            jdbc.update("UPDATE branches SET operational=FALSE WHERE id=?", branch);
+            jdbc.execute(
+                    "ALTER TABLE rolling_branch_schedules ADD CONSTRAINT"
+                            + " rolling_test_reject_summary CHECK (branch_id <> "
+                            + branch
+                            + " OR last_message IS NULL) NOT VALID");
+            try {
+                assertThatThrownBy(() -> service.reconcile(branch, "MANUAL", "manager"))
+                        .hasMessageContaining("active and operational");
+                var workspace = service.inspect(branch);
+                assertThat(workspace.runs().getFirst().status()).isEqualTo("RUNNING");
+                assertThat(workspace.message()).isNull();
+            } finally {
+                jdbc.execute(
+                        "ALTER TABLE rolling_branch_schedules DROP CONSTRAINT"
+                                + " rolling_test_reject_summary");
+            }
+        } finally {
+            jdbc.update("DELETE FROM rolling_branch_schedules WHERE branch_id=?", branch);
+            jdbc.update("DELETE FROM branches WHERE id=?", branch);
+        }
+    }
+
+    @Test
+    @Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void scheduledRetryRepairsAFailedDateAndPreservesDatesOnBothSides() {
+        var f = fixture();
+        var date = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(1);
+        var rejectedDate = date.plusDays(1);
+        var laterDate = rejectedDate.plusDays(1);
+        java.util.function.Function<LocalDate, java.util.Map<String, Object>> allocationOn =
+                day ->
+                        jdbc.queryForMap(
+                                "SELECT * FROM inventory_daily_allocations WHERE"
+                                        + " branch_product_id=? AND service_date=?",
+                                f.product(),
+                                day);
+        try {
+            service.save(f.branch(), maximumPlan(-1, 4), "manager");
+            // Reject a slot write for the middle date so both neighboring dates can commit.
+            jdbc.execute(
+                    "ALTER TABLE pickup_slots ADD CONSTRAINT rolling_test_reject_middle_date"
+                            + " CHECK (branch_id <> "
+                            + f.branch()
+                            + " OR slot_date <> DATE '"
+                            + rejectedDate
+                            + "') NOT VALID");
+            try {
+                assertThatThrownBy(() -> service.reconcile(f.branch(), "SCHEDULED", "system"))
+                        .hasMessageContaining("rolling_test_reject_middle_date");
+                var run = service.inspect(f.branch()).runs().getFirst();
+                assertThat(run.status()).isEqualTo("FAILED");
+                assertThat(run.allocationsCreated()).isGreaterThanOrEqualTo(2);
+                assertThat(run.lastProgressAt()).isNotNull();
+                assertThat(run.summary()).contains(rejectedDate.toString());
+                assertThat(run.summary()).contains("Completed dates were kept");
+                assertThat(allocationOn.apply(date)).containsEntry("status", "APPROVED");
+                assertThat(allocationOn.apply(laterDate)).containsEntry("status", "APPROVED");
+                assertThat(service.inspect(f.branch()).lastSuccess()).isNull();
+                assertThat(
+                                jdbc.queryForObject(
+                                        "SELECT count(*) FROM pickup_slots WHERE branch_id=? AND"
+                                                + " slot_date=?",
+                                        Integer.class,
+                                        f.branch(),
+                                        rejectedDate))
+                        .isZero();
+            } finally {
+                jdbc.execute(
+                        "ALTER TABLE pickup_slots DROP CONSTRAINT rolling_test_reject_middle_date");
+            }
+            var committed = allocationOn.apply(date);
+            var laterCommitted = allocationOn.apply(laterDate);
+            service.reconcile(f.branch(), "SCHEDULED", "system");
+            assertThat(service.inspect(f.branch()).runs().getFirst().status()).isEqualTo("SUCCESS");
+            assertThat(allocationOn.apply(date)).isEqualTo(committed);
+            assertThat(allocationOn.apply(laterDate)).isEqualTo(laterCommitted);
+            assertThat(allocationOn.apply(rejectedDate)).containsEntry("status", "APPROVED");
+        } finally {
+            cleanupCommittedReadinessFixture(f);
+        }
+    }
+
+    @Test
+    void singleDayReconciliationRepairsTheNewDayAfterMidnight() {
+        var f = fixture();
+        var zone = ZoneId.of("Asia/Kolkata");
+        var today = LocalDate.of(2026, 1, 2);
+        var midnight = today.atStartOfDay(zone).toInstant();
+        var crossingMidnight = org.mockito.Mockito.mock(Clock.class);
+        org.mockito.Mockito.when(crossingMidnight.withZone(zone)).thenReturn(crossingMidnight);
+        org.mockito.Mockito.when(crossingMidnight.getZone()).thenReturn(zone);
+        org.mockito.Mockito.when(crossingMidnight.instant())
+                .thenReturn(midnight.minusSeconds(1), midnight);
+        var rolling =
+                new RollingScheduleService(
+                        jdbc,
+                        concurrentTransaction(),
+                        inventory,
+                        crossingMidnight,
+                        features,
+                        new RollingAutomationDiagnostics(jdbc, clock, features));
+        service.save(
+                f.branch(),
+                new RollingScheduleService.Plan(
+                        true,
+                        LocalTime.of(10, 0),
+                        LocalTime.of(11, 0),
+                        30,
+                        5,
+                        1,
+                        127,
+                        -1,
+                        List.of(
+                                new RollingScheduleService.Template(
+                                        f.policy(), BigDecimal.TEN, false))),
+                "manager");
+        jdbc.update(
+                "UPDATE branch_inventory_policies SET booking_horizon_days=0 WHERE id=?",
+                f.policy());
+
+        rolling.reconcile(f.branch());
+
+        assertThat(
+                        jdbc.queryForList(
+                                "SELECT DISTINCT slot_date FROM pickup_slots WHERE branch_id=?",
+                                java.sql.Date.class,
+                                f.branch()))
+                .containsExactly(java.sql.Date.valueOf(today));
+        assertThat(allocation(f, today)).containsEntry("status", "DRAFT");
+        assertThat(service.inspect(f.branch()).runs().getFirst().status()).isEqualTo("SUCCESS");
+    }
+
+    @Test
+    void recentCommittedProgressKeepsAnOldRunActiveAndCountsSurviveStaleCleanup() {
+        var f = fixture();
+        service.save(f.branch(), maximumPlan(-1, 2), "manager");
+        var now = clock.instant();
+        var audit = new RollingAutomationDiagnostics(jdbc, clock, features);
+        var oldAudit =
+                new RollingAutomationDiagnostics(
+                        jdbc, Clock.fixed(now.minusSeconds(7200), clock.getZone()), features);
+        long id = oldAudit.start(f.branch(), "SCHEDULED", "system");
+        audit.recordProgress(id, 4, 2);
+
+        var active = audit.runs(f.branch()).getFirst();
+        assertThat(active.slotsCreated()).isEqualTo(4);
+        assertThat(active.allocationsCreated()).isEqualTo(2);
+        var health = audit.health(f.branch(), service.workspace(f.branch()), List.of(active));
+        assertThat(health.status()).isEqualTo("RUNNING");
+        assertThat(health.interrupted()).isFalse();
+        assertThat(health.overdue()).isFalse();
+
+        audit.start(f.branch(), "MANUAL", "manager");
+        assertThat(audit.runs(f.branch()))
+                .filteredOn(run -> run.id() == id)
+                .singleElement()
+                .extracting(RollingAutomationDiagnostics.Run::status)
+                .isEqualTo("RUNNING");
+
+        var laterAudit =
+                new RollingAutomationDiagnostics(
+                        jdbc, Clock.fixed(now.plusSeconds(660), clock.getZone()), features);
+        assertThat(
+                        laterAudit
+                                .health(f.branch(), service.workspace(f.branch()), List.of(active))
+                                .interrupted())
+                .isTrue();
+        laterAudit.start(f.branch(), "MANUAL", "manager");
+        var interrupted =
+                laterAudit.runs(f.branch()).stream()
+                        .filter(run -> run.id() == id)
+                        .findFirst()
+                        .orElseThrow();
+        assertThat(interrupted.status()).isEqualTo("FAILED");
+        assertThat(interrupted.slotsCreated()).isEqualTo(4);
+        assertThat(interrupted.allocationsCreated()).isEqualTo(2);
+    }
+
+    @Test
+    void interruptedRunCanBeRetriedAsSoonAsHealthReportsIt() {
+        var f = fixture();
+        service.save(f.branch(), maximumPlan(-1, 2), "manager");
+        var now = clock.instant();
+        var audit = new RollingAutomationDiagnostics(jdbc, clock, features);
+        var abandoned =
+                new RollingAutomationDiagnostics(
+                        jdbc, Clock.fixed(now.minusSeconds(660), clock.getZone()), features);
+        long runId = abandoned.start(f.branch(), "SCHEDULED", "system");
+        audit.recordProgress(runId, 4, 2);
+
+        assertThat(service.inspect(f.branch()).health().status()).isEqualTo("RUNNING");
+        assertThatThrownBy(() -> service.reconcile(f.branch(), "MANUAL", "manager"))
+                .hasMessageContaining("Generation is already in progress");
+
+        abandoned.recordProgress(runId, 0, 0);
+        assertThat(service.inspect(f.branch()).health().interrupted()).isTrue();
+        service.reconcile(f.branch(), "MANUAL", "manager");
+
+        var workspace = service.inspect(f.branch());
+        assertThat(workspace.runs().getFirst().status()).isEqualTo("SUCCESS");
+        assertThat(workspace.health().interrupted()).isFalse();
+        assertThat(workspace.health().lastRunFailed()).isFalse();
+        var interrupted =
+                workspace.runs().stream()
+                        .filter(run -> run.id() == runId)
+                        .findFirst()
+                        .orElseThrow();
+        assertThat(interrupted.status()).isEqualTo("FAILED");
+        assertThat(interrupted.slotsCreated()).isEqualTo(4);
+        assertThat(interrupted.allocationsCreated()).isEqualTo(2);
+    }
+
+    @Test
+    void failedDateActivityKeepsAnOlderRunVisibleBehindNewerFailures() {
+        var f = fixture();
+        service.save(f.branch(), maximumPlan(-1, 2), "manager");
+        var now = clock.instant();
+        var oldAudit =
+                new RollingAutomationDiagnostics(
+                        jdbc, Clock.fixed(now.minusSeconds(1200), clock.getZone()), features);
+        var audit = new RollingAutomationDiagnostics(jdbc, clock, features);
+        long activeId = oldAudit.start(f.branch(), "SCHEDULED", "system");
+        oldAudit.recordProgress(activeId, 4, 2);
+        assertThat(service.inspect(f.branch()).health().interrupted()).isTrue();
+
+        // An attempt rolled back, so only its activity timestamp is refreshed.
+        audit.recordProgress(activeId, 0, 0);
+        for (int i = 0; i < 31; i++) {
+            long failedId = audit.start(f.branch(), "MANUAL", "manager");
+            audit.finish(failedId, f.branch(), "FAILED", 0, 0, 0, 0, 0, "Saved plan changed");
+        }
+        var workspace = service.inspect(f.branch());
+        assertThat(workspace.runs()).noneMatch(run -> run.id() == activeId);
+        assertThat(workspace.health().status()).isEqualTo("RUNNING");
+        assertThat(workspace.health().lastRunFailed()).isFalse();
+        assertThat(workspace.health().interrupted()).isFalse();
+        assertThat(workspace.health().overdue()).isFalse();
+        assertThat(
+                        jdbc.queryForMap(
+                                "SELECT slots_created, allocations_created FROM"
+                                        + " rolling_automation_runs WHERE id=?",
+                                activeId))
+                .containsEntry("slots_created", 4)
+                .containsEntry("allocations_created", 2);
+
+        var completed =
+                new RollingAutomationDiagnostics(
+                        jdbc, Clock.fixed(now.plusSeconds(1), clock.getZone()), features);
+        completed.finish(activeId, f.branch(), "SUCCESS", 1200000, 0, 0, 4, 2, "Coverage checked");
+        var recovered = service.inspect(f.branch());
+        assertThat(recovered.health().lastRunFailed()).isFalse();
+        assertThat(recovered.runs().getFirst().id()).isEqualTo(activeId);
+    }
+
+    @Test
+    @Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     void durableRunStartDoesNotWaitForAnUncommittedSlotWriter() throws Exception {
         long branch =
                 jdbc.queryForObject(
@@ -1159,6 +1427,59 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
             executor.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS);
             jdbc.update("DELETE FROM pickup_slots WHERE branch_id=?", branch);
             jdbc.update("DELETE FROM branches WHERE id=?", branch);
+        }
+    }
+
+    @Test
+    @Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void duplicateGenerationDoesNotWaitForTheActiveDateLock() throws Exception {
+        var f = fixture();
+        var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        try {
+            service.save(f.branch(), maximumPlan(-1, 2), "manager");
+            var started =
+                    new java.util.concurrent.atomic.AtomicReference<
+                            java.util.concurrent.Future<?>>();
+            concurrentTransaction()
+                    .executeWithoutResult(
+                            tx -> {
+                                jdbc.queryForObject(
+                                        "SELECT id FROM branches WHERE id=? FOR NO KEY UPDATE",
+                                        Long.class,
+                                        f.branch());
+                                started.set(
+                                        executor.submit(
+                                                () ->
+                                                        service.reconcile(
+                                                                f.branch(),
+                                                                "SCHEDULED",
+                                                                "system")));
+                                long deadline =
+                                        System.nanoTime()
+                                                + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+                                while (service.inspect(f.branch()).runs().isEmpty()) {
+                                    if (System.nanoTime() >= deadline)
+                                        throw new AssertionError(
+                                                "Scheduled run did not claim the branch");
+                                    java.util.concurrent.locks.LockSupport.parkNanos(10_000_000);
+                                }
+                                assertThatThrownBy(
+                                                () ->
+                                                        service.reconcile(
+                                                                f.branch(), "MANUAL", "manager"))
+                                        .hasMessageContaining("Generation is already in progress");
+                                service.reconcile(f.branch(), "SCHEDULED", "system");
+                                assertThat(service.inspect(f.branch()).runs()).hasSize(1);
+                            });
+            started.get().get(10, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(service.inspect(f.branch()).runs().getFirst().status()).isEqualTo("SUCCESS");
+            service.reconcile(f.branch(), "MANUAL", "manager");
+            assertThat(service.inspect(f.branch()).runs()).hasSize(2);
+        } finally {
+            executor.shutdownNow();
+            executor.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS);
+            cleanupCommittedReadinessFixture(f);
         }
     }
 

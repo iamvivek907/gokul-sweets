@@ -1,5 +1,6 @@
 package com.gokulsweets.restaurant.inventory.rolling;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 import org.junit.jupiter.api.Test;
@@ -7,6 +8,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /** Daily scheduling and branch isolation for automatic coverage. */
 class RollingScheduleWorkerTest {
@@ -43,7 +46,7 @@ class RollingScheduleWorkerTest {
                 .doNothing()
                 .when(service)
                 .reconcile(1L, "SCHEDULED", "SYSTEM_ROLLING_AUTOMATION");
-        var worker = new RollingScheduleWorker(jdbc, service);
+        var worker = new RollingScheduleWorker(jdbc, service, Runnable::run);
         worker.reconcile();
         worker.reconcile();
         var calls = inOrder(service);
@@ -55,10 +58,44 @@ class RollingScheduleWorkerTest {
     }
 
     @Test
+    void dailyCallbackReturnsWhileOneBatchRunsOnTheDedicatedThread() throws Exception {
+        var executor = new RollingScheduleExecutionConfiguration().rollingScheduleExecutor();
+        executor.initialize();
+        var jdbc = mock(JdbcTemplate.class);
+        var service = mock(RollingScheduleService.class);
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        when(jdbc.queryForList(anyString(), eq(Long.class))).thenReturn(List.of(1L));
+        doAnswer(
+                        invocation -> {
+                            assertThat(Thread.currentThread().getName())
+                                    .startsWith("rolling-automation-");
+                            entered.countDown();
+                            release.await();
+                            return null;
+                        })
+                .when(service)
+                .reconcile(1L, "SCHEDULED", "SYSTEM_ROLLING_AUTOMATION");
+
+        try {
+            var worker = new RollingScheduleWorker(jdbc, service, executor);
+            org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(
+                    java.time.Duration.ofSeconds(5), worker::reconcile);
+            assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
+            worker.reconcile();
+            assertThat(executor.getThreadPoolExecutor().getQueue()).isEmpty();
+            verify(service, times(1)).reconcile(1L, "SCHEDULED", "SYSTEM_ROLLING_AUTOMATION");
+        } finally {
+            release.countDown();
+            executor.destroy();
+        }
+    }
+
+    @Test
     void dedicatedImportWorkerDoesNotRunDailyAutomation() {
         var jdbc = mock(JdbcTemplate.class);
         var service = mock(RollingScheduleService.class);
-        var worker = new RollingScheduleWorker(jdbc, service);
+        var worker = new RollingScheduleWorker(jdbc, service, Runnable::run);
         ReflectionTestUtils.setField(worker, "importWorker", true);
         worker.reconcile();
         verifyNoInteractions(jdbc, service);

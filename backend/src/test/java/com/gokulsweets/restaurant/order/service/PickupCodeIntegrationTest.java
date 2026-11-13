@@ -23,6 +23,7 @@ import java.util.UUID;
         classMode = org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 class PickupCodeIntegrationTest {
     @Autowired AdminOrderWorkflowService workflow;
+    @Autowired tools.jackson.databind.ObjectMapper mapper;
 
     @Autowired
     com.gokulsweets.restaurant.order.lifecycle.service.AdminOrderLifecycleCoordinator lifecycle;
@@ -79,7 +80,7 @@ class PickupCodeIntegrationTest {
                         "0042");
         assertThat(response.orderStatus())
                 .isEqualTo(com.gokulsweets.restaurant.order.enums.OrderStatus.PICKED_UP);
-        assertThat(response.toString()).doesNotContain("0042");
+        assertThat(mapper.writeValueAsString(response)).doesNotContain("\"0042\"");
         assertThat(codes.customerCode(number).code()).isNull();
         assertThat(
                         workflow.transitionStatus(
