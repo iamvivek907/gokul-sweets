@@ -1309,8 +1309,13 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
                 .containsEntry("slots_created", 4)
                 .containsEntry("allocations_created", 2);
 
-        audit.finish(activeId, f.branch(), "SUCCESS", 1200000, 0, 0, 4, 2, "Coverage checked");
-        assertThat(service.inspect(f.branch()).health().lastRunFailed()).isTrue();
+        var completed =
+                new RollingAutomationDiagnostics(
+                        jdbc, Clock.fixed(now.plusSeconds(1), clock.getZone()), features);
+        completed.finish(activeId, f.branch(), "SUCCESS", 1200000, 0, 0, 4, 2, "Coverage checked");
+        var recovered = service.inspect(f.branch());
+        assertThat(recovered.health().lastRunFailed()).isFalse();
+        assertThat(recovered.runs().getFirst().id()).isEqualTo(activeId);
     }
 
     @Test
@@ -1353,6 +1358,59 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
             executor.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS);
             jdbc.update("DELETE FROM pickup_slots WHERE branch_id=?", branch);
             jdbc.update("DELETE FROM branches WHERE id=?", branch);
+        }
+    }
+
+    @Test
+    @Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void duplicateGenerationDoesNotWaitForTheActiveDateLock() throws Exception {
+        var f = fixture();
+        var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        try {
+            service.save(f.branch(), maximumPlan(-1, 2), "manager");
+            var started =
+                    new java.util.concurrent.atomic.AtomicReference<
+                            java.util.concurrent.Future<?>>();
+            concurrentTransaction()
+                    .executeWithoutResult(
+                            tx -> {
+                                jdbc.queryForObject(
+                                        "SELECT id FROM branches WHERE id=? FOR NO KEY UPDATE",
+                                        Long.class,
+                                        f.branch());
+                                started.set(
+                                        executor.submit(
+                                                () ->
+                                                        service.reconcile(
+                                                                f.branch(),
+                                                                "SCHEDULED",
+                                                                "system")));
+                                long deadline =
+                                        System.nanoTime()
+                                                + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+                                while (service.inspect(f.branch()).runs().isEmpty()) {
+                                    if (System.nanoTime() >= deadline)
+                                        throw new AssertionError(
+                                                "Scheduled run did not claim the branch");
+                                    java.util.concurrent.locks.LockSupport.parkNanos(10_000_000);
+                                }
+                                assertThatThrownBy(
+                                                () ->
+                                                        service.reconcile(
+                                                                f.branch(), "MANUAL", "manager"))
+                                        .hasMessageContaining("Generation is already in progress");
+                                service.reconcile(f.branch(), "SCHEDULED", "system");
+                                assertThat(service.inspect(f.branch()).runs()).hasSize(1);
+                            });
+            started.get().get(10, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(service.inspect(f.branch()).runs().getFirst().status()).isEqualTo("SUCCESS");
+            service.reconcile(f.branch(), "MANUAL", "manager");
+            assertThat(service.inspect(f.branch()).runs()).hasSize(2);
+        } finally {
+            executor.shutdownNow();
+            executor.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS);
+            cleanupCommittedReadinessFixture(f);
         }
     }
 

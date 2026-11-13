@@ -153,6 +153,7 @@ export default function RollingAutomationPage(){
     const loading=branchId!==null&&(settledLoad?.branchId!==branchId||settledLoad?.reload!==reload);
     const workspace=snapshot?.branchId===branchId?snapshot.data:null;
     const controlsDisabled=busy||loading||!canManage;
+    const generationRunning=workspace?.health?.status==="RUNNING";
     const policyById=useMemo(()=>new Map(workspace?.policies.map(policy=>[policy.id,policy])??[]),[workspace?.policies]);
     const maximumPolicies=useMemo(()=>(workspace?.policies??[]).filter(usableMaximum),[workspace?.policies]);
     const selectedIds=useMemo(()=>new Set(draft.usePolicyMaximum?maximumPolicies.map(policy=>policy.id):draft.templates.map(item=>item.policyId)),[draft.usePolicyMaximum,maximumPolicies,draft.templates]);
@@ -198,6 +199,7 @@ export default function RollingAutomationPage(){
     async function submit(mode:"save"|"run"|"saveAndRun"){
         if(!branchId||!authorization||!workspace||mutation.current||loading||!canManage)return;
         setFeedbackTarget(mode==="run"?"stock":"review");
+        if(mode!=="save"&&generationRunning){setError("Generation is in progress. Reload saved settings after it finishes.");return;}
         if(mode==="run"&&dirty){setError("Save your changes before generating daily stock.");return;}
         if(mode==="run"&&savedReadyCount===0){setError("The saved setup has no eligible dishes or quantities. Review step 2, then Save & generate now.");return;}
         if(mode!=="run"){
@@ -334,7 +336,7 @@ export default function RollingAutomationPage(){
                     {readyPolicies.length===0&&<p className="text-sm font-semibold text-amber-950">Choose policy maximums or configure eligible dishes in step 2. There is no daily stock to generate yet.</p>}
                     {invalidIds.size>0&&<button type="button" className="min-h-11 text-left text-sm font-semibold text-red-900 underline" onClick={()=>showPolicies("attention")}>Fix quantities for {invalidIds.size} selected dishes</button>}
                     {feedbackTarget==="review"&&feedback}
-                    <button type="button" className="min-h-12 w-full rounded-2xl bg-[#8f1838] px-4 py-3 font-bold text-white shadow-sm disabled:opacity-40" disabled={controlsDisabled||!draft.enabled||!readyPolicies.length||invalidIds.size>0} onClick={()=>void submit("saveAndRun")}>{busy?"Applying setup…":"Save & generate now"}</button>
+                    <button type="button" className="min-h-12 w-full rounded-2xl bg-[#8f1838] px-4 py-3 font-bold text-white shadow-sm disabled:opacity-40" disabled={controlsDisabled||generationRunning||!draft.enabled||!readyPolicies.length||invalidIds.size>0} onClick={()=>void submit("saveAndRun")}>{busy?"Applying setup…":"Save & generate now"}</button>
                     <button type="submit" form="automation-form" disabled={controlsDisabled} className={`${action} w-full text-sm font-semibold`}>Save automation settings</button>
                     <p className="text-xs leading-5 text-stone-500">Save & generate applies this setup and creates only missing records now. Save settings alone waits for the next daily run. Pausing takes effect when saved.</p>
                     {!canManage&&<p className="text-xs text-stone-500">Read-only access: ask an authorized manager to save or generate.</p>}
@@ -348,7 +350,7 @@ export default function RollingAutomationPage(){
                 {workspace.health?.overdue&&<p role="alert" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-950">The saved setup’s daily refresh is overdue. Save & generate now to check the current setup.</p>}
                 {(workspace.health?.lastRunFailed||workspace.health?.interrupted)&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-900">The most recent run failed or was interrupted. Open run history for its result before retrying.</p>}
                 {feedbackTarget==="stock"&&feedback}
-                <details><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-[#8f1838]">Saved stock details & run history</summary><div className="mt-2 space-y-3">{workspace.health&&<CoveragePanel health={workspace.health} runs={workspace.runs??[]} retryDisabled={busy||loading||dirty||!workspace.plan?.enabled||!canManage||savedReadyCount===0} onRetry={()=>void submit("run")}/>}<details className="rounded-xl bg-stone-50 p-3"><summary className="cursor-pointer text-sm font-semibold">Technical execution summary</summary><p className="mt-2 break-words text-xs leading-5">{workspace.message??"No completed generation yet."}</p><p className="mt-2 text-xs">Last attempt: {runTime(workspace.lastAttempt)}</p></details><button type="button" className={action} disabled={busy||loading||dirty||!workspace.plan?.enabled||!canManage||savedReadyCount===0} onClick={()=>void submit("run")}>Generate missing coverage now</button></div></details>
+                <details><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-[#8f1838]">Saved stock details & run history</summary><div className="mt-2 space-y-3">{workspace.health&&<CoveragePanel health={workspace.health} runs={workspace.runs??[]} retryDisabled={busy||loading||generationRunning||dirty||!workspace.plan?.enabled||!canManage||savedReadyCount===0} onRetry={()=>void submit("run")}/>}<details className="rounded-xl bg-stone-50 p-3"><summary className="cursor-pointer text-sm font-semibold">Technical execution summary</summary><p className="mt-2 break-words text-xs leading-5">{workspace.message??"No completed generation yet."}</p><p className="mt-2 text-xs">Last attempt: {runTime(workspace.lastAttempt)}</p></details><button type="button" className={action} disabled={busy||loading||generationRunning||dirty||!workspace.plan?.enabled||!canManage||savedReadyCount===0} onClick={()=>void submit("run")}>Generate missing coverage now</button></div></details>
                 <Link href="/admin/inventory" className="inline-flex min-h-11 items-center text-sm font-semibold text-[#8f1838] underline">Review daily stock in Inventory</Link>
             </section>
         </>}

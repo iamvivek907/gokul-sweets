@@ -63,12 +63,54 @@ public class RollingAutomationDiagnostics {
     private record Allocation(long product, LocalDate date, String status, String unit) {}
 
     /** Branch-wide execution status, independent of the size of the history response. */
-    private record ExecutionHealth(Instant enabledSince, Instant lastSuccess, boolean running) {}
+    private record ExecutionHealth(
+            Instant enabledSince, Instant lastSuccess, boolean running, String lastOutcome) {}
+
+    /**
+     * Claims a run inside a short transaction. The advisory lock serializes admission across
+     * instances and the run row keeps ownership after the transaction releases the lock.
+     */
+    Long tryStart(long branch, String trigger, String actor) {
+        final long started =
+                MethodTiming.start(
+                        RollingAutomationDiagnostics.class, "tryStart(long,String,String)");
+        try {
+            if (!Boolean.TRUE.equals(
+                    jdbc.queryForObject(
+                            "SELECT pg_try_advisory_xact_lock(hashtextextended(?, 0))",
+                            Boolean.class,
+                            "rolling-automation:" + branch))) return null;
+            expireStaleRuns(branch);
+            if (Boolean.TRUE.equals(
+                    jdbc.queryForObject(
+                            "SELECT EXISTS (SELECT 1 FROM rolling_automation_runs"
+                                    + " WHERE branch_id=? AND status='RUNNING')",
+                            Boolean.class,
+                            branch))) return null;
+            return insertRun(branch, trigger, actor);
+        } finally {
+            MethodTiming.finish(
+                    started, RollingAutomationDiagnostics.class, "tryStart(long,String,String)");
+        }
+    }
 
     /** Starts a durable execution before taking the transactional branch lock. */
     public long start(long branch, String trigger, String actor) {
         final long started =
                 MethodTiming.start(RollingAutomationDiagnostics.class, "start(long,String,String)");
+        try {
+            expireStaleRuns(branch);
+            return insertRun(branch, trigger, actor);
+        } finally {
+            MethodTiming.finish(
+                    started, RollingAutomationDiagnostics.class, "start(long,String,String)");
+        }
+    }
+
+    /** Expires abandoned runs without discarding committed counts. */
+    private void expireStaleRuns(long branch) {
+        final long started =
+                MethodTiming.start(RollingAutomationDiagnostics.class, "expireStaleRuns(long)");
         try {
             jdbc.update(
                     "UPDATE rolling_automation_runs SET"
@@ -78,6 +120,18 @@ public class RollingAutomationDiagnostics {
                     java.sql.Timestamp.from(clock.instant()),
                     branch,
                     java.sql.Timestamp.from(clock.instant().minusSeconds(3600)));
+        } finally {
+            MethodTiming.finish(
+                    started, RollingAutomationDiagnostics.class, "expireStaleRuns(long)");
+        }
+    }
+
+    /** Creates the durable run row once admission succeeds. */
+    private long insertRun(long branch, String trigger, String actor) {
+        final long started =
+                MethodTiming.start(
+                        RollingAutomationDiagnostics.class, "insertRun(long,String,String)");
+        try {
             return jdbc.query(
                     "INSERT INTO"
                         + " rolling_automation_runs(branch_id,trigger_type,actor,status,started_at)"
@@ -89,7 +143,7 @@ public class RollingAutomationDiagnostics {
                     branch);
         } finally {
             MethodTiming.finish(
-                    started, RollingAutomationDiagnostics.class, "start(long,String,String)");
+                    started, RollingAutomationDiagnostics.class, "insertRun(long,String,String)");
         }
     }
 
@@ -153,7 +207,7 @@ public class RollingAutomationDiagnostics {
             jdbc.update(
                     "DELETE FROM rolling_automation_runs WHERE branch_id=? AND status<>'RUNNING'"
                         + " AND id NOT IN (SELECT id FROM rolling_automation_runs WHERE branch_id=?"
-                        + " AND status<>'RUNNING' ORDER BY started_at DESC,id DESC LIMIT 30)",
+                        + " AND status<>'RUNNING' ORDER BY finished_at DESC,id DESC LIMIT 30)",
                     branch,
                     branch);
         } finally {
@@ -169,8 +223,8 @@ public class RollingAutomationDiagnostics {
         final long started = MethodTiming.start(RollingAutomationDiagnostics.class, "runs(long)");
         try {
             return jdbc.query(
-                    "SELECT * FROM rolling_automation_runs WHERE branch_id=? ORDER BY started_at"
-                            + " DESC,id DESC LIMIT 30",
+                    "SELECT * FROM rolling_automation_runs WHERE branch_id=?"
+                            + " ORDER BY COALESCE(finished_at,started_at) DESC,id DESC LIMIT 30",
                     (rs, n) ->
                             new Run(
                                     rs.getLong("id"),
@@ -374,17 +428,23 @@ public class RollingAutomationDiagnostics {
                                     SELECT 1 FROM rolling_automation_runs r
                                     WHERE r.branch_id=s.branch_id AND r.status='RUNNING'
                                       AND COALESCE(r.last_progress_at, r.started_at)>=?
+                                ), (
+                                    SELECT r.status FROM rolling_automation_runs r
+                                    WHERE r.branch_id=s.branch_id
+                                      AND r.status IN ('SUCCESS', 'FAILED')
+                                    ORDER BY r.finished_at DESC, r.id DESC LIMIT 1
                                 )
                             FROM rolling_branch_schedules s WHERE s.branch_id=?
                             """,
                             rs -> {
                                 if (!rs.next())
-                                    return new ExecutionHealth(now.toInstant(), null, false);
+                                    return new ExecutionHealth(now.toInstant(), null, false, null);
                                 var success = rs.getTimestamp(2);
                                 return new ExecutionHealth(
                                         rs.getTimestamp(1).toInstant(),
                                         success == null ? null : success.toInstant(),
-                                        rs.getBoolean(3));
+                                        rs.getBoolean(3),
+                                        rs.getString(4));
                             },
                             java.sql.Timestamp.from(staleBefore),
                             branch);
@@ -404,7 +464,7 @@ public class RollingAutomationDiagnostics {
                                             Objects.requireNonNullElse(
                                                     latest.lastProgressAt(), latest.startedAt()))
                                     .isBefore(staleBefore);
-            boolean failed = !running && latest != null && latest.status().equals("FAILED");
+            boolean failed = !running && "FAILED".equals(execution.lastOutcome());
             boolean attention =
                     overdue
                             || failed

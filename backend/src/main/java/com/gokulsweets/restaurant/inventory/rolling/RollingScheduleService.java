@@ -666,11 +666,18 @@ WHERE bp.branch_id=? ORDER BY p.id FOR NO KEY UPDATE OF p
                         RollingScheduleService.class, "reconcile(long,String,String,Long)");
         try {
             long began = System.nanoTime();
-            long runId = diagnostics.start(branchId, trigger, actor);
-            var run =
-                    new Reconciliation(runId, expectedVersion, LocalDate.now(clock.withZone(IST)));
             var bounded = new TransactionTemplate(transactions.getTransactionManager());
             bounded.setTimeout(300);
+            Long runId = bounded.execute(tx -> diagnostics.tryStart(branchId, trigger, actor));
+            if (runId == null) {
+                if ("SCHEDULED".equals(trigger)) return;
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Generation is already in progress for this branch. Reload for its"
+                                + " status.");
+            }
+            var run =
+                    new Reconciliation(runId, expectedVersion, LocalDate.now(clock.withZone(IST)));
             RuntimeException firstDateFailure = null;
             try {
                 while (!run.date.isAfter(run.end)) {

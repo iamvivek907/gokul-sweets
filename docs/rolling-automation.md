@@ -180,7 +180,9 @@ latest thirty completed runs per branch plus in-progress runs; the API returns a
 recent entries. Counts from committed dates survive restarts. Successful and failed date
 attempts both refresh run activity. Health warns after ten minutes without activity. The next
 invocation marks a run failed after an hour without activity. Both thresholds use the start time
-until the first date attempt finishes. Coverage health stays in progress while any run is active.
+until the first date attempt finishes. Coverage health stays in progress while a run is active,
+and the outcome banner follows completion order. Only one run can generate coverage per branch
+at a time, even across application instances.
 Earlier last-success timestamps remain valid after upgrade.
 
 Each date transaction has a five-minute deadline. Run timing sums the branch lock wait and hold
