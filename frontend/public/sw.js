@@ -360,9 +360,10 @@ function launchMarkupProbe() {
     const tag = /^<\/?([a-z][\w:-]*)(?:[^"'<>]|"[^"]*"|'[^']*')*>/i;
     const headTags = new Set(["html", "body", "base", "link", "meta", "head"]);
     const nonRendering = new Set(["script", "style", "title", "template", "noscript"]);
-    let pending = "", raw = "", inHead = false;
+    const marker = '<span data-gokul-launch-ready="">Opening Gokul</span>';
+    let pending = "", raw = "", inHead = false, hasBodyMarkup = false;
 
-    return bytes => {
+    return {hasBodyMarkup: () => hasBodyMarkup, read(bytes) {
         pending += decoder.decode(bytes, {stream: true});
         let offset = 0;
         while (offset < pending.length) {
@@ -381,7 +382,7 @@ function launchMarkupProbe() {
             const next = pending[offset];
             if (/\s/.test(next)) { offset++; continue; }
             if (next !== "<") {
-                if (!inHead) return true;
+                if (!inHead) hasBodyMarkup = true;
                 const end = pending.indexOf("<", offset);
                 offset = end < 0 ? pending.length : end;
                 continue;
@@ -401,6 +402,9 @@ function launchMarkupProbe() {
                 continue;
             }
 
+            if (!inHead && rest.startsWith(marker)) return true;
+            if (!inHead && marker.startsWith(rest)) break;
+
             const match = tag.exec(rest);
             if (!match) break;
             offset += match[0].length;
@@ -413,13 +417,13 @@ function launchMarkupProbe() {
                 raw = "</" + name + ">";
                 continue;
             }
-            if (!inHead) return true;
+            if (!inHead) hasBodyMarkup = true;
         }
         pending = pending.slice(offset);
         // Do not keep buffering a malformed tag indefinitely.
         if (pending.length > 128 * 1024) throw Error("Invalid storefront launch markup");
         return false;
-    };
+    }};
 }
 
 async function openLaunchDocument(request, signal) {
@@ -433,15 +437,17 @@ async function openLaunchDocument(request, signal) {
     // Peek at a clone so the original response keeps its URL, headers, and streaming body.
     const reader = response.clone().body.getReader();
     const isHtml = /\btext\/html\b/i.test(response.headers.get("content-type") ?? "");
-    const hasLaunchMarkup = isHtml ? launchMarkupProbe() : bytes => bytes.byteLength > 0;
+    const markup = isHtml ? launchMarkupProbe() : null;
     try {
         for (;;) {
             const chunk = await reader.read();
             if (chunk.done) {
+                // A complete older storefront document may not carry the marker yet.
+                if (markup?.hasBodyMarkup()) return response;
                 void response.body.cancel().catch(() => {});
                 return null;
             }
-            if (hasLaunchMarkup(chunk.value)) return response;
+            if (markup ? markup.read(chunk.value) : chunk.value.byteLength > 0) return response;
         }
     } finally {
         // A tee branch's cancel promise can wait for the browser to consume the original.

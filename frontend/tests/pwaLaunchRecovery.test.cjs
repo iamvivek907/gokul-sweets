@@ -98,12 +98,12 @@ test("headers without HTML do not clear the launch deadline",async()=>{
  assert.equal(f.timers.size,0);
 });
 
-test("HTML head, comments, and scripts do not release a blank document",async()=>{
+test("HTML head, scripts, and hidden streamed segments do not release a blank document",async()=>{
  let signal;
  const f=fixture((_request,options)=>{
   signal=options.signal;
   return Promise.resolve(new Response(new ReadableStream({start(controller){
-   controller.enqueue(new TextEncoder().encode('<!doctype html><html><head><title>Gokul</title><script>const fake="<h1>Loaded</h1>";</script></head><body><!-- <h1>Not visible</h1> --><script src="/app.js"></script>'));
+   controller.enqueue(new TextEncoder().encode('<!doctype html><html><head><title>Gokul</title><script>const fake="<h1>Loaded</h1>";</script></head><body><!-- <span data-gokul-launch-ready="">Opening Gokul</span> --><script src="/app.js"></script><div hidden id="S:0"><h1>Streamed menu</h1></div>'));
    signal.addEventListener("abort",()=>controller.error(signal.reason),{once:true});
   }}),{headers:{"content-type":"text/html"}}));
  });
@@ -121,7 +121,7 @@ test("split HTML markup releases the original stream as soon as the opening scre
  const app=new Response(new ReadableStream({start(controller){stream=controller;}}),{headers:{"content-type":"text/html","cache-control":"no-store"}});
  const f=fixture(async()=>app);
  const pending=f.navigate("/menu");
- const parts=['<!doctype html><html><head><ti','tle>Gokul</title></head><body><!','-- <h1>Hidden</h1> --','><script>const fake="<body>";</scr','ipt><div class="gokul-mobile-','boot" role="status">Opening Gokul</div>'];
+ const parts=['<!doctype html><html><head><ti','tle>Gokul</title></head><body><!','-- <h1>Hidden</h1> --','><script>const fake="<body>";</scr','ipt><div class="gokul-mobile-boot"><span data-gokul-launch-','ready="">Opening Gokul</span></div>'];
  for(const part of parts.slice(0,-1))stream.enqueue(new TextEncoder().encode(part));
  await new Promise(resolve=>setImmediate(resolve));
  assert.equal(f.timers.size,1);
@@ -131,6 +131,13 @@ test("split HTML markup releases the original stream as soon as the opening scre
  stream.enqueue(new TextEncoder().encode("<p>Ready</p>"));
  stream.close();
  assert.equal(await app.text(),parts.join("")+"<p>Ready</p>");
+});
+
+test("a complete HTML document without a launch marker still opens during rollout",async()=>{
+ const app=new Response("<!doctype html><html><body><h1>Previous app build</h1></body></html>",{headers:{"content-type":"text/html"}});
+ const f=fixture(async()=>app);
+ assert.equal(await f.navigate("/menu"),app);
+ assert.equal(f.timers.size,0);
 });
 
 test("exact cached storefront pages remain usable during outages",async()=>{

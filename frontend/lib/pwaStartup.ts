@@ -23,6 +23,7 @@ const launchMark = encodeURIComponent("<svg xmlns=\"http://www.w3.org/2000/svg\"
 // First paint must not wait for the stylesheet bundle. Only the SSR boot surface matches.
 export const criticalBootCss = `
 .gokul-mobile-boot{display:none}
+.gokul-mobile-boot[data-gokul-storefront-boot]{display:flex;position:fixed;inset:0;z-index:1000;align-items:center;justify-content:center;flex-direction:column;gap:.75rem;background:#980c31;color:#fff1d7;font:600 1rem/1.4 system-ui,sans-serif;pointer-events:none}
 @media(max-width:640px){
  .gokul-mobile-boot,.gokul-mobile-launch{--gokul-launch-mark:url("data:image/svg+xml,${launchMark}")}
  .gokul-mobile-boot{display:flex;position:fixed;inset:0;z-index:1000;align-items:center;justify-content:center;flex-direction:column;overflow:hidden;background:#980c31;color:#fff1d7;pointer-events:none}
