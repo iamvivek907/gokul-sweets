@@ -154,7 +154,9 @@ ORDER BY p.created_at DESC, p.id DESC LIMIT 20
                             .toList();
             Set<Long> bookable;
             try {
-                bookable = availability.bookableHighlights(branchId, today, candidates);
+                bookable = candidates.isEmpty()
+                        ? Set.of()
+                        : availability.bookableHighlights(branchId, today, candidates);
             } catch (IllegalArgumentException | IllegalStateException exception) {
                 log.warn(
                         "Omitting unorderable storefront highlights: branchId={}, reason={}",

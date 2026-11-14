@@ -305,7 +305,7 @@ export default function ProductCard({
 
                 {refined && (chefPick || sharedSpiceLevel) && (
                     <div className="menu-card-facts">
-                        {chefPick && <span className="menu-card-chef-pick"><span aria-hidden="true">★</span><T text="Chef’s pick" /></span>}
+                        {chefPick && <span className="menu-card-chef-pick"><span aria-hidden="true">★</span><span><T text="Chef’s pick" /></span></span>}
                         {sharedSpiceLevel && <span className="menu-card-spice"><span aria-hidden="true">🌶</span><span className="sr-only"><T text="Spice level" />{" "}</span><T text={{MILD: "Mild", MEDIUM: "Medium", HOT: "Hot"}[sharedSpiceLevel]} /></span>}
                     </div>
                 )}
