@@ -21,6 +21,7 @@ export interface CartAvailability {
     recheckAt?: string | null;
     observedAt?: string | null;
     receivedMonotonic?: number;
+    requestStartedMonotonic?: number;
     fulfilmentType: "PICKUP";
     today: string;
     maximumDate: string;
@@ -82,17 +83,21 @@ export async function checkCartAvailability(
     const previewQuery = menuPreview
         ? `?menuPreview=true&compact=true&versioned=true${slotId === undefined ? "" : `&slotId=${encodeURIComponent(slotId)}`}`
         : "";
+    const requestStartedMonotonic = typeof performance === "undefined" ? 0 : performance.now();
     const data = await apiClient<CartAvailability | CompactMenuAvailability>(`/api/branches/${branchId}/availability${previewQuery}`, {
         method: "POST", signal, body: JSON.stringify({startDate, days, items: items.map(({productId,quantity,weightGrams})=>({productId,quantity,weightGrams})), fulfilmentType: "PICKUP"})
     });
-    return {...readAvailability(data), receivedMonotonic: typeof performance === "undefined" ? 0 : performance.now()};
+    return {...readAvailability(data), requestStartedMonotonic, receivedMonotonic: typeof performance === "undefined" ? 0 : performance.now()};
 }
 
 /** Server-relative boundary; older servers retain the existing periodic refresh fallback. */
 export function menuPreviewDeadline(data: CartAvailability): number | null {
-    if (!data.observedAt || !data.recheckAt || !Number.isFinite(data.receivedMonotonic)) return null;
+    // Server observation cannot precede the request. Using that lower bound
+    // charges transit and parsing time without comparing device and server clocks.
+    const anchor = data.requestStartedMonotonic ?? data.receivedMonotonic;
+    if (!data.observedAt || !data.recheckAt || anchor === undefined || !Number.isFinite(anchor)) return null;
     const remaining = Date.parse(data.recheckAt) - Date.parse(data.observedAt);
-    return Number.isFinite(remaining) ? data.receivedMonotonic! + Math.max(0, remaining) : null;
+    return Number.isFinite(remaining) ? anchor + Math.max(0, remaining) : null;
 }
 
 /** Give a preview that crossed a service boundary one fresh read before reporting failure. */
@@ -196,7 +201,8 @@ export async function checkMenuAvailability(
     const timed = responses.filter(value => menuPreviewDeadline(value) !== null)
         .sort((left, right) => menuPreviewDeadline(left)! - menuPreviewDeadline(right)!)[0];
     return {...first, recheckAt: timed?.recheckAt ?? boundaries[0] ?? first.recheckAt,
-        observedAt: timed?.observedAt, receivedMonotonic: timed?.receivedMonotonic, dates: first.dates.map(day => {
+        observedAt: timed?.observedAt, receivedMonotonic: timed?.receivedMonotonic,
+        requestStartedMonotonic: timed?.requestStartedMonotonic, dates: first.dates.map(day => {
         const parts = responses.map(response => response.dates.find(value => value.date === day.date));
         return {...day,
             available: parts.every(part => part?.available === true),

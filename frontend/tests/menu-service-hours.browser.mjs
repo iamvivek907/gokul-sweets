@@ -34,7 +34,7 @@ try{for(const width of [320,390,1280]){
    if(failMenu)return route.fulfill({status:503,headers,json:{message:'Temporary outage'}});
    const sold=saved.enabled&&saved.items.find(item=>item.branchProductId===101)?.soldOut;
    // Browsing at 4 AM may build a cart for an eligible later pickup.
-   json=[{id:1,name:'Snacks',description:null,displayOrder:1,products:[1,2].map(id=>({...product,id,name:id===1?'Samosa':'Chola samosa',available:!sold,serviceAvailability:{available:!sold,code:sold?'SOLD_OUT':'AVAILABLE',message:sold?'Sold out.':null,evaluatedAt:'2026-10-04T22:30:00Z',nextChangeAt:serviceBoundary?'2026-10-04T22:30:08Z':null}}))}];
+   json=[{id:1,name:'Snacks',description:null,displayOrder:1,products:[1,2].map(id=>({...product,id,name:id===1?'Samosa':'Chola samosa',available:!sold,serviceAvailability:{available:!sold,code:sold?'SOLD_OUT':'AVAILABLE',message:sold?'Sold out.':null,evaluatedAt:'2026-10-04T22:30:00Z',nextChangeAt:serviceBoundary?(id===1?'2026-10-04T22:30:08Z':'2026-10-04T22:30:20Z'):null}}))}];
   }else if(path==='/api/branches/1/discovery')json={overallExperience:{average:4.5,count:2},offerings:[],topRatedItems:[]};
   return route.fulfill({headers,json});
  });
@@ -76,10 +76,14 @@ try{for(const width of [320,390,1280]){
  serviceBoundary=true;await page.reload();
  const add=samosa.getByRole('button',{name:/^Add .* to cart$/});
  await add.click();failMenu=true;
- await page.clock.fastForward(9000);
+ await page.clock.runFor(9000);
  const notice=page.locator('.menu-refresh-notice');
  await notice.getByText(/The menu could not refresh/).waitFor();
  assert.equal(await samosa.getByRole('button',{name:'Add one more Samosa',exact:true}).isDisabled(),true);
+ const laterDish=page.locator('#gokul-product-2').getByRole('button',{name:'Add Chola samosa to cart',exact:true});
+ assert.equal(await laterDish.isEnabled(),true,'a later cutoff remains orderable until it expires');
+ await page.clock.runFor(12000);
+ assert.equal(await laterDish.isDisabled(),true,'the second cutoff is enforced before the 30-second poll');
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items.length),1);
  failMenu=false;serviceBoundary=false;
  await notice.getByRole('button',{name:'Try again',exact:true}).click();

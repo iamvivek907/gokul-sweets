@@ -221,3 +221,17 @@ test('repeated expired previews stop after one refresh',async()=>{
  },signal),/changed while checking/);
  assert.equal(attempts,2);
 });
+
+test('a single delayed pickup response consumes its validity before it arrives',async()=>{
+ let now=100;
+ const f=fixture((body,n)=>{
+  now+=n===1?6000:20;
+  return {...response(body),observedAt:'2026-10-08T10:00:00Z',
+   recheckAt:n===1?'2026-10-08T10:00:02Z':'2026-10-08T10:00:30Z'};
+ },{setTimeout,clearTimeout,performance:{now:()=>now}});
+ const signal=new AbortController().signal;
+ const result=await f.readFreshMenuPreview(()=>f.checkMenuAvailability(1,'2026-10-08',1,items.slice(0,1),signal),signal);
+ assert.equal(f.calls.length,2);
+ assert.equal(result.requestStartedMonotonic,6100);
+ assert.equal(f.menuPreviewDeadline(result),36100);
+});

@@ -120,6 +120,7 @@ export function useDateAvailability(products?: MenuProduct[]) {
     const refreshedBoundary = useRef<string | null>(null);
     const snapshot = result?.data && (result.key === key || menuPreview && result.scope === scope)
         ? result.data : undefined;
+    const [expiredSnapshot, setExpiredSnapshot] = useState<CartAvailability>();
     const recheckAt = snapshot?.recheckAt;
     const deadline = snapshot ? menuPreviewDeadline(snapshot) : null;
     useEffect(() => {
@@ -127,18 +128,21 @@ export function useDateAvailability(products?: MenuProduct[]) {
         const boundaryKey = JSON.stringify([branchId, requestDate, previewSlotId, recheckAt]);
         const remaining = deadline - performance.now();
         if (!Number.isFinite(remaining)) return;
+        const transit = Math.max(0, (snapshot?.receivedMonotonic ?? 0) - (snapshot?.requestStartedMonotonic ?? snapshot?.receivedMonotonic ?? 0));
+        const expire = () => setExpiredSnapshot(snapshot);
+        const invalidate = setTimeout(expire, Math.max(0, Math.ceil(remaining)));
         const timer = setTimeout(() => {
-            setResult(current => current?.data === snapshot ? null : current);
             if (refreshedBoundary.current !== boundaryKey && navigator.onLine && document.visibilityState === "visible") {
-                // A fast device clock or a late response must not create a refresh loop.
+                // Wait until even the upper bound of the server cutoff has passed.
                 refreshedBoundary.current = boundaryKey;
                 refresh.request();
             }
-        }, Math.max(0, Math.min(Math.ceil(remaining), 2147483647)));
-        return () => clearTimeout(timer);
+        }, Math.max(0, Math.ceil(remaining + transit)));
+        return () => {clearTimeout(invalidate); clearTimeout(timer);};
     }, [menuPreview, recheckAt, deadline, branchId, requestDate, previewSlotId, refresh, snapshot]);
-    const data = result?.key === key ? result.data : undefined;
-    const day = snapshot?.dates[0];
+    const currentSnapshot = expiredSnapshot === snapshot ? undefined : snapshot;
+    const data = result?.key === key ? currentSnapshot : undefined;
+    const day = currentSnapshot?.dates[0];
     const selectedSlot = day?.slots.find(value => value.slot.id === intent.selection?.slot.id);
     // Menu previews include unchosen products; only the actual cart can invalidate its saved pickup.
     const cartIds = new Set(cart.branchId === branch?.id ? cart.items.map(item => item.product.id) : []);

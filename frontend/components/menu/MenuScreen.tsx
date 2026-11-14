@@ -7,7 +7,7 @@ import {useBranchMeals} from "@/hooks/useBranchMeals";
 import MealCollection from "@/components/meal/MealCollection";
 import {mealCanBeBuilt,mealProductsForPickup} from "@/lib/mealAvailability";
 import BrandLoading from "@/components/common/BrandLoading";
-import {datedMenuAvailable} from "@/lib/datedMenuAvailability";
+import {blockExpiredMenuService, datedMenuAvailable, menuServiceDeadline} from "@/lib/datedMenuAvailability";
 import MenuToolbar,{measureMenuToolbar} from "./MenuToolbar";
 import {reportLoadingStage} from "@/lib/customerLoading";
 import dynamic from "next/dynamic";
@@ -365,9 +365,10 @@ export default function MenuScreen() {
 
 
                     renderStarted.current = performance.now();
-                    lastCatalog.current={branchId:selectedBranch.id,categories:result};setRefreshError(null);
+                    const current = blockExpiredMenuService(result, performance.now());
+                    lastCatalog.current={branchId:selectedBranch.id,categories:current};setRefreshError(null);
                     setCategories(
-                        result
+                        current
                     );
 
                     // Filters belong to the browsing session, not to a catalog refresh.
@@ -942,7 +943,9 @@ export default function MenuScreen() {
 
     const guardedIncrease = (id:number) => {
         try {
-            if(!branch||validateMenuBranch(branch.id)===null||!pickupAllows(id))return;
+            const product = allProducts.find(item => item.id === id);
+            if(!branch||!product?.available||performance.now() >= (menuServiceDeadline(product) ?? Infinity)
+                ||validateMenuBranch(branch.id)===null||!pickupAllows(id))return;
             if(!fitsKnownPickupStock(id)){showCartMessage("No more available for this pickup.");return;}
             increaseQuantity(id,branch.id);
         }
@@ -1022,7 +1025,7 @@ export default function MenuScreen() {
 
         if (weightGrams && pickupCheck.features?.smartAvailability && weightPickup.current!==getPickupSlotSnapshot()) {showCartMessage("Pickup changed. Review the displayed time before adding.");return;}
         const liveProduct=allProducts.find(item=>item.id===product.id);
-        if(!liveProduct?.available || !pickupAllows(product.id)){setWeightProduct(null);showCartMessage(liveProduct?.serviceAvailability?.message??"This item is currently unavailable.");return;}
+        if(!liveProduct?.available || performance.now() >= (menuServiceDeadline(liveProduct) ?? Infinity) || !pickupAllows(product.id)){setWeightProduct(null);showCartMessage(liveProduct?.serviceAvailability?.message??"This item is currently unavailable.");return;}
         if(!fitsKnownPickupStock(product.id,weightGrams)){showCartMessage("No more available for this pickup.");return;}
         const selectedBranch = validateMenuBranch(branch.id);
         if (selectedBranch === null) return;
