@@ -2,9 +2,7 @@
 
 import {LanguagePicker, T, useTranslation} from "@/lib/language";
 
-import {
-    useRouter
-} from "next/navigation";
+import {useState} from "react";
 
 import {
     useAdminAuth
@@ -18,8 +16,8 @@ import AdminMobileNav
 export default function AdminTopbar() {
     const translate = useTranslation();
 
-    const router =
-        useRouter();
+    const [signingOut, setSigningOut] = useState(false);
+    const [logoutError, setLogoutError] = useState("");
 
 
     const {
@@ -31,12 +29,16 @@ export default function AdminTopbar() {
 
     async function handleLogout() {
 
-        await logout();
-
-
-        router.replace(
-            "/admin/login"
-        );
+        if (signingOut) return;
+        setSigningOut(true);
+        setLogoutError("");
+        try {
+            await logout();
+        } catch (error) {
+            setLogoutError(error instanceof Error ? error.message : "Sign-out could not be confirmed.");
+        } finally {
+            setSigningOut(false);
+        }
     }
 
 
@@ -138,6 +140,7 @@ export default function AdminTopbar() {
                 <button
                     type="button"
                     aria-label={translate("Logout")}
+                    disabled={signingOut}
                     onClick={
                         handleLogout
                     }
@@ -169,6 +172,7 @@ export default function AdminTopbar() {
             </div>
 
 
+            {logoutError && <p role="alert" className="px-4 pb-2 text-sm text-red-800">{logoutError}</p>}
         </header>
     );
 }

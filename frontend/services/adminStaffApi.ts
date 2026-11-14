@@ -69,7 +69,7 @@ async function ensureOk(
     if (response.status === 401) {
 
         throw new Error(
-            "Your admin session is no longer authorized."
+            "The server rejected this request. Check your admin session and try again."
         );
     }
 
@@ -77,7 +77,7 @@ async function ensureOk(
     if (response.status === 403) {
 
         throw new Error(
-            "You do not have permission to manage this staff member."
+            await readErrorMessage(response, "You do not have permission to manage this staff member.")
         );
     }
 
@@ -102,7 +102,9 @@ export async function getAdminStaff(
             authorization,
             {
                 method: "GET",
-                signal
+                signal: signal
+                    ? AbortSignal.any([signal, AbortSignal.timeout(15000)])
+                    : AbortSignal.timeout(15000)
             }
         );
 
@@ -128,7 +130,9 @@ export async function getAdminStaffOptions(
             authorization,
             {
                 method: "GET",
-                signal
+                signal: signal
+                    ? AbortSignal.any([signal, AbortSignal.timeout(15000)])
+                    : AbortSignal.timeout(15000)
             }
         );
 
@@ -154,6 +158,7 @@ export async function createAdminStaff(
             authorization,
             {
                 method: "POST",
+                signal: AbortSignal.timeout(30000),
 
                 headers: {
                     "Content-Type": "application/json"
@@ -188,6 +193,7 @@ export async function updateAdminStaff(
             authorization,
             {
                 method: "PUT",
+                signal: AbortSignal.timeout(30000),
 
                 headers: {
                     "Content-Type": "application/json"
@@ -222,6 +228,7 @@ export async function resetAdminStaffPassword(
             authorization,
             {
                 method: "PATCH",
+                signal: AbortSignal.timeout(30000),
 
                 headers: {
                     "Content-Type": "application/json"
