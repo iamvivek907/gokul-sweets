@@ -104,11 +104,8 @@ html:has(.future-storefront)::-webkit-scrollbar,.future-storefront :is(.mobile-m
  .future-storefront[data-customer-design=reference] .menu-search-dialog .menu-search-suggestions{min-height:0;overflow:auto;overscroll-behavior:contain}
  .future-storefront[data-customer-design=reference] .menu-search-dialog .menu-search-show-results{flex:none;min-height:44px;margin-top:8px;padding:8px}
 }
-.future-storefront [data-menu-product-card][data-search-arrival]{
- border-radius:16px;
- outline:3px solid #7352a8;
- outline-offset:2px;
-}
+.future-storefront [data-menu-product-card]:focus{outline:none}
+.future-storefront .menu-card-open:focus-visible{outline:2px solid #8f1838;outline-offset:-3px}
 
 .future-storefront .mobile-menu-pickup button.menu-pickup-help,
 .future-storefront button.menu-pickup-help{

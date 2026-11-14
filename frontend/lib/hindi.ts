@@ -1245,6 +1245,7 @@ export const hindi: Record<string,string> = {
   "Follow us for fresh arrivals and festive favourites.": "नए व्यंजन और त्योहारों की पसंद के लिए हमसे जुड़ें।",
   "Your branch menu": "आपकी शाखा का मेन्यू",
   "Loading dishes. Your cart and pickup are saved.": "व्यंजन लोड हो रहे हैं। आपका कार्ट और पिकअप सुरक्षित हैं।",
+  "Dish sizes could not load. Try again to group them.": "व्यंजन के साइज़ लोड नहीं हो सके। उन्हें एक साथ देखने के लिए फिर कोशिश करें।",
   "The menu could not refresh. Your cart is saved. Prices and availability will be checked before ordering.": "मेन्यू रीफ़्रेश नहीं हो सका। आपका कार्ट सुरक्षित है। ऑर्डर से पहले कीमत और उपलब्धता जाँची जाएगी।",
   "Your pickup plan": "आपकी पिकअप योजना",
   "Edit items": "आइटम बदलें",

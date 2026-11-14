@@ -56,7 +56,11 @@ public class MenuPreviewReads {
 
     /** Request order, quantities, weights, branch and date are all part of the sharing identity. */
     private record Key(
-            long branchId, LocalDate date, List<CreateOrderItemRequest> items, long second) {}
+            long branchId,
+            LocalDate date,
+            List<CreateOrderItemRequest> items,
+            Long slotId,
+            long second) {}
 
     /** One in-progress read; removed before its result or exception is published to subscribers. */
     private record Pending(
@@ -81,7 +85,30 @@ public class MenuPreviewReads {
                         MenuPreviewReads.class,
                         "check(long,LocalDate,List<CreateOrderItemRequest>)");
         try {
-            var key = new Key(branchId, date, List.copyOf(items), clock.instant().getEpochSecond());
+            return check(branchId, date, items, null);
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    MenuPreviewReads.class,
+                    "check(long,LocalDate,List<CreateOrderItemRequest>)");
+        }
+    }
+
+    /** Reads a preview scoped to the selected slot when supplied. */
+    public CartAvailabilityService.Availability check(
+            long branchId, LocalDate date, List<CreateOrderItemRequest> items, Long slotId) {
+        long started =
+                MethodTiming.start(
+                        MenuPreviewReads.class,
+                        "check(long,LocalDate,List<CreateOrderItemRequest>,Long)");
+        try {
+            var key =
+                    new Key(
+                            branchId,
+                            date,
+                            List.copyOf(items),
+                            slotId,
+                            clock.instant().getEpochSecond());
             Pending read;
             boolean owner = false;
             synchronized (pending) {
@@ -97,7 +124,10 @@ public class MenuPreviewReads {
                     owner = true;
                 }
             }
-            if (read == null) return service.check(branchId, date, items);
+            if (read == null)
+                return (slotId == null
+                        ? service.check(branchId, date, items)
+                        : service.check(branchId, date, items, slotId));
             if (!owner) {
                 try {
                     long remaining = waitNanos - (ticker.getAsLong() - read.started());
@@ -121,7 +151,10 @@ public class MenuPreviewReads {
                 }
             }
             try {
-                var result = service.check(branchId, date, items);
+                var result =
+                        (slotId == null
+                                ? service.check(branchId, date, items)
+                                : service.check(branchId, date, items, slotId));
                 synchronized (pending) {
                     pending.remove(key, read);
                 }
@@ -138,7 +171,7 @@ public class MenuPreviewReads {
             MethodTiming.finish(
                     started,
                     MenuPreviewReads.class,
-                    "check(long,LocalDate,List<CreateOrderItemRequest>)");
+                    "check(long,LocalDate,List<CreateOrderItemRequest>,Long)");
         }
     }
 }

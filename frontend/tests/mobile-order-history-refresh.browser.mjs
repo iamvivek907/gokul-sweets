@@ -5,16 +5,29 @@ const browser=await chromium.launch({headless:true}),base=process.env.BROWSER_BA
 const branch={id:1,name:'Gokul Test Branch',active:true,pickupAvailable:true};
 try{for(const [width,themed] of [[390,true],[1280,true],[390,false]]){
  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();
+ let releaseReadiness,sessionStarted;
+ const readinessGate=new Promise(resolve=>releaseReadiness=resolve);
+ const sessionRequested=new Promise(resolve=>sessionStarted=resolve);
  let order={orderNumber:'REFRESH-1',customerOrderNumber:1,branchId:1,branchName:branch.name,orderStatus:'PREPARING',fulfillmentType:'PICKUP',totalAmount:120,createdAt:new Date().toISOString()},reads=0,authenticated=true,fail=false,hold=false,release;
  await context.addInitScript(branch=>{localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-social-follow-popup-seen','true');window.__ordersVisible=true;window.__ordersOnline=true;Object.defineProperty(document,'visibilityState',{get:()=>window.__ordersVisible?'visible':'hidden',configurable:true});Object.defineProperty(navigator,'onLine',{get:()=>window.__ordersOnline,configurable:true});},branch);
  await context.route('**/api/**',async route=>{const url=new URL(route.request().url()),path=url.pathname;let json=[];
   if(path==='/api/storefront/features')json={futuristicStorefrontV2:themed,checkoutExperienceV2:themed,simplifiedCheckout:themed,acceptedCheckoutQuote:themed};
-  else if(path==='/api/storefront/customer-identity')json={enabled:true};else if(path==='/api/customer/identity/me')json={authenticated,phone:'+919876543210'};
+  else if(path==='/api/storefront/customer-identity'){await readinessGate;json={enabled:true};}
+  else if(path==='/api/customer/identity/me'){sessionStarted();json={authenticated,phone:'+919876543210'};}
   else if(path==='/api/branches')json=[branch];else if(path==='/api/branches/1')json=branch;
   else if(path==='/api/customer/identity/orders/page'){reads++;if(hold)await new Promise(resolve=>release=resolve);if(fail)return route.fulfill({status:503,json:{message:'Unavailable'}});json={orders:url.searchParams.get('status')==='ACTIVE'&&order.orderStatus==='PICKED_UP'?[]:[order],nextBefore:null};}
   return route.fulfill({json}).catch(()=>{});
  });
- await page.clock.install();await page.goto(`${base}/orders`);await page.locator('.profile-order-card').first().waitFor();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
+ await page.clock.install();await page.goto(`${base}/orders`);
+ let waitForSession;
+ try {
+  await Promise.race([sessionRequested,new Promise((_,reject)=>waitForSession=setTimeout(()=>reject(new Error('Session must start before readiness resolves')),10000))]);
+  assert.equal(reads,0,'private history waits for readiness and the session');
+ } finally {
+  clearTimeout(waitForSession);
+  releaseReadiness();
+ }
+ await page.locator('.profile-order-card').first().waitFor();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
  const filtered=page.waitForResponse(response=>{const url=new URL(response.url());return url.pathname==='/api/customer/identity/orders/page'&&url.searchParams.get('status')==='ACTIVE';});await page.getByRole('button',{name:'Active',exact:true}).click();await (await filtered).finished();await page.locator('.profile-order-card').first().waitFor();await page.clock.pauseAt(await page.evaluate(()=>Date.now()+1000));
  hold=true;let count=reads;await page.clock.fastForward(15001);for(let n=0;n<100&&!release;n++)await new Promise(resolve=>setTimeout(resolve,10));assert.ok(release);assert.equal(reads,count+1);assert.equal(await page.locator('.profile-order-card').count(),1,'pending refresh retains cards');
  hold=false;order={...order,orderStatus:'READY_FOR_PICKUP'};release();await page.getByText('Ready for Pickup',{exact:true}).waitFor();

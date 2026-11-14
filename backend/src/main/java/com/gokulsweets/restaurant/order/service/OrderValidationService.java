@@ -643,12 +643,76 @@ public class OrderValidationService {
             Set<Long> productIds = requestedItems.keySet();
             List<BranchProduct> branchProducts =
                     branchProductRepository.findForOrder(branchId, productIds);
-            Map<Long, BranchProduct> branchProductMap =
+            return validateProducts(
+                    branchId,
+                    requestedItems,
+                    serviceAvailability,
                     branchProducts.stream()
                             .collect(
                                     Collectors.toMap(
-                                            branchProduct -> branchProduct.getProduct().getId(),
+                                            product -> product.getProduct().getId(),
+                                            Function.identity())));
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    OrderValidationService.class,
+                    "validateProducts(Long,Map<Long,RequestedOrderItem>,com.gokulsweets.restaurant.menu.MenuServiceWindows.Snapshot)");
+        }
+    }
+
+    /** Validates each requested highlight independently using a shared branch rules snapshot. */
+    ValidatedPickupCart validateHighlights(Long branchId, List<CreateOrderItemRequest> items) {
+        long started =
+                MethodTiming.start(
+                        OrderValidationService.class,
+                        "validateHighlights(Long,List<CreateOrderItemRequest>)");
+        try {
+            validateBranch(branchId);
+            var requested = normalizeItems(items);
+            var serviceAt = serviceWindows.pickupEvaluator(branchId, requested.keySet());
+            var statuses = serviceAt.apply(null);
+            var products =
+                    branchProductRepository.findForOrder(branchId, requested.keySet()).stream()
+                            .collect(
+                                    Collectors.toMap(
+                                            product -> product.getProduct().getId(),
                                             Function.identity()));
+            var validated = new ArrayList<ValidatedOrderItem>();
+            for (var item : requested.entrySet()) {
+                try {
+                    validated.addAll(
+                            validateProducts(
+                                    branchId,
+                                    Map.of(item.getKey(), item.getValue()),
+                                    statuses,
+                                    products));
+                } catch (IllegalArgumentException | IllegalStateException exception) {
+                    log.debug(
+                            "Omitting unorderable storefront highlight: branchId={}, productId={}",
+                            branchId,
+                            item.getKey());
+                }
+            }
+            return new ValidatedPickupCart(validated, serviceAt);
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    OrderValidationService.class,
+                    "validateHighlights(Long,List<CreateOrderItemRequest>)");
+        }
+    }
+
+    /** Validates requested quantities and product rules using the supplied branch products. */
+    private List<ValidatedOrderItem> validateProducts(
+            Long branchId,
+            Map<Long, RequestedOrderItem> requestedItems,
+            com.gokulsweets.restaurant.menu.MenuServiceWindows.Snapshot serviceAvailability,
+            Map<Long, BranchProduct> branchProductMap) {
+        long started =
+                MethodTiming.start(
+                        OrderValidationService.class,
+                        "validateProducts(Long,Map<Long,RequestedOrderItem>,com.gokulsweets.restaurant.menu.MenuServiceWindows.Snapshot,Map<Long,BranchProduct>)");
+        try {
             List<ValidatedOrderItem> validated = new ArrayList<>();
             for (Map.Entry<Long, RequestedOrderItem> entry : requestedItems.entrySet()) {
                 Long productId = entry.getKey();
@@ -721,9 +785,9 @@ public class OrderValidationService {
             return validated;
         } finally {
             MethodTiming.finish(
-                    __gokulMethodStartedNanos,
+                    started,
                     OrderValidationService.class,
-                    "validateProducts(Long,Map<Long,RequestedOrderItem>,com.gokulsweets.restaurant.menu.MenuServiceWindows.Snapshot)");
+                    "validateProducts(Long,Map<Long,RequestedOrderItem>,com.gokulsweets.restaurant.menu.MenuServiceWindows.Snapshot,Map<Long,BranchProduct>)");
         }
     }
 

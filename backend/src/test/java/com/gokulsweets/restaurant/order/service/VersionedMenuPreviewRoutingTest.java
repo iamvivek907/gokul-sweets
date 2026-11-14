@@ -31,6 +31,8 @@ class VersionedMenuPreviewRoutingTest {
                     .thenReturn(result);
             when(legacy.check(anyLong(), eq(date), anyList())).thenReturn(result);
             when(previews.check(anyLong(), eq(date), anyList())).thenReturn(result);
+            when(legacy.check(anyLong(), eq(date), anyList(), eq(42L))).thenReturn(result);
+            when(previews.check(anyLong(), eq(date), anyList(), eq(42L))).thenReturn(result);
             var mvc =
                     MockMvcBuilders.standaloneSetup(
                                     new CartAvailabilityController(
@@ -54,6 +56,20 @@ class VersionedMenuPreviewRoutingTest {
             if (enabled) verify(previews).check(eq(1L), eq(date), anyList());
             else {
                 verify(legacy).check(eq(1L), eq(date), anyList());
+                verifyNoInteractions(previews);
+            }
+            clearInvocations(legacy, previews);
+            mvc.perform(
+                            post(path + "?menuPreview=true&compact=true&versioned=true&slotId=42")
+                                    .contentType("application/json")
+                                    .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string("Cache-Control", "no-store"));
+            if (enabled) {
+                verify(previews).check(eq(1L), eq(date), anyList(), eq(42L));
+                verifyNoInteractions(legacy);
+            } else {
+                verify(legacy).check(eq(1L), eq(date), anyList(), eq(42L));
                 verifyNoInteractions(previews);
             }
             clearInvocations(legacy, previews);

@@ -153,6 +153,8 @@ export default function ProductGrid({
                     premium={portionGroups!==undefined&&compactGroups}
                     refined={refined}
                     unavailableForPickup={unavailable}
+                    soldOut={product.available === false && product.serviceAvailability?.code === "SOLD_OUT"
+                        || unavailable && !pickupChecking && pickup?.available === false && pickup.code === "SOLD_OUT"}
                     pickupMessage={pickupChecking ? pickupStatusMessage ?? "Checking pickup" : describePickupAvailability(pickup, false)}
                     pickupChecking={pickupChecking}
                     product={product}
