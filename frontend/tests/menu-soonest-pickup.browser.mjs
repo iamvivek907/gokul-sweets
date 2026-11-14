@@ -15,6 +15,7 @@ try{for(const width of [320,390,1280]){
  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();page.setDefaultTimeout(15000);
  await page.clock.install({time:new Date(`${today}T22:00:00+05:30`)});
  let outage=false,holdDiscovery=false,release=null,discoveries=0;const dateDiscoveryGates=[];let holdDateDiscovery=false;let showCompanion=false, holdConfirmation=false, shrinkBookingWindow=false, releaseConfirmation;
+ let pickerReads=0;
  const checks=[],errors=[];page.on('pageerror',e=>errors.push(e.message));
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key'};
  await context.route('**/api/**',async route=>{
@@ -22,7 +23,7 @@ try{for(const width of [320,390,1280]){
   if(request.method()==='OPTIONS')return route.fulfill({status:204,headers});
   if(path==='/api/storefront/features')json={futuristicStorefrontV2:true,checkoutExperienceV2:true,contextualStorefrontV2:true,smartAvailability:true,today,futureOrderingDays:7};
   else if(path==='/api/branches')json=[branch];else if(path==='/api/branches/1')json=branch;
-  else if(path==='/api/menu')json={revision:'ready-future',serviceWindowsEnabled:true,observedAt:new Date().toISOString(),items:[{productId:1,available:false,serviceAvailability:{available:false,code:'SERVICE_WINDOW',message:'Available tomorrow morning',nextChangeAt:null}},{productId:2,available:false},{productId:3,available:showCompanion}]};
+  else if(path==='/api/menu')json={revision:'ready-future',serviceWindowsEnabled:true,observedAt:new Date().toISOString(),items:[{productId:1,available:false,serviceAvailability:{available:false,code:'SERVICE_WINDOW',message:'Available tomorrow morning',nextChangeAt:null}},{productId:2,available:false},{productId:3,available:showCompanion,serviceAvailability:showCompanion?null:{available:false,code:'SOLD_OUT',message:'Sold out',nextChangeAt:null}}]};
   else if(path==='/api/menu/catalog/1/ready-future')json={revision:'ready-future',categories:[{id:1,name:'Breakfast',products:[product,{...product,id:2,name:'Disabled Paratha',available:false},{...product,id:3,name:'Companion Paratha'}]}]};
   else if(path==='/api/menu/portion-groups')json={groups:[]};
   else if(path==='/api/storefront/customer-identity')json={enabled:false};
@@ -34,15 +35,17 @@ try{for(const width of [320,390,1280]){
    json={today,maximumDate:later,dates:[today,tomorrow,later].map((date,index)=>({date,slots:[{slot:slot(date,index+1),normalAvailable:true,issues:[]}]}))};
   }else if(path.endsWith('/availability')){
    const payload=request.postDataJSON(),date=payload.startDate;checks.push(date);
+   if(payload.days>1)pickerReads++;
    if(holdConfirmation&&payload.days===1&&!new URL(request.url()).searchParams.has('menuPreview')){
     holdConfirmation=false;heldConfirmation=true;
     await new Promise(resolve=>{releaseConfirmation=resolve;});
    }
    if(outage)return route.fulfill({status:503,headers,json:{message:'Offline'}});
    const dates=payload.days===1?[date]:shrinkBookingWindow?[tomorrow]:[tomorrow,later];
+   const canBook=!payload.items.some(item=>item.productId===3&&!showCompanion);
    json={today,maximumDate:dates.at(-1),dates:dates.map(value=>({
-    date:value,available:true,items:[{productId:1,productName:product.name,available:true}],
-    slots:[{slot:slot(value,[today,tomorrow,later].indexOf(value)+1),normalAvailable:true,issues:[]}]
+    date:value,available:canBook,items:payload.items.map(item=>({productId:item.productId,available:item.productId!==3||showCompanion})),
+    slots:[{slot:slot(value,[today,tomorrow,later].indexOf(value)+1),normalAvailable:canBook,issues:[]}]
    }))};
   }
   try{await route.fulfill({headers,json});}catch(error){if(!heldConfirmation)throw error;}
@@ -114,10 +117,14 @@ try{for(const width of [320,390,1280]){
   const confirm=dialog.getByRole('button',{name:'Use this pickup',exact:true});
   const standard=dialog.getByRole('button',{name:/08:00.*Standard/});
   await standard.waitFor();
+  const companion='#gokul-product-3';
+  await page.locator(`${companion} [data-sold-out="true"]`).waitFor({state:'attached'});
+  const readsBefore=pickerReads;
   showCompanion=true;
   await page.clock.runFor(31000);
-  await page.locator('#gokul-product-3').waitFor({state:'attached'});
+  await page.waitForFunction(selector=>document.querySelector(`${selector} button[data-ordering-target="add"]`)?.disabled===false,companion);
   assert.equal(await dialog.isVisible(),true);
+  assert.equal(pickerReads,readsBefore,'an unrelated dish change does not reload pickup options');
   const previous=await saved();
   const laterDate=dialog.getByRole('button',{name:later,exact:true});
   await laterDate.click();
@@ -148,6 +155,20 @@ try{for(const width of [320,390,1280]){
    assert.equal(await dialog.getByRole('alert').count(),0,'cancelling a stale check is silent');
    assert.deepEqual(await saved(),previous,'stale confirmation leaves the saved pickup intact');
   }finally{releaseConfirmation();}
+  await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
+  shrinkBookingWindow=false;
+  await page.evaluate(()=>window.dispatchEvent(new CustomEvent('gokul-request-menu-pickup',{detail:{productId:3}})));
+  await dialog.getByText('Companion Paratha',{exact:true}).waitFor();
+  const recheck=page.waitForResponse(response=>{
+   if(!response.url().endsWith('/availability')||response.request().method()!=='POST')return false;
+   const payload=response.request().postDataJSON();
+   return payload.days>1&&payload.items.some(item=>item.productId===3);
+  });
+  showCompanion=false;
+  await page.clock.runFor(31000);
+  await recheck;
+  await dialog.getByText('No pickup times available for these items on this date. Try another date or remove items.',{exact:true}).waitFor();
+  assert.equal(await dialog.isVisible(),true,'the dish that opened the picker triggers an in-place recheck');
   await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
   await page.evaluate(()=>{
    localStorage.removeItem('gokul-cart');

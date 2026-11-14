@@ -57,9 +57,10 @@ export default function MobileMenuPickup({compactHeader=false,showHelp=false,bra
  const pickupSnapshot=useSyncExternalStore(subscribeToPickupSlot,getPickupSlotSnapshot,getServerPickupSlotSnapshot);
  const cart=useMemo(()=>parseCart(cartSnapshot),[cartSnapshot]);
  const includesCandidate=!!cart.items.length&&candidateId!==null&&!cart.items.some(item=>item.product.id===candidateId);
- const candidate=includesCandidate ? products.find(product=>product.id===candidateId) : undefined;
- const candidateMode=candidate?.saleMode;
- const candidateWeight=candidate?.minimumWeightGrams;
+ const candidate=candidateId===null ? undefined : products.find(product=>product.id===candidateId);
+ const candidateAvailable=candidate?.available;
+ const candidateMode=includesCandidate ? candidate?.saleMode : undefined;
+ const candidateWeight=includesCandidate ? candidate?.minimumWeightGrams : undefined;
  const candidateMissing=includesCandidate&&!candidate;
  const requested=useMemo(()=>{
   const items=availabilityItems(cart.items,cart);
@@ -99,7 +100,7 @@ export default function MobileMenuPickup({compactHeader=false,showHelp=false,bra
    }
   });
   return()=>{c.abort();controller.current?.abort();};
- },[open,branchId,today,days,cart,cartSnapshot,pickupSnapshot,requested,candidateMissing,onChoosingChange]);
+ },[open,branchId,today,days,cart,cartSnapshot,pickupSnapshot,requested,candidateMissing,candidateAvailable,onChoosingChange]);
 
  function choose(trigger:HTMLElement,id:number|null=null){
   if(busy||open)return;
