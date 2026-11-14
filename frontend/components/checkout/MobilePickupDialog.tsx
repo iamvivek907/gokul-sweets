@@ -9,8 +9,8 @@ import type {PickupSelection} from "@/types/pickup";
 const dateLabel=(date:string,locale:"en"|"hi",today:string)=>{const named=new Intl.DateTimeFormat(locale==="hi"?"hi-IN":"en-IN",{weekday:"short",day:"numeric",month:"short",year:"numeric",timeZone:"Asia/Kolkata"}).format(new Date(`${date}T12:00:00+05:30`));const tomorrow=indiaToday(new Date(Date.parse(`${today}T12:00:00+05:30`)+86400000));return `${date===today?`${translate("Today",locale)} · `:date===tomorrow?`${translate("Tomorrow",locale)} · `:""}${named}`;};
 const money=(amount:number)=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR"}).format(amount);
 
-export default function MobilePickupDialog({dates,options,chosen,disabled,onClose,onConfirm,advisory=false,loading=false,initialDate,restoreFocus,checkingItem,branchPhone,today=indiaToday()}:{
- branchPhone?:string|null;checkingItem?:string;loading?:boolean;restoreFocus?:HTMLElement|null;today?:string;initialDate?:string;advisory?:boolean;dates:CartAvailability["dates"];options:PickupSelection[];chosen:PickupSelection|null;disabled:boolean;
+export default function MobilePickupDialog({dates,options,chosen,disabled,onClose,onConfirm,advisory=false,loading=false,availabilityError,initialDate,restoreFocus,checkingItem,branchPhone,today=indiaToday()}:{
+ branchPhone?:string|null;availabilityError?:string;checkingItem?:string;loading?:boolean;restoreFocus?:HTMLElement|null;today?:string;initialDate?:string;advisory?:boolean;dates:CartAvailability["dates"];options:PickupSelection[];chosen:PickupSelection|null;disabled:boolean;
  onClose:()=>void;
  /** True saves the selection, false reports an unavailable slot, and null cancels a stale check. */
  onConfirm:(selection:PickupSelection)=>Promise<boolean|null>;
@@ -63,7 +63,7 @@ export default function MobilePickupDialog({dates,options,chosen,disabled,onClos
   <div className="mobile-pickup-dialog-header"><h2 id="mobile-pickup-title"><T text="Choose pickup date & time" /></h2><button type="button" disabled={checking} onClick={close} aria-label="Close pickup selector"><T text="Close" /> <span aria-hidden="true">×</span></button></div>
   <div className="mobile-pickup-dialog-body">
    <p><T text={advisory?"Choose a time, then confirm. Your cart is kept.":"Choose a date, then tap a pickup time. Nothing changes until you confirm."} /></p>
-   {loading?<p role="status"><T text="Checking times…"/></p>:<>
+   {loading?<p role="status"><T text="Checking times…"/></p>:availabilityError?<p role="alert"><T text={availabilityError}/></p>:<>
    {checkingItem&&<p className="menu-pickup-context"><T text="Pickup times include your cart and"/> <strong>{checkingItem}</strong>. <T text="No item is added until you choose Add."/></p>}
    <div className="mobile-pickup-dates" role="group" aria-label="Pickup dates">{dates.map(day=><button type="button" key={day.date} disabled={disabled||checking} aria-label={day.date} aria-pressed={date===day.date} onClick={()=>{setSelectedDate(day.date);setSelection(null);setError("");}}><strong>{dateLabel(day.date,locale,today)}</strong><small><T text={options.some(option=>option.date===day.date)?"Times available":"No matching time"} /></small></button>)}</div>
    <h3>{date?dateLabel(date,locale,today):""} · <T text="Pickup times" /></h3>
@@ -72,6 +72,6 @@ export default function MobilePickupDialog({dates,options,chosen,disabled,onClos
    </>}
    {error&&<p role="alert">{error}</p>}
   </div>
-  <div className="mobile-pickup-dialog-actions"><button type="button" disabled={checking} onClick={close}><T text="Cancel" /></button><button type="button" disabled={disabled||checking||!selected} onClick={async()=>{if(!selected||confirming.current)return;confirming.current=true;setChecking(true);setError("");try{const confirmed=await onConfirm(selected);if(confirmed===false&&mounted.current)setError("That pickup time is no longer available. Choose another time.");}catch(error){if(mounted.current)setError(error instanceof Error?error.message:"We couldn’t confirm pickup. Please try again.");}finally{confirming.current=false;if(mounted.current)setChecking(false);}}}><T text={checking?"Checking pickup…":"Use this pickup"} /></button></div>
+  <div className="mobile-pickup-dialog-actions"><button type="button" disabled={checking} onClick={close}><T text="Cancel" /></button><button type="button" disabled={disabled||checking||!!availabilityError||!selected} onClick={async()=>{if(!selected||availabilityError||confirming.current)return;confirming.current=true;setChecking(true);setError("");try{const confirmed=await onConfirm(selected);if(confirmed===false&&mounted.current)setError("That pickup time is no longer available. Choose another time.");}catch(error){if(mounted.current)setError(error instanceof Error?error.message:"We couldn’t confirm pickup. Please try again.");}finally{confirming.current=false;if(mounted.current)setChecking(false);}}}><T text={checking?"Checking pickup…":"Use this pickup"} /></button></div>
  </dialog>;
 }

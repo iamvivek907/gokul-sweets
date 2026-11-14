@@ -10,6 +10,7 @@ import {savePickupIntent} from "@/hooks/usePickupIntent";
 import {getMatchingStoredBranchSnapshot} from "@/lib/branchStorage";
 import {getCartSnapshot,getServerCartSnapshot,subscribeToCart,parseCart} from "@/lib/cartStorage";
 import {availabilityItems,checkCartAvailability,discoverPickupDates,MENU_READ_RETRY_DEADLINE_MS,retryMenuRead,type CartAvailability} from "@/services/availabilityApi";
+import {ApiError} from "@/services/apiClient";
 import {cartPickupOptions,branchPickupOptions} from "@/lib/menuPickupOptions";
 import {T,useLanguage,translate} from "@/lib/language";
 import type {MenuProduct} from "@/types/menu";
@@ -52,6 +53,7 @@ export default function MobileMenuPickup({compactHeader=false,showHelp=false,bra
  const namedDate=relativeDate?`${relativeDate}, ${dateLabel}`:dateLabel;
  const timeLabel=(time:string)=>new Intl.DateTimeFormat(locale==="hi"?"hi-IN":"en-IN",{hour:"numeric",minute:"2-digit",hour12:true,timeZone:"Asia/Kolkata"}).format(new Date(`2000-01-01T${time}+05:30`));
  const [data,setData]=useState<CartAvailability|null>(null),[open,setOpen]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState("");
+ const [pickerError,setPickerError]=useState("");
  const [candidateId,setCandidateId]=useState<number|null>(null);
  const cartSnapshot=useSyncExternalStore(subscribeToCart,getCartSnapshot,getServerCartSnapshot);
  const pickupSnapshot=useSyncExternalStore(subscribeToPickupSlot,getPickupSlotSnapshot,getServerPickupSlotSnapshot);
@@ -79,10 +81,13 @@ export default function MobileMenuPickup({compactHeader=false,showHelp=false,bra
   controller.current=c;
   queueMicrotask(async()=>{
    if(c.signal.aborted)return;
-   setBusy(true);setData(null);setError("");
+   setBusy(true);setData(null);setError("");setPickerError("");
    try{
     if(cart.items.length&&cart.branchId!==branchId)throw new Error("Choose your cart’s branch before changing pickup.");
-    if(candidateMissing)throw new Error("This item is no longer available. Open pickup times again.");
+    if(candidateMissing){
+     setPickerError("This item is no longer available.");
+     return;
+    }
     if(requested.length>100)throw new Error("Review this large cart at checkout before changing pickup.");
     const signal=AbortSignal.any([c.signal,AbortSignal.timeout(MENU_READ_RETRY_DEADLINE_MS)]);
     const value=await retryMenuRead(attempt => requested.length
@@ -92,7 +97,11 @@ export default function MobileMenuPickup({compactHeader=false,showHelp=false,bra
     if(getMatchingStoredBranchSnapshot(branchId)===null)throw new Error("Your branch changed. Open pickup times again.");
     setData(value);
    }catch(error){
-    if(c.signal.aborted)return;
+    if(c.signal.aborted||cartSnapshot!==getCartSnapshot()||pickupSnapshot!==getPickupSlotSnapshot())return;
+    if(error instanceof ApiError&&error.status===400){
+     setPickerError(error.message);
+     return;
+    }
     setOpen(false);onChoosingChange?.(false);
     setError(error instanceof Error?error.message:"We couldn’t load pickup times. Your cart is saved. Try again.");
    }finally{
@@ -105,7 +114,7 @@ export default function MobileMenuPickup({compactHeader=false,showHelp=false,bra
  function choose(trigger:HTMLElement,id:number|null=null){
   if(busy||open)return;
   setCandidateId(id);
-  setPickerTrigger(trigger);setData(null);setBusy(true);setOpen(true);
+  setPickerTrigger(trigger);setData(null);setPickerError("");setBusy(true);setOpen(true);
   onChoosingChange?.(true);
  }
  useEffect(()=>{
@@ -134,15 +143,21 @@ export default function MobileMenuPickup({compactHeader=false,showHelp=false,bra
 </>;
  return <>{headerHost&&createPortal(<div className="menu-compact-header" aria-label="Menu pickup header" aria-hidden={!compact} inert={!compact}><button className="menu-compact-pickup" data-ordering-target={compact?"pickup":undefined} type="button" disabled={busy||open} onClick={event=>{if(availabilityError&&!error){onRetry?.();return;}void choose(event.currentTarget);}} aria-label={`${compactLabel} · ${busy?translate('Checking times…',locale):compactError?translate('Pickup times unavailable. Tap to retry.',locale):compactTime}`}><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 2v6m8-6v6M4 10h16"/></svg><span><strong>{compactLabel}</strong><small role={compactError?"alert":undefined}>{busy?<T text="Checking times…"/>:compactError?<T text="Pickup times unavailable. Tap to retry."/>:compactTime}</small></span><span aria-hidden="true">⌄</span></button><button id="gokul-menu-header-search" className="menu-compact-search" type="button" aria-label="Search the menu" onClick={searchMenu}><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="7.5"/><path d="m16 16 5 5"/></svg></button></div>,headerHost)}<section ref={pickupRef} className="mobile-menu-pickup" data-menu-refined={compactHeader || undefined} data-pickup-state={expired||selectionUnavailable||noPickupMessage||availabilityError||error?"attention":selection?"selected":"choose"} aria-label="Menu pickup time"><svg className="reference-pickup-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 2v6m8-6v6M4 10h16"/></svg><div><span><T text={automatic?"Soonest pickup":"PICKUP TIME"}/>{branchName&&<> · {branchName}</>}</span><strong>{selection&&!expired&&!selectionUnavailable?`${namedDate} · ${timeLabel(selection.slot.startTime)}–${timeLabel(selection.slot.endTime)} IST`:displayDate?`${namedDate} · ${translate("Time not selected",locale)}`:noPickupMessage?<T text="No normal pickup times found"/>:<T text="Choose pickup date & time"/> }</strong></div><button className="relative" data-ordering-target="pickup" type="button" aria-busy={busy} aria-label={busy?translate("Checking times…",locale):undefined} disabled={busy||open} onClick={event=>void choose(event.currentTarget)}><span className={busy?"invisible":undefined}><T text={selection?"Change time":"Choose time"}/></span>{busy&&<span className="absolute inset-0 flex items-center justify-center"><T text="Checking times…"/></span>}</button>{help}
  {compactHeader?<div className="menu-pickup-notices">{notices}</div>:notices}
- {open&&<Dialog branchPhone={branchPhone} checkingItem={products.find(p=>p.id===candidateId)?.name} loading={busy} restoreFocus={pickerTrigger} advisory today={today} dates={data?.dates??[]} options={data?(requested.length?cartPickupOptions(data):branchPickupOptions(data)):[]} chosen={selection} initialDate={date??today} disabled={busy} onClose={()=>{controller.current?.abort();setBusy(false);setOpen(false);onChoosingChange?.(false);}} onConfirm={async value=>{
-  if(getMatchingStoredBranchSnapshot(branchId)===null||cartSnapshot!==getCartSnapshot()||pickupSnapshot!==getPickupSlotSnapshot()||candidateMissing)return null;
+ {open&&<Dialog branchPhone={branchPhone} availabilityError={pickerError} checkingItem={products.find(p=>p.id===candidateId)?.name} loading={busy} restoreFocus={pickerTrigger} advisory today={today} dates={data?.dates??[]} options={data?(requested.length?cartPickupOptions(data):branchPickupOptions(data)):[]} chosen={selection} initialDate={date??today} disabled={busy} onClose={()=>{controller.current?.abort();setBusy(false);setOpen(false);onChoosingChange?.(false);}} onConfirm={async value=>{
+  if(getMatchingStoredBranchSnapshot(branchId)===null||cartSnapshot!==getCartSnapshot()||pickupSnapshot!==getPickupSlotSnapshot()||candidateMissing||pickerError)return null;
   const amounts=new Set(requested.map(item=>item.productId));
   const c=new AbortController();controller.current=c;
   const signal=AbortSignal.any([c.signal,AbortSignal.timeout(MENU_READ_RETRY_DEADLINE_MS)]);
   const fresh=await retryMenuRead(attempt => requested.length
    ? checkCartAvailability(branchId,value.date,1,requested,attempt)
    : discoverPickupDates(branchId,value.date,1,attempt), signal).catch(error=>{
-    if(c.signal.aborted)return null;
+    if(c.signal.aborted||getMatchingStoredBranchSnapshot(branchId)===null
+     ||pickupSnapshot!==getPickupSlotSnapshot()||cartSnapshot!==getCartSnapshot())return null;
+    if(error instanceof ApiError&&error.status===400){
+     setData(null);
+     setPickerError(error.message);
+     return null;
+    }
     throw error;
    });
   if(!fresh||c.signal.aborted||getMatchingStoredBranchSnapshot(branchId)===null||pickupSnapshot!==getPickupSlotSnapshot()||cartSnapshot!==getCartSnapshot())return null;

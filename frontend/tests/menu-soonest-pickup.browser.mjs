@@ -42,10 +42,12 @@ try{for(const width of [320,390,1280]){
    }
    if(outage)return route.fulfill({status:503,headers,json:{message:'Offline'}});
    const dates=payload.days===1?[date]:shrinkBookingWindow?[tomorrow]:[tomorrow,later];
-   const canBook=!payload.items.some(item=>item.productId===3&&!showCompanion);
+   if(payload.items.some(item=>item.productId===3&&!showCompanion)){
+    return route.fulfill({status:400,headers,json:{code:'INVALID_REQUEST',message:'Companion Paratha is sold out.'}});
+   }
    json={today,maximumDate:dates.at(-1),dates:dates.map(value=>({
-    date:value,available:canBook,items:payload.items.map(item=>({productId:item.productId,available:item.productId!==3||showCompanion})),
-    slots:[{slot:slot(value,[today,tomorrow,later].indexOf(value)+1),normalAvailable:canBook,issues:[]}]
+    date:value,available:true,items:payload.items.map(item=>({productId:item.productId,available:item.productId!==3||showCompanion})),
+    slots:[{slot:slot(value,[today,tomorrow,later].indexOf(value)+1),normalAvailable:true,issues:[]}]
    }))};
   }
   try{await route.fulfill({headers,json});}catch(error){if(!heldConfirmation)throw error;}
@@ -166,9 +168,15 @@ try{for(const width of [320,390,1280]){
   });
   showCompanion=false;
   await page.clock.runFor(31000);
-  await recheck;
-  await dialog.getByText('No pickup times available for these items on this date. Try another date or remove items.',{exact:true}).waitFor();
+  assert.equal((await recheck).status(),400);
+  await dialog.getByRole('alert').getByText('Companion Paratha is sold out.',{exact:true}).waitFor();
+  assert.equal(await confirm.isDisabled(),true);
+  assert.deepEqual(await saved(),previous,'a sold-out dish leaves the saved pickup intact');
   assert.equal(await dialog.isVisible(),true,'the dish that opened the picker triggers an in-place recheck');
+  showCompanion=true;
+  await page.clock.runFor(31000);
+  await standard.waitFor();
+  assert.equal(await dialog.getByRole('alert').count(),0,'the open picker recovers when the dish returns');
   await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
   await page.evaluate(()=>{
    localStorage.removeItem('gokul-cart');
