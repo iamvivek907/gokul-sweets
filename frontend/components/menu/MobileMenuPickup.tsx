@@ -162,9 +162,10 @@ export default function MobileMenuPickup({compactHeader=false,showHelp=false,bra
    if(!(error instanceof ApiError)||error.status!==400)throw error;
    // A rejection for one date does not establish that the entire booking window is closed.
    try{
-    const window=await readPickupOptions(today,days+1,signal);
+    const recoverySignal=AbortSignal.any([c.signal,AbortSignal.timeout(MENU_READ_RETRY_DEADLINE_MS)]);
+    const updated=await readPickupOptions(today,days+1,recoverySignal);
     if(!isCurrentPickupRequest(c.signal))return null;
-    setData(window);
+    setData(updated);
     return false;
    }catch(refreshError){
     if(!isCurrentPickupRequest(c.signal))return null;

@@ -176,6 +176,8 @@ try{for(const width of [320,390,1280]){
   await page.waitForFunction(date=>document.querySelector(`.mobile-pickup-dates button[aria-label="${date}"]`)?.getAttribute('aria-pressed')==='true',tomorrow);
   assert.equal(await laterDate.count(),0,'confirmation recovery shows the remaining booking window');
   assert.equal(await standard.isEnabled(),true);
+  await standard.click();
+  assert.equal(await confirm.isEnabled(),true,'a remaining slot can be confirmed after the date rejection');
   assert.deepEqual(await saved(),previous,'reloading the booking window leaves the saved pickup intact');
   await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
   shrinkBookingWindow=false;
