@@ -149,10 +149,25 @@ public class StaffSessionFilter extends OncePerRequestFilter {
         }
     }
 
+    /**
+     * Returns a structured rejection before an authenticated write reaches its handler.
+     *
+     * @param response the response for the rejected request
+     * @param code the staff session error code recognized by the admin client
+     * @throws IOException if the error response cannot be written
+     */
     private static void rejectWrite(HttpServletResponse response, String code) throws IOException {
-        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-        response.setHeader("Cache-Control", "no-store");
-        response.setContentType("application/json");
-        response.getWriter().write("{\"code\":\"" + code + "\"}");
+        final long started =
+                MethodTiming.start(
+                        StaffSessionFilter.class, "rejectWrite(HttpServletResponse,String)");
+        try {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.setHeader("Cache-Control", "no-store");
+            response.setContentType("application/json");
+            response.getWriter().write("{\"code\":\"" + code + "\"}");
+        } finally {
+            MethodTiming.finish(
+                    started, StaffSessionFilter.class, "rejectWrite(HttpServletResponse,String)");
+        }
     }
 }
