@@ -35,6 +35,7 @@ export function AdminAuthProvider({children}: {children: ReactNode}) {
     const [verificationFailed, setVerificationFailed] = useState(false);
     const pending = useRef<{controller: AbortController; done: Promise<void>} | null>(null);
     const changingSession = useRef(false);
+    const signOutRequest = useRef<AbortController | null>(null);
     const recheckSession = useRef(false);
 
     const cancelCheck = useCallback(() => {
@@ -84,6 +85,7 @@ export function AdminAuthProvider({children}: {children: ReactNode}) {
         window.addEventListener("online", check);
         return () => {
             cancelCheck();
+            signOutRequest.current?.abort();
             channel?.close();
             window.removeEventListener(staffSessionCheckEvent, check);
             window.removeEventListener(staffCsrfRejectedEvent, checkChangedSession);
@@ -119,21 +121,28 @@ export function AdminAuthProvider({children}: {children: ReactNode}) {
         if (changingSession.current) throw new Error("A sign-in change is already in progress.");
         changingSession.current = true;
         cancelCheck();
+        const controller = new AbortController();
+        signOutRequest.current = controller;
         try {
-            await logoutAdmin();
-            setProfile(null);
+            const verifiedProfile = await logoutAdmin(controller.signal);
+            if (controller.signal.aborted) return;
+            setProfile(verifiedProfile);
             setVerificationFailed(false);
             setReady(true);
+            if (verifiedProfile) {
+                throw new Error("Sign-out could not be confirmed. Check your connection and try again.");
+            }
             broadcast();
         } finally {
-            finishSessionChange();
+            signOutRequest.current = null;
+            if (!controller.signal.aborted) finishSessionChange();
         }
     }, [cancelCheck, finishSessionChange]);
 
     const hasPermission = useCallback((permission: string) => !!profile &&
         (profile.roleName === "OWNER_ADMIN" || profile.permissions.includes(permission)), [profile]);
     const hasAnyPermission = useCallback((permissions: string[]) => permissions.some(hasPermission), [hasPermission]);
-    const value = useMemo(() => ({profile, authorization: profile ? "staff-session" : null,
+    const value = useMemo(() => ({profile, authorization: profile ? `staff-session:${profile.staffId}` : null,
         ready, verificationFailed, isAuthenticated: !!profile, login, refresh, logout, hasPermission, hasAnyPermission}),
         [profile, ready, verificationFailed, login, refresh, logout, hasPermission, hasAnyPermission]);
     return <AdminAuthContext.Provider value={value}>{children}</AdminAuthContext.Provider>;

@@ -194,6 +194,16 @@ function todayInBusinessZone() {
 }
 
 
+function sameStaffDetails(original: AdminStaff, current: AdminStaff) {
+    return original.id === current.id
+        && original.fullName === current.fullName
+        && original.phone === current.phone
+        && original.roleName === current.roleName
+        && original.active === current.active
+        && original.branchIds.length === current.branchIds.length
+        && original.branchIds.every(id => current.branchIds.includes(id));
+}
+
 export default function AdminStaffPage() {
 
     const {
@@ -303,6 +313,9 @@ export default function AdminStaffPage() {
 
     const [loadAttempt, setLoadAttempt] = useState(0);
     const loadedStaff = useRef(false);
+    const mutation = useRef<AbortController | null>(null);
+    const [editingSnapshot, setEditingSnapshot] = useState<AdminStaff | null>(null);
+    useEffect(() => () => mutation.current?.abort(), []);
 
     const [
         saving,
@@ -373,6 +386,9 @@ export default function AdminStaffPage() {
             ]
         );
 
+
+    const draftConflict = !createMode && editingSnapshot !== null
+        && (!selectedStaff || !sameStaffDetails(editingSnapshot, selectedStaff));
 
     const filteredStaff =
         useMemo(
@@ -487,6 +503,7 @@ export default function AdminStaffPage() {
                         const firstStaff = staffResult[0] ?? null;
                         setOptions(optionsResult);
                         setSelectedStaffId(firstStaff?.id ?? null);
+                        setEditingSnapshot(firstStaff);
                         setForm(firstStaff ? toFormState(firstStaff) : EMPTY_FORM);
                         loadedStaff.current = true;
                     }
@@ -553,6 +570,7 @@ export default function AdminStaffPage() {
     function selectStaff(
         item: AdminStaff
     ) {
+        setEditingSnapshot(item);
 
         setCreateMode(
             false
@@ -598,6 +616,7 @@ export default function AdminStaffPage() {
 
 
     function beginCreate() {
+        setEditingSnapshot(null);
 
         setCreateMode(
             true
@@ -658,6 +677,7 @@ export default function AdminStaffPage() {
     }
 
     function applySavedStaff(saved: AdminStaff) {
+        setEditingSnapshot(saved);
         setStaff(current => {
             const next = current.some(member => member.id === saved.id)
                 ? current.map(member => member.id === saved.id ? saved : member)
@@ -676,13 +696,15 @@ export default function AdminStaffPage() {
             ||
             loading
             ||
-            saving
+            saving || draftConflict || mutation.current
         ) {
 
             return;
         }
 
 
+        const controller = new AbortController();
+        mutation.current = controller;
         setSaving(
             true
         );
@@ -1007,8 +1029,10 @@ export default function AdminStaffPage() {
                 const created =
                     await createAdminStaff(
                         request,
-                        authorization
+                        authorization,
+                        controller.signal
                     );
+                if (controller.signal.aborted) return;
 
 
                 setCreateMode(
@@ -1064,8 +1088,10 @@ export default function AdminStaffPage() {
                 await updateAdminStaff(
                     selectedStaffId,
                     request,
-                    authorization
+                    authorization,
+                    controller.signal
                 );
+            if (controller.signal.aborted) return;
 
 
             setSuccess(
@@ -1076,6 +1102,7 @@ export default function AdminStaffPage() {
             applySavedStaff(updated);
 
         } catch (exception) {
+            if (controller.signal.aborted) return;
 
             setError(
                 (exception instanceof TypeError || (exception instanceof DOMException && exception.name === "TimeoutError"))
@@ -1084,10 +1111,8 @@ export default function AdminStaffPage() {
             );
 
         } finally {
-
-            setSaving(
-                false
-            );
+            mutation.current = null;
+            if (!controller.signal.aborted) setSaving(false);
         }
     }
 
@@ -1101,7 +1126,7 @@ export default function AdminStaffPage() {
             ||
             loading
             ||
-            saving
+            saving || draftConflict || mutation.current
         ) {
 
             return;
@@ -1135,6 +1160,8 @@ export default function AdminStaffPage() {
         }
 
 
+        const controller = new AbortController();
+        mutation.current = controller;
         setSaving(
             true
         );
@@ -1155,8 +1182,10 @@ export default function AdminStaffPage() {
             await resetAdminStaffPassword(
                 selectedStaff.id,
                 newPassword,
-                authorization
+                authorization,
+                controller.signal
             );
+            if (controller.signal.aborted) return;
 
 
             setPasswordResetOpen(
@@ -1181,6 +1210,7 @@ export default function AdminStaffPage() {
             );
 
         } catch (exception) {
+            if (controller.signal.aborted) return;
 
             setError(
                 (exception instanceof TypeError || (exception instanceof DOMException && exception.name === "TimeoutError"))
@@ -1189,10 +1219,8 @@ export default function AdminStaffPage() {
             );
 
         } finally {
-
-            setSaving(
-                false
-            );
+            mutation.current = null;
+            if (!controller.signal.aborted) setSaving(false);
         }
     }
 
@@ -1416,6 +1444,19 @@ export default function AdminStaffPage() {
                     )
                 }
 
+
+                {draftConflict && (
+                    <div role="alert" className="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm">
+                        {selectedStaff
+                            ? "This staff record changed after you started editing. Review the latest details before saving."
+                            : "This staff record is no longer available. Select another staff member to continue."}
+                        {selectedStaff && (
+                            <button type="button" className="ml-3 underline" onClick={() => selectStaff(selectedStaff)}>
+                                Discard draft and load latest details
+                            </button>
+                        )}
+                    </div>
+                )}
 
                 {
                     success
@@ -2656,7 +2697,7 @@ export default function AdminStaffPage() {
                                             <button
                                                 type="button"
                                                 disabled={
-                                                    loading || saving
+                                                    loading || saving || draftConflict
                                                 }
                                                 onClick={
                                                     () => {
@@ -2755,30 +2796,14 @@ export default function AdminStaffPage() {
                                                         }
                                                         onClick={
                                                             () => {
-
-                                                                setCreateMode(
-                                                                    false
-                                                                );
-
-
-                                                                const firstStaff =
-                                                                    staff[0]
-                                                                    ?? null;
-
-
-                                                                setSelectedStaffId(
-                                                                    firstStaff?.id
-                                                                    ?? null
-                                                                );
-
-
-                                                                setForm(
-                                                                    firstStaff
-                                                                        ? toFormState(
-                                                                            firstStaff
-                                                                        )
-                                                                        : EMPTY_FORM
-                                                                );
+                                                                const firstStaff = staff[0];
+                                                                if (firstStaff) {
+                                                                    selectStaff(firstStaff);
+                                                                } else {
+                                                                    setCreateMode(false);
+                                                                    setEditingSnapshot(null);
+                                                                    setForm(EMPTY_FORM);
+                                                                }
                                                             }
                                                         }
                                                         className="
@@ -2880,7 +2905,7 @@ export default function AdminStaffPage() {
                                                             <button
                                                                 type="button"
                                                                 disabled={
-                                                                    loading || saving
+                                                                    loading || saving || draftConflict
                                                                     ||
                                                                     newPassword.length < 8
                                                                     ||

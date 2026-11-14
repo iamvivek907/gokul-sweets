@@ -10,6 +10,7 @@ const owner = {id: 7, username: "owner", fullName: "Test Owner", roleName: "OWNE
 const manager = {id: 8, username: "manager", fullName: "Test Manager", roleName: "MANAGER", branchIds: [1], phone: null, active: true};
 const profile = {...owner, staffId: owner.id, permissions: ["STAFF_MANAGE"]};
 let sessionStatus = 503;
+let managerChanged = false;
 const csrf = "initial-token";
 let createAttempts = 0;
 let loseCreateResponse = false;
@@ -42,7 +43,7 @@ await context.route("**/api/**", async route => {
     });
     if (path === "/api/admin/staff" && method === "GET") {
         staffReads++;
-        return respond(200, created ? [owner, manager] : [owner]);
+        return respond(200, created ? [owner, {...manager, active: !managerChanged}] : [owner]);
     }
     const isCreate = path === "/api/admin/staff" && method === "POST";
     const isReset = path === "/api/admin/staff/7/password" && method === "PATCH";
@@ -104,6 +105,17 @@ try {
     await page.getByRole("alert").filter({hasText: "Sign-out could not be confirmed."}).waitFor();
     assert.match(page.url(), /\/admin\/staff$/);
     assert.equal(await staffInput("Full Name").inputValue(), "Test Manager");
+
+    await page.getByRole("button", {name: /Test Manager/}).click();
+    await staffInput("Phone").fill("9000000000");
+    managerChanged = true;
+    await page.getByRole("button", {name: "Refresh staff list", exact: true}).click();
+    await page.getByRole("alert").filter({hasText: "This staff record changed"}).waitFor();
+    assert.equal(await staffInput("Phone").inputValue(), "9000000000");
+    assert.equal(await page.getByRole("button", {name: "Save Changes", exact: true}).isDisabled(), true);
+    await page.getByRole("button", {name: "Discard draft and load latest details", exact: true}).click();
+    assert.equal(await staffInput("Phone").inputValue(), "");
+    assert.equal(await page.getByRole("button", {name: "Save Changes", exact: true}).isEnabled(), true);
 
     await page.getByRole("button", {name: /Test Owner/}).click();
     await page.getByRole("button", {name: "Reset Password", exact: true}).click();

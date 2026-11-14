@@ -149,7 +149,8 @@ export async function getAdminStaffOptions(
 
 export async function createAdminStaff(
     request: CreateAdminStaffRequest,
-    authorization: string
+    authorization: string,
+    signal?: AbortSignal
 ): Promise<AdminStaff> {
 
     const response =
@@ -158,7 +159,9 @@ export async function createAdminStaff(
             authorization,
             {
                 method: "POST",
-                signal: AbortSignal.timeout(30000),
+                signal: signal
+                    ? AbortSignal.any([signal, AbortSignal.timeout(30000)])
+                    : AbortSignal.timeout(30000),
 
                 headers: {
                     "Content-Type": "application/json"
@@ -184,7 +187,8 @@ export async function createAdminStaff(
 export async function updateAdminStaff(
     staffId: number,
     request: UpdateAdminStaffRequest,
-    authorization: string
+    authorization: string,
+    signal?: AbortSignal
 ): Promise<AdminStaff> {
 
     const response =
@@ -193,7 +197,9 @@ export async function updateAdminStaff(
             authorization,
             {
                 method: "PUT",
-                signal: AbortSignal.timeout(30000),
+                signal: signal
+                    ? AbortSignal.any([signal, AbortSignal.timeout(30000)])
+                    : AbortSignal.timeout(30000),
 
                 headers: {
                     "Content-Type": "application/json"
@@ -219,7 +225,8 @@ export async function updateAdminStaff(
 export async function resetAdminStaffPassword(
     staffId: number,
     newPassword: string,
-    authorization: string
+    authorization: string,
+    signal?: AbortSignal
 ): Promise<void> {
 
     const response =
@@ -228,7 +235,9 @@ export async function resetAdminStaffPassword(
             authorization,
             {
                 method: "PATCH",
-                signal: AbortSignal.timeout(30000),
+                signal: signal
+                    ? AbortSignal.any([signal, AbortSignal.timeout(30000)])
+                    : AbortSignal.timeout(30000),
 
                 headers: {
                     "Content-Type": "application/json"

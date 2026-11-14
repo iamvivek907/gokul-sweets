@@ -109,7 +109,7 @@ test("failed sign-out preserves a verified session and can be retried", async ()
     await new Promise(setImmediate);
     assert.match(f.requests.at(-1).url, /auth\/me$/);
     f.requests.at(-1).resolve(response(200, "csrf", profile));
-    await assert.rejects(failed, /Sign-out could not be confirmed/);
+    assert.deepEqual(await failed, profile);
     const retry = f.api.logoutAdmin();
     assert.equal(f.requests.at(-1).init.headers.get("X-Staff-CSRF"), "csrf");
     f.requests.at(-1).resolve(response(204));
@@ -152,4 +152,31 @@ test("a verification from before a cross-tab session change cannot overwrite the
     assert.equal(f.requests.at(-1).init.headers.get("X-Staff-CSRF"), "fresh-csrf");
     f.requests.at(-1).resolve(response(201));
     await write;
+});
+
+test("sign-out fallback returns the verified identity and blocks writes from the prior account", async () => {
+    const f = setup();
+    await verify(f);
+    const logout = f.api.logoutAdmin();
+    f.requests.at(-1).resolve(response(503));
+    await new Promise(setImmediate);
+    const newProfile = {staffId: 2, username: "other"};
+    f.requests.at(-1).resolve(response(200, "other-csrf", newProfile));
+    assert.deepEqual(await logout, newProfile);
+    const count = f.requests.length;
+    await assert.rejects(f.api.adminFetch("/api/admin/staff", "staff-session:1", {method: "POST"}), /account changed/);
+    assert.equal(f.requests.length, count);
+});
+
+test("sign-out cancellation releases the request and skips fallback verification", async () => {
+    const f = setup();
+    await verify(f);
+    const controller = new AbortController();
+    const logout = f.api.logoutAdmin(controller.signal);
+    const request = f.requests.at(-1);
+    controller.abort();
+    assert.equal(request.init.signal.aborted, true);
+    request.reject(controller.signal.reason);
+    await assert.rejects(logout, {name: "AbortError"});
+    assert.equal(f.requests.length, 2);
 });

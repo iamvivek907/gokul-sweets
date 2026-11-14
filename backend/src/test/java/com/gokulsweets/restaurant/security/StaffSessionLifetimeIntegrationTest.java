@@ -136,12 +136,12 @@ class StaffSessionLifetimeIntegrationTest {
         var user = user("OWNER_ADMIN");
         var signIn = sessions.issue(user);
         var start = clock.instant();
-        assertThat(
-                        jdbc.queryForObject(
-                                "SELECT expires_at FROM staff_sessions WHERE token_hash=?",
-                                (r, n) -> r.getTimestamp(1).toInstant(),
-                                StaffSessionService.hash(signIn.token())))
-                .isEqualTo(start.plus(Duration.ofHours(12)));
+        Instant expiresAt =
+                jdbc.queryForObject(
+                        "SELECT expires_at FROM staff_sessions WHERE token_hash=?",
+                        (r, n) -> r.getTimestamp(1).toInstant(),
+                        StaffSessionService.hash(signIn.token()));
+        assertThat(expiresAt).isEqualTo(start.plus(Duration.ofHours(12)));
         // Older cookies may still have a 15-hour expiry in the database.
         jdbc.update(
                 "UPDATE staff_sessions SET expires_at=? WHERE token_hash=?",

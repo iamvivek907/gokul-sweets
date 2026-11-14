@@ -3,14 +3,16 @@ import {ADMIN_API_BASE_URL} from "@/lib/constants";
 
 const API_BASE = ADMIN_API_BASE_URL;
 let csrfToken: string | null = null;
+let verifiedStaffId: number | null = null;
 let sessionVersion = 0;
 
 export const staffSessionCheckEvent = "gokul-admin-check-session";
 export const staffCsrfRejectedEvent = "gokul-admin-csrf-rejected";
 export const staffReauthenticationEvent = "gokul-admin-reauthenticate";
 
-function rememberCsrf(response: Response) {
-    csrfToken = response.headers.get("X-Staff-CSRF");
+function rememberSession(profile: AdminProfile | null, response: Response) {
+    verifiedStaffId = profile?.staffId ?? null;
+    csrfToken = profile ? response.headers.get("X-Staff-CSRF") : null;
 }
 export class StaffEnrollmentRequired extends Error {
     constructor(readonly token: string) {super("Set up an authenticator before accessing the staff portal.");}
@@ -30,7 +32,7 @@ export async function authenticateAdmin(username: string, password: string, code
     if (!response.ok) throw new Error("Unable to sign in. Check that secure staff sessions are enabled.");
     const {profile} = await response.json() as {profile: AdminProfile};
     sessionVersion++;
-    rememberCsrf(response);
+    rememberSession(profile, response);
     return profile;
 }
 export async function setupStaffMfa(token: string): Promise<{secret: string; uri: string}> {
@@ -41,9 +43,9 @@ export async function setupStaffMfa(token: string): Promise<{secret: string; uri
 export async function confirmStaffMfa(token: string, code: string): Promise<{profile: AdminProfile; recoveryCodes: string[]}> {
     const response = await request("/api/admin/auth/mfa/confirm", {token, code});
     if (!response.ok) throw new Error("Invalid authenticator code. Check your device clock and retry.");
-    const result = await response.json();
+    const result = await response.json() as {profile: AdminProfile; recoveryCodes: string[]};
     sessionVersion++;
-    rememberCsrf(response);
+    rememberSession(result.profile, response);
     return result;
 }
 export async function fetchAdminProfile(signal?: AbortSignal): Promise<AdminProfile | null> {
@@ -58,38 +60,49 @@ export async function fetchAdminProfile(signal?: AbortSignal): Promise<AdminProf
     const profile = response.status === 401 ? null : await response.json() as AdminProfile;
     requestSignal.throwIfAborted();
     if (version !== sessionVersion) throw new Error("A newer staff session is active.");
-    csrfToken = profile ? response.headers.get("X-Staff-CSRF") : null;
+    rememberSession(profile, response);
     return profile;
 }
 export function invalidateAdminSessionCheck() {
     sessionVersion++;
     csrfToken = null;
+    verifiedStaffId = null;
 }
 
-export async function logoutAdmin(): Promise<void> {
+export async function logoutAdmin(signal?: AbortSignal): Promise<AdminProfile | null> {
+    const timeout = AbortSignal.timeout(10000);
+    const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
     try {
         const response = await adminFetch("/api/admin/auth/logout", "staff-session", {
-            method: "POST", signal: AbortSignal.timeout(10000)
+            method: "POST", signal: requestSignal
         });
         if (response.ok) {
+            signal?.throwIfAborted();
             invalidateAdminSessionCheck();
-            return;
+            return null;
         }
     } catch {
         // The server may have revoked the session before the response was lost.
     }
 
-    const signedOut = await fetchAdminProfile().then(profile => profile === null, () => false);
-    if (!signedOut) throw new Error("Sign-out could not be confirmed. Check your connection and try again.");
-    invalidateAdminSessionCheck();
+    signal?.throwIfAborted();
+    const profile = await fetchAdminProfile(signal).catch(() => {
+        throw new Error("Sign-out could not be confirmed. Check your connection and try again.");
+    });
+    if (!profile) invalidateAdminSessionCheck();
+    return profile;
 }
-/** The authorization argument remains for existing admin callers; it is only a presence marker. */
-export async function adminFetch(path: string, _authorization: string, init?: RequestInit): Promise<Response> {
+/** Scoped callers bind a write to the staff identity shown on their page. */
+export async function adminFetch(path: string, authorization: string, init?: RequestInit): Promise<Response> {
     const version = sessionVersion;
     const headers = new Headers(init?.headers);
     const method = (init?.method ?? "GET").toUpperCase();
     const changing = !["GET", "HEAD", "OPTIONS"].includes(method);
     if (changing) {
+        if (verifiedStaffId !== null && authorization.startsWith("staff-session:")
+            && authorization !== `staff-session:${verifiedStaffId}`) {
+            throw new Error("The active staff account changed. Reopen this page and try again.");
+        }
         if (!csrfToken) {
             if (typeof window !== "undefined") window.dispatchEvent(new Event(staffSessionCheckEvent));
             throw new Error("Unable to verify the session for this change. Check your connection and try again.");
