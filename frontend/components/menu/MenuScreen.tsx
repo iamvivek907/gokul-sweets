@@ -230,7 +230,11 @@ export default function MenuScreen() {
         setError(null);
         setRefreshError(null);
     }, [branchId]);
-    useMenuServiceRefresh(settledLoad === loadKey ? branchId : undefined, rawCategories, setCategories, publishMenuRefresh);
+    const reportMenuRefreshFailure = useCallback(() => {
+        setRefreshError("The menu could not refresh. Your cart is saved. Prices and availability will be checked before ordering.");
+    }, []);
+    useMenuServiceRefresh(settledLoad === loadKey ? branchId : undefined,
+        rawCategories, setCategories, publishMenuRefresh, reportMenuRefreshFailure);
 
     const [
         cartNotice,
@@ -767,7 +771,7 @@ export default function MenuScreen() {
     const pickupStatusMessage = pickupCheck.error || pickupCheck.automaticError ? "Pickup check failed. Please retry."
         : pickupCheck.pickupRequired&&!pickupCheck.findingSoonest ? "Choose pickup time to add" : "";
     const pickupStockById=useMemo(()=>new Map(pickupCheck.items?.map(item=>[item.productId,item])),[pickupCheck.items]);
-    const pickupAllows = (id:number) => !pickupCheck.features?.smartAvailability || !!pickupCheck.intent.selection && pickupCheck.intent.pickupRaw === getPickupSlotSnapshot() && pickupIsFresh(pickupCheck.intent.selection,new Date()) && !pickupCheck.findingSoonest && !pickupChecking && pickupStockById.get(id)?.available === true;
+    const pickupAllows = (id:number) => !pickupCheck.features?.smartAvailability || !!pickupCheck.intent.selection && pickupCheck.intent.pickupRaw === getPickupSlotSnapshot() && pickupIsFresh(pickupCheck.intent.selection,new Date()) && !pickupCheck.findingSoonest && !pickupChecking && performance.now() < (pickupCheck.deadline ?? Infinity) && pickupStockById.get(id)?.available === true;
     const [availableOnly,setAvailableOnly]=useState(false);
     const filterByPickup = availableOnly && pickupCheck.features?.smartAvailability === true;
     // The menu may keep showing an earlier preview while cart quantities refresh.

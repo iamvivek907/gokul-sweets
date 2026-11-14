@@ -196,3 +196,28 @@ test('cart pickup recovery retries the same whole cart without using the menu pr
  assert.deepEqual(f.calls[1].body,f.calls[0].body);
  assert.equal(f.calls[1].body.items[0].quantity,7);
 });
+
+test('a multi-batch preview that expires before completion is replaced before publication',async()=>{
+ let now=0;
+ const f=fixture(async(body,n)=>{
+  if(n===2){await new Promise(resolve=>setImmediate(resolve));now=6000;}
+  const data=response(body);
+  return {...data,observedAt:'2026-10-08T10:00:00Z',recheckAt:n===1?'2026-10-08T10:00:02Z':'2026-10-08T10:00:30Z',
+   dates:data.dates.map(day=>({...day,items:day.items.map(item=>({...item,available:n<=2}))}))};
+ },{setTimeout,clearTimeout,performance:{now:()=>now}});
+ const signal=new AbortController().signal;
+ const result=await f.readFreshMenuPreview(()=>f.checkMenuAvailability(1,'2026-10-08',1,items.slice(0,101),signal),signal);
+ assert.equal(f.calls.length,4);
+ assert.equal(result.dates[0].items[0].available,false);
+});
+
+test('repeated expired previews stop after one refresh',async()=>{
+ const f=fixture(response,{setTimeout,clearTimeout,performance:{now:()=>2000}});
+ const signal=new AbortController().signal;
+ let attempts=0;
+ await assert.rejects(f.readFreshMenuPreview(async()=>{
+  attempts++;
+  return {observedAt:'2026-10-08T10:00:00Z',recheckAt:'2026-10-08T10:00:02Z',receivedMonotonic:0};
+ },signal),/changed while checking/);
+ assert.equal(attempts,2);
+});

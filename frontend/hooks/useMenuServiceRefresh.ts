@@ -7,7 +7,7 @@ import type {MenuCategory} from "@/types/menu";
 /** Refresh server decisions at the next IST service boundary; never trust the device's hour. */
 export function useMenuServiceRefresh(
  branchId:number|undefined,categories:MenuCategory[],setCategories:Dispatch<SetStateAction<MenuCategory[]>>,
- onRefresh:(categories:MenuCategory[])=>void
+ onRefresh:(categories:MenuCategory[])=>void, onFailure:()=>void
 ) {
  const boundaries=categories.flatMap(c=>c.products).flatMap(p=>p.serviceAvailability?.nextChangeAt?[Date.parse(p.serviceAvailability.nextChangeAt)]:[]);
  const boundary=boundaries.length?Math.min(...boundaries):null;
@@ -18,19 +18,21 @@ export function useMenuServiceRefresh(
   const controller=new AbortController();let busy=false;
   const serverStart=evaluated?Date.parse(evaluated):Date.now(),started=received??performance.now();
   const elapsed=()=>performance.now()-started;
-  const expired=()=>boundary!==null&&boundary<=serverStart+elapsed();
+  const expiredBoundary=()=>boundary!==null&&boundary<=serverStart+elapsed();
   async function refresh(expired=false){
    if(controller.signal.aborted)return;
    if(expired)setCategories(current=>current.map(c=>({...c,products:c.products.map(p=>p.serviceAvailability?.nextChangeAt&&Date.parse(p.serviceAvailability.nextChangeAt)<=serverStart+elapsed()?{...p,available:false,serviceAvailability:{...p.serviceAvailability,code:"CHECKING",message:"Checking current availability…"}}:p)})));
    if(busy||!navigator.onLine||document.visibilityState!=="visible")return;
    busy=true;
    const signal=AbortSignal.any([controller.signal,AbortSignal.timeout(MENU_READ_RETRY_DEADLINE_MS)]);
-   try{const fresh=await retryMenuRead(attempt=>refreshMenuAvailability(branchId!,attempt),signal);if(!controller.signal.aborted)onRefresh(fresh);}catch{/* A failed refresh keeps cart and last menu; expired items remain blocked. */}finally{busy=false;}
+   try{const fresh=await retryMenuRead(attempt=>refreshMenuAvailability(branchId!,attempt),signal);if(!controller.signal.aborted)onRefresh(fresh);}
+   catch{if(!controller.signal.aborted && expiredBoundary())onFailure();}
+   finally{busy=false;}
   }
-  const timer=window.setInterval(()=>void refresh(expired()),30000);
+  const timer=window.setInterval(()=>void refresh(expiredBoundary()),30000);
   const transition=boundary===null?null:window.setTimeout(()=>void refresh(true),Math.max(0,boundary-serverStart-elapsed()+100));
-  const resume=()=>void refresh(expired());
+  const resume=()=>void refresh(expiredBoundary());
   window.addEventListener("online",resume);document.addEventListener("visibilitychange",resume);
   return()=>{controller.abort();clearInterval(timer);if(transition!==null)clearTimeout(transition);window.removeEventListener("online",resume);document.removeEventListener("visibilitychange",resume);};
- },[branchId,boundary,evaluated,received,setCategories,onRefresh]);
+ },[branchId,boundary,evaluated,received,setCategories,onRefresh,onFailure]);
 }

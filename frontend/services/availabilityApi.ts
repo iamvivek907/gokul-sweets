@@ -95,6 +95,19 @@ export function menuPreviewDeadline(data: CartAvailability): number | null {
     return Number.isFinite(remaining) ? data.receivedMonotonic! + Math.max(0, remaining) : null;
 }
 
+/** Give a preview that crossed a service boundary one fresh read before reporting failure. */
+export async function readFreshMenuPreview(
+    read: () => Promise<CartAvailability>, signal: AbortSignal
+): Promise<CartAvailability> {
+    for (let attempt = 0; attempt < 2; attempt++) {
+        signal.throwIfAborted();
+        const data = await read();
+        signal.throwIfAborted();
+        if (performance.now() < (menuPreviewDeadline(data) ?? Infinity)) return data;
+    }
+    throw new Error("Pickup availability changed while checking the menu.");
+}
+
 /** Branch capacity only; item validation follows on the selected date. */
 export async function discoverPickupDates(branchId:number,startDate:string,days:number,signal?:AbortSignal) {
     return readAvailability(await apiClient<CartAvailability>(`/api/branches/${branchId}/pickup-discovery?startDate=${encodeURIComponent(startDate)}&days=${days}`,{signal}));
