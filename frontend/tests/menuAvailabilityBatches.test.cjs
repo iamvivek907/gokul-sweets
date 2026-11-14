@@ -1,12 +1,68 @@
 const assert=require('node:assert/strict'),test=require('node:test'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
-function fixture(respond){const calls=[],box={exports:{},TypeError,setTimeout,clearTimeout,require:()=>({apiClient:async(path,options)=>{const body=JSON.parse(options.body);calls.push({path,body,signal:options.signal});return respond(body,calls.length);}})};vm.runInNewContext(ts.transpileModule(fs.readFileSync('services/availabilityApi.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,box);return {...box.exports,calls};}
+class ApiError extends Error {
+ constructor(status,code,retryAfterMs=null){
+  super(code);Object.assign(this,{status,code,retryAfterMs});
+ }
+}
+function fixture(respond){const calls=[],box={exports:{},TypeError,AbortController,setTimeout,clearTimeout,require:()=>({ApiError,apiClient:async(path,options)=>{const body=JSON.parse(options.body);calls.push({path,body,signal:options.signal});return respond(body,calls.length);}})};vm.runInNewContext(ts.transpileModule(fs.readFileSync('services/availabilityApi.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,box);return {...box.exports,calls};}
 const items=Array.from({length:215},(_,i)=>({productId:i+1,quantity:i===0?7:1,weightGrams:null}));
 const response=body=>({fulfilmentType:'PICKUP',today:'2026-10-07',maximumDate:'2026-10-10',dates:[{date:body.startDate,available:true,items:body.items.map(p=>({productId:p.productId,available:true})),slots:[{slot:{id:1,remainingCapacity:10},normalAvailable:true,priorityAvailable:false,issues:[]}]}]});
 test('full catalogue uses bounded two-request waves and preserves actual cart quantities',async()=>{const f=fixture(response);const data=await f.checkMenuAvailability(1,'2026-10-08',1,items);assert.deepEqual(f.calls.map(c=>c.body.items.length),[100,100,15]);assert.equal(f.calls[0].body.items[0].quantity,7);assert.ok(f.calls.every(c=>c.path.endsWith('?menuPreview=true&compact=true&versioned=true')));assert.deepEqual(Array.from(data.dates[0].items,p=>p.productId),items.map(p=>p.productId));});
 test('issues from later batches and pickup-window restrictions survive merging',async()=>{const f=fixture((body,n)=>{const data=response(body);if(n===2){const slot=data.dates[0].slots[0];slot.issues=[{productId:113,available:false}];slot.code='PICKUP_WINDOW';slot.normalAvailable=false;slot.reason='Closed';data.dates[0].available=false;}return data;});const data=await f.checkMenuAvailability(1,'2026-10-08',1,items);assert.equal(data.dates[0].slots[0].issues[0].productId,113);assert.equal(data.dates[0].slots[0].code,'PICKUP_WINDOW');assert.equal(data.dates[0].slots[0].normalAvailable,false);assert.equal(data.dates[0].available,false);});
 test('failed batch rejects incomplete preview and stops later requests',async()=>{const f=fixture((body,n)=>{if(n===2)throw Error('offline');return response(body)});await assert.rejects(f.checkMenuAvailability(1,'2026-10-08',1,items),/offline/);assert.equal(f.calls.length,2);});
+test('failed preview cancels its in-flight sibling and leaves the parent signal usable',async()=>{
+ const parent=new AbortController();
+ const f=fixture((_,n)=>{
+  if(n===2)throw Error('batch failed');
+  const signal=f.calls[0].signal;
+  return new Promise((_,reject)=>signal.addEventListener('abort',()=>reject(signal.reason),{once:true}));
+ });
+ await assert.rejects(f.checkMenuAvailability(1,'2026-10-08',1,items,parent.signal),/batch failed/);
+ assert.equal(f.calls.length,2);
+ assert.equal(f.calls[0].signal.aborted,true);
+ assert.equal(parent.signal.aborted,false);
+});
+test('repeated completed previews release their parent abort listeners',async()=>{
+ const {getEventListeners}=require('node:events');
+ const parent=new AbortController();
+ const f=fixture(response);
+ for(let index=0;index<100;index++){
+  await f.checkMenuAvailability(1,'2026-10-08',1,items.slice(0,2),parent.signal,1);
+ }
+ assert.equal(getEventListeners(parent.signal,'abort').length,0);
+});
 test('context cancellation stops subsequent batches',async()=>{const controller=new AbortController();const f=fixture(body=>{controller.abort();return response(body)});await assert.rejects(f.checkMenuAvailability(1,'2026-10-08',1,items,controller.signal),{name:'AbortError'});assert.equal(f.calls.length,1);});
 test('authoritative cart request remains a single whole-cart check',async()=>{const f=fixture(response);await f.checkCartAvailability(1,'2026-10-08',1,items.slice(0,2));assert.equal(f.calls.length,1);assert.equal(f.calls[0].path,'/api/branches/1/availability');});
+test('every saved-pickup preview batch uses the same selected slot',async()=>{
+ const f=fixture(response);
+ const result=await f.checkMenuAvailability(1,'2026-10-08',1,items,undefined,42);
+ assert.equal(f.calls.length,3);
+ assert.ok(f.calls.every(call=>call.path.endsWith('&slotId=42')));
+ assert.equal(result.dates[0].items.length,215);
+});
+test('a selected slot missing from any batch is removed from the merged preview',async()=>{
+ const f=fixture((body,n)=>{
+  const data=response(body);
+  if(n===2)data.dates[0].slots=[];
+  return data;
+ });
+ const result=await f.checkMenuAvailability(1,'2026-10-08',1,items,undefined,1);
+ assert.equal(result.dates[0].slots.length,0);
+});
+test('a later capacity change closes the affected pickup type across batches',async()=>{
+ const f=fixture((body,n)=>{
+  const data=response(body),slot=data.dates[0].slots[0];
+  slot.slot={...slot.slot,remainingCapacity:n===2?0:10,priorityEnabled:true,priorityRemainingCapacity:2};
+  slot.normalAvailable=n!==2;
+  slot.priorityAvailable=true;
+  return data;
+ });
+ const result=await f.checkMenuAvailability(1,'2026-10-08',1,items,undefined,1);
+ const slot=result.dates[0].slots[0];
+ assert.equal(slot.slot.remainingCapacity,0);
+ assert.equal(slot.slot.priorityRemainingCapacity,2);
+ assert.equal(slot.priorityAvailable,true);
+});
 test('compact issues restore exact slot decisions across independent batch catalogs',async()=>{
  const f=fixture((body,n)=>{const data=response(body),day=data.dates[0];
   const issue={...day.items[0],available:false,code:n===1?'NOT_READY':'SERVICE_WINDOW',reason:'Choose another time',expectedReadyAt:'2026-10-08T12:00:00'};
@@ -44,4 +100,36 @@ test('malformed availability stops the preview before unusable slot data can rea
  const f=fixture((body,n)=>{const data=response(body);if(n===2)data.dates[0].slots=[null];return data;});
  await assert.rejects(f.checkMenuAvailability(1,'2026-10-08',1,items),/We couldn’t check pickup availability/);
  assert.equal(f.calls.length,2);
+});
+
+test('connection failures and a temporary server error recover before a menu error is shown',async()=>{
+ const f=fixture(response);
+ let attempts=0;
+ const value=await f.retryMenuRead(async()=>{
+  attempts++;
+  if(attempts===1)throw new ApiError(0,'CONNECTION_FAILED');
+  if(attempts===2)throw new ApiError(503,'UNAVAILABLE');
+  return 'ready';
+ });
+ assert.equal(value,'ready');
+ assert.equal(attempts,3);
+});
+test('persistent failures stop after two retries and validation failures stop immediately',async()=>{
+ const f=fixture(response);
+ for(const [status,expected] of [[503,3],[400,1]]){
+  let attempts=0;
+  await assert.rejects(f.retryMenuRead(async()=>{attempts++;throw new ApiError(status,'FAILED');}),/FAILED/);
+  assert.equal(attempts,expected);
+ }
+});
+test('navigation cancels retry backoff and removes its abort listener',async()=>{
+ const f=fixture(response),controller=new AbortController();
+ const {getEventListeners}=require('node:events');
+ let attempts=0;
+ const pending=f.retryMenuRead(async()=>{attempts++;throw new ApiError(0,'CONNECTION_FAILED');},controller.signal);
+ await new Promise(resolve=>setImmediate(resolve));
+ controller.abort();
+ await assert.rejects(pending,{name:'AbortError'});
+ assert.equal(attempts,1);
+ assert.equal(getEventListeners(controller.signal,'abort').length,0);
 });

@@ -117,6 +117,27 @@ class CartAvailabilityServiceTest {
 
         assertThat(service.check(branchId, date, 1, request, true).recheckAt())
                 .isEqualTo(Instant.parse("2026-09-29T18:30:00Z"));
+        var otherSlot = slot(branch, date, 1001L, LocalTime.of(14, 0), LocalTime.of(14, 30));
+        when(slotRepository.findByBranchIdAndSlotDateBetweenOrderBySlotDateAscStartTimeAsc(
+                        branchId, date, date))
+                .thenReturn(List.of(slot, otherSlot));
+        when(slotRepository.findWithBranchById(1000L)).thenReturn(Optional.of(slot));
+        var fullDay = service.check(branchId, date, 1, request, true).dates().getFirst();
+        var selected = service.checkMenuSlot(branchId, date, request, 1000L).dates().getFirst();
+        assertThat(fullDay.slots()).hasSize(2);
+        assertThat(selected.slots()).containsExactly(fullDay.slots().getFirst());
+        assertThat(selected.items()).isEqualTo(fullDay.items());
+        var foreign = new Branch();
+        foreign.setId(99L);
+        when(slotRepository.findWithBranchById(1000L))
+                .thenReturn(
+                        Optional.of(
+                                slot(foreign, date, 1000L, LocalTime.NOON, LocalTime.of(13, 0))));
+        assertThat(service.checkMenuSlot(branchId, date, request, 1000L).dates().getFirst().slots())
+                .isEmpty();
+        when(slotRepository.findByBranchIdAndSlotDateBetweenOrderBySlotDateAscStartTimeAsc(
+                        branchId, date, date))
+                .thenReturn(List.of(slot));
         assertThat(service.check(branchId, date, 1, request).recheckAt()).isNull();
         // The earliest preparation cutoff, even before a slot starts, ends preview reuse.
         firstPolicy.setProductionLeadMinutes(721);
@@ -193,25 +214,26 @@ class CartAvailabilityServiceTest {
         var allocations = Mockito.mock(InventoryDailyAllocationRepository.class);
         var slots = Mockito.mock(PickupSlotRepository.class);
         var settings = Mockito.mock(BranchPickupSettingsRepository.class);
-        when(validation.validatePickupCartWithWindows(any(), anyList()))
-                .thenReturn(
-                        new com.gokulsweets.restaurant.order.service.model.ValidatedPickupCart(
-                                List.of(
-                                        new ValidatedOrderItem(
-                                                breakfast.getProduct(),
-                                                breakfast,
-                                                ProductSaleMode.UNIT,
-                                                1,
-                                                null),
-                                        new ValidatedOrderItem(
-                                                sweets.getProduct(),
-                                                sweets,
-                                                ProductSaleMode.UNIT,
-                                                1,
-                                                null)),
-                                ignored ->
-                                        new com.gokulsweets.restaurant.menu.MenuServiceWindows
-                                                .Snapshot(false, java.util.Map.of())));
+        var validated =
+                new com.gokulsweets.restaurant.order.service.model.ValidatedPickupCart(
+                        List.of(
+                                new ValidatedOrderItem(
+                                        breakfast.getProduct(),
+                                        breakfast,
+                                        ProductSaleMode.UNIT,
+                                        1,
+                                        null),
+                                new ValidatedOrderItem(
+                                        sweets.getProduct(),
+                                        sweets,
+                                        ProductSaleMode.UNIT,
+                                        1,
+                                        null)),
+                        ignored ->
+                                new com.gokulsweets.restaurant.menu.MenuServiceWindows.Snapshot(
+                                        false, java.util.Map.of()));
+        when(validation.validatePickupCartWithWindows(any(), anyList())).thenReturn(validated);
+        when(validation.validateHighlights(any(), anyList())).thenReturn(validated);
         when(policies.findByBranchProductIdIn(anyList()))
                 .thenReturn(List.of(breakfastPolicy, sweetsPolicy));
         when(allocations.findByBranchProductIdInAndServiceDateBetween(anyList(), any(), any()))
@@ -248,6 +270,7 @@ class CartAvailabilityServiceTest {
                 List.of(
                         new CreateOrderItemRequest(201L, 1, null),
                         new CreateOrderItemRequest(202L, 1, null));
+        assertThat(service.bookableHighlights(10L, today, request)).containsExactly(202L);
         assertThat(service.check(10L, today, 8, request).dates()).hasSize(1);
         var preview = service.check(10L, today, 8, request, true);
         assertThat(preview.dates()).hasSize(8);

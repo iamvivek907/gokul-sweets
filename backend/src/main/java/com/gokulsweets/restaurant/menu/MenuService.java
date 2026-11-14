@@ -35,7 +35,7 @@ public class MenuService {
             if (branchId == null) throw new IllegalArgumentException("Branch ID is required.");
             for (int attempt = 0; attempt < 3; attempt++) {
                 var snapshot = catalog.get(branchId);
-                var live = availability.get(branchId);
+                var live = availability.get(branchId, snapshot);
                 if (!snapshot.revision().equals(live.revision())) continue;
                 var states = new HashMap<Long, MenuAvailabilityService.Item>();
                 live.items().forEach(i -> states.put(i.productId(), i));

@@ -85,10 +85,25 @@ public class MenuAvailabilityService {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(MenuAvailabilityService.class, "get(long)");
         try {
+            return get(branchId, catalog.get(branchId));
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos, MenuAvailabilityService.class, "get(long)");
+        }
+    }
+
+    /**
+     * Uses a catalog already read for this branch in the caller's transaction. A concurrent catalog
+     * change during a rebuild still triggers a fresh read.
+     */
+    Availability get(long branchId, MenuCatalogService.Catalog observedCatalog) {
+        final long started =
+                MethodTiming.start(
+                        MenuAvailabilityService.class, "get(long,MenuCatalogService.Catalog)");
+        try {
             // Menu flags are advisory. Never cache dated quantities, holds, or checkout acceptance.
             boolean publish = TransactionSynchronizationManager.isCurrentTransactionReadOnly();
             if (publish) {
-                var observedCatalog = catalog.get(branchId);
                 Instant observedNow = inventoryClock.instant();
                 Cached observed;
                 synchronized (cache) {
@@ -107,7 +122,7 @@ public class MenuAvailabilityService {
             }
             synchronized (branchLocks[Math.floorMod(branchId, branchLocks.length)]) {
                 for (int attempt = 0; attempt < 3; attempt++) {
-                    var snapshot = catalog.get(branchId);
+                    var snapshot = attempt == 0 ? observedCatalog : catalog.get(branchId);
                     Instant now = inventoryClock.instant();
                     Cached cached;
                     synchronized (cache) {
@@ -117,7 +132,8 @@ public class MenuAvailabilityService {
                             && cached != null
                             && cached.value().revision().equals(snapshot.revision())
                             && !now.isBefore(cached.evaluatedAt())
-                            && now.isBefore(cached.until()))
+                            && now.isBefore(cached.until())
+                            && catalog.revision().equals(snapshot.revision()))
                         return new Availability(
                                 cached.value().revision(),
                                 cached.value().serviceWindowsEnabled(),
@@ -171,7 +187,7 @@ public class MenuAvailabilityService {
                     "Menu is updating. Please try again.");
         } finally {
             MethodTiming.finish(
-                    __gokulMethodStartedNanos, MenuAvailabilityService.class, "get(long)");
+                    started, MenuAvailabilityService.class, "get(long,MenuCatalogService.Catalog)");
         }
     }
 }

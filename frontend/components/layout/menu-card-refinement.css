@@ -28,7 +28,24 @@
 .future-storefront[data-customer-design=reference] .gokul-menu-product-card .product-card-purchase>span:first-child {font-weight:750;color:#292323;letter-spacing:-.015em}
 .future-storefront[data-customer-design=reference] .gokul-menu-product-card .menu-sale-price {border-radius:5px;padding:3px 6px;background:#ffdf33;color:#211b0c;box-shadow:0 2px 0 #d8b723}
 .future-storefront[data-customer-design=reference] .gokul-menu-product-card .product-rating-summary {background:#fff6e5;border:1px solid #efd9ad;border-radius:9px;padding:4px 7px;color:#583712}
+.future-storefront[data-customer-design=reference] .menu-card-facts {display:flex;flex-wrap:wrap;gap:4px;margin:3px 0}
+.future-storefront[data-customer-design=reference] .menu-card-facts>span {display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border-radius:6px;font-size:.75rem;font-weight:650;line-height:1.4}
+.future-storefront[data-customer-design=reference] .menu-card-chef-pick {background:#fff1c8;color:#704600}
+.future-storefront[data-customer-design=reference] .menu-card-spice {background:#f8e9e4;color:#782d24}
 .future-storefront[data-customer-design=reference] .gokul-menu-product-card :is(button.product-card-controls,.product-card-controls>button):enabled:hover {background:linear-gradient(180deg,#f5fff9,#d1f9e3)!important;box-shadow:0 5px 12px #087f5533}
+.future-storefront[data-customer-design=reference] .gokul-product-card.gokul-menu-product-card[data-sold-out=true] {
+ background:#f7f5f3!important;
+ border-color:#e4ded9!important;
+ box-shadow:none!important;
+}
+.future-storefront[data-customer-design=reference] .gokul-menu-product-card[data-sold-out=true] .product-card-image img {filter:saturate(.55)}
+.future-storefront[data-customer-design=reference] .gokul-menu-product-card[data-sold-out=true] .menu-sale-price {background:#ebe5de;color:#4e433c;box-shadow:none}
+.future-storefront[data-customer-design=reference] .gokul-menu-product-card[data-sold-out=true] :is(.product-card-controls:has(>button:disabled):not(:has([role=group][aria-hidden=false])),button.product-card-controls:disabled,.product-card-controls>button:disabled) {
+ background:#eeebe8!important;
+ color:#5d534d!important;
+ border-color:#d7cfc9!important;
+ box-shadow:none!important;
+}
 .future-storefront[data-customer-design=reference] .menu-search-dialog .menu-search-show-results {display:block;min-height:48px;width:100%;margin-top:20px;padding:12px;border-radius:14px;background:#951436;color:#fff;font-weight:750}
 .future-storefront[data-customer-design=reference] .menu-search-dialog .menu-search-suggestions {max-height:40dvh;overflow-y:auto}
 @media(max-width:640px){

@@ -104,7 +104,7 @@ try{for(const [width,enabled,expired=false,reduced=true,classic=false] of [[320,
  await page.evaluate(()=>{window.scrollTo({top:0,behavior:'instant'});document.querySelector('#menu-category-1 details').open=false;});
  await page.locator('#gokul-menu-search').click();await searchDialog.waitFor();
  await searchInput.fill('Rasgulla');await option.click();await searchDialog.waitFor({state:'hidden'});
- const dish=page.locator('#gokul-product-1');await dish.and(page.locator('[data-search-arrival]')).waitFor();
+ const dish=page.locator('#gokul-product-1');await dish.and(page.locator(':focus')).waitFor();
  assert.equal(await dish.evaluate(node=>node===document.activeElement),true,'choosing a suggestion focuses its dish');
  assert.equal(await page.locator('#menu-category-1 details').evaluate(node=>node.open),true,'the destination category opens');
  assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),cartBeforeSearch);

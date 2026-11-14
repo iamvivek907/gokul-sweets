@@ -32,6 +32,7 @@ import LinkFeedback from "@/components/common/LinkFeedback";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {usePhoneViewport} from "@/hooks/usePhoneViewport";
 import {apiClient} from "@/services/apiClient";
+import {retryMenuRead} from "@/services/availabilityApi";
 import {matchesMobileFilters,mobileMenuRows,type PortionGroup} from "@/lib/mobileMenu";
 import {progressiveBatches} from "@/lib/progressiveBatches";
 import {readMenuBrowse,writeMenuBrowse,browserMenuStorage,type MenuBrowseState} from "@/lib/menuBrowseState";
@@ -48,6 +49,7 @@ import {useDateAvailability} from "@/components/menu/PickupContext";
 
 import {
     type ReactNode,
+    useCallback,
     useEffect,
     useLayoutEffect,
     useMemo,
@@ -160,7 +162,6 @@ export default function MenuScreen() {
         const frame = requestAnimationFrame(() => {paint = requestAnimationFrame(() => reportLoadingStage("MENU_RENDER", started));});
         return () => {cancelAnimationFrame(frame); cancelAnimationFrame(paint);};
     }, [categories]);
-    useMenuServiceRefresh(branch?.id,rawCategories,setCategories);
 
 
     const [
@@ -219,6 +220,17 @@ export default function MenuScreen() {
     ] =
         useState(0);
 
+    const branchId = branch?.id;
+    const loadKey = branchId === undefined ? null : `${branchId}:${reloadKey}`;
+    const [settledLoad, setSettledLoad] = useState<string | null>(null);
+    const publishMenuRefresh = useCallback((fresh: MenuCategory[]) => {
+        if (branchId === undefined) return;
+        lastCatalog.current = {branchId, categories: fresh};
+        setCategories(fresh);
+        setError(null);
+        setRefreshError(null);
+    }, [branchId]);
+    useMenuServiceRefresh(settledLoad === loadKey ? branchId : undefined, rawCategories, setCategories, publishMenuRefresh);
 
     const [
         cartNotice,
@@ -323,19 +335,21 @@ export default function MenuScreen() {
 
                 try {
 
+                    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]);
                     const result =
-                        await getMenu(
+                        await retryMenuRead(() => getMenu(
                             selectedBranch.id,
-                            controller.signal,
+                            signal,
                             catalog => {
-                                if (controller.signal.aborted) return;
+                                if (signal.aborted || (lastCatalog.current?.branchId === selectedBranch.id
+                                    && lastCatalog.current.categories.length)) return;
                                 renderStarted.current = performance.now();
                                 lastCatalog.current={branchId:selectedBranch.id,categories:catalog};
                                 setCategories(catalog);
                                 setLoadedBranchId(selectedBranch.id);
                                 setLoading(false);
                             }
-                        );
+                        ), signal);
 
 
                     if (
@@ -446,7 +460,7 @@ export default function MenuScreen() {
 
 
                     if(lastCatalog.current?.branchId===selectedBranch.id&&lastCatalog.current.categories.length){
-                        setCategories(lastCatalog.current.categories);setError(null);setRefreshError("The menu could not refresh. Your cart is saved. Prices and availability will be checked before ordering.");setLoadedBranchId(selectedBranch.id);setLoading(false);return;
+                        setError(null);setRefreshError("The menu could not refresh. Your cart is saved. Prices and availability will be checked before ordering.");setLoadedBranchId(selectedBranch.id);setLoading(false);return;
                     }
                     setCategories([]);
                     setError(
@@ -463,6 +477,8 @@ export default function MenuScreen() {
                     setLoading(
                         false
                     );
+                } finally {
+                    if (!controller.signal.aborted) setSettledLoad(loadKey);
                 }
             }
 
@@ -478,7 +494,7 @@ export default function MenuScreen() {
         },
         [
             branch,
-            reloadKey
+            loadKey
         ]
     );
 
@@ -855,20 +871,16 @@ export default function MenuScreen() {
     }
     useLayoutEffect(()=>{
         if(!searchDestination||searchDestination.branchId!==branch?.id)return;
-        let timer:ReturnType<typeof setTimeout>|undefined;
-        let target:HTMLElement|null=null;
         const frame=requestAnimationFrame(()=>{
             const anchor=document.getElementById(`gokul-product-${searchDestination.productId}`);
-            target=anchor?.closest<HTMLElement>("[data-menu-product-card]")??null;
+            const target=anchor?.closest<HTMLElement>("[data-menu-product-card]");
             if(!target)return;
             const category=target.closest(".menu-category-disclosure");
             if(category instanceof HTMLDetailsElement)category.open=true;
-            target.setAttribute("data-search-arrival","");
             target.focus({preventScroll:true});
             target.scrollIntoView({block:"center",behavior:"instant"});
-            timer=setTimeout(()=>target?.removeAttribute("data-search-arrival"),1700);
         });
-        return()=>{cancelAnimationFrame(frame);clearTimeout(timer);target?.removeAttribute("data-search-arrival");};
+        return()=>cancelAnimationFrame(frame);
     },[searchDestination,branch?.id]);
 
     const hasActiveFilters =

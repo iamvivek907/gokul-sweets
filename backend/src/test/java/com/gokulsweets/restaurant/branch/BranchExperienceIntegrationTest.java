@@ -68,13 +68,22 @@ class BranchExperienceIntegrationTest {
         try {
             flags.setBranchExperience(true);
             assertThat(branches.getBranch(id).coverImageUrl()).isNull();
+            assertThat(branches.getBranch(id).pickupAvailable()).isFalse();
+            jdbc.update(
+                    "INSERT INTO branch_pickup_settings(branch_id,enabled) VALUES (?,true)", id);
             var live = experience.publish(id, media.editVersion());
             assertThat(live.publishedRevision()).isEqualTo(1);
             assertThat(branches.getBranch(id).coverImageUrl())
                     .isEqualTo("https://media.example/branch.jpg");
+            assertThat(
+                            branches.getActiveBranches().stream()
+                                    .filter(branch -> branch.id().equals(id)))
+                    .containsExactly(branches.getBranch(id));
+            assertThat(branches.getBranch(id).pickupAvailable()).isTrue();
             assertThat(experience.history(id)).hasSize(1);
             flags.setBranchExperience(false);
             assertThat(branches.getBranch(id).coverImageUrl()).isNull();
+            assertThat(branches.getBranch(id).pickupAvailable()).isTrue();
         } finally {
             flags.setBranchExperience(wasEnabled);
         }

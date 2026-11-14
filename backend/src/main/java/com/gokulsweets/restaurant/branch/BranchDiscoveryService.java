@@ -355,11 +355,6 @@ WHERE r.branch_id=? AND r.review_status='PUBLISHED' AND o.order_status IN ('PICK
                                                     rs.getLong(6),
                                                     rs.getLong(7))),
                             id);
-            var available =
-                    menu.getMenu(id).stream()
-                            .flatMap(c -> c.products().stream())
-                            .filter(p -> p.available())
-                            .collect(java.util.stream.Collectors.toMap(p -> p.id(), p -> p));
             var ranks =
                     jdbc.query(
                             """
@@ -380,41 +375,22 @@ GROUP BY ri.product_id ORDER BY AVG(ri.rating) DESC,COUNT(*) DESC,ri.product_id 
                                             rs.getLong(3),
                                             null),
                             id);
-            var top =
+            var available =
+                    menu.getMenu(id).stream()
+                            .flatMap(c -> c.products().stream())
+                            .filter(p -> p.available())
+                            .collect(java.util.stream.Collectors.toMap(p -> p.id(), p -> p));
+            var eligible =
                     ranks.stream()
                             .filter(r -> available.containsKey(r.productId()))
                             .limit(3)
+                            .toList();
+            var excerpts = excerpts(id, eligible.stream().map(RatedItem::productId).toList());
+            var top =
+                    eligible.stream()
                             .map(
                                     r -> {
                                         var product = available.get(r.productId());
-                                        var excerpts =
-                                                jdbc.query(
-                                                        """
-SELECT r.comment,r.overall_rating FROM reviews r JOIN review_items ri ON ri.review_id=r.id JOIN orders o ON o.id=r.order_id
-WHERE r.branch_id=? AND ri.product_id=? AND r.review_status='PUBLISHED' AND o.order_status IN ('PICKED_UP','DELIVERED')
-AND LENGTH(TRIM(r.comment))>=20 ORDER BY r.created_at DESC,r.id DESC LIMIT 20
-""",
-                                                        (rs, n) ->
-                                                                new Excerpt(
-                                                                        rs.getString(1),
-                                                                        rs.getInt(2)),
-                                                        id,
-                                                        r.productId());
-                                        var excerpt =
-                                                excerpts.stream()
-                                                        .filter(
-                                                                e ->
-                                                                        publicComment(e.comment())
-                                                                                != null)
-                                                        .findFirst()
-                                                        .map(
-                                                                e ->
-                                                                        new Excerpt(
-                                                                                publicComment(
-                                                                                        e
-                                                                                                .comment()),
-                                                                                e.overallRating()))
-                                                        .orElse(null);
                                         return new RatedItem(
                                                 r.productId(),
                                                 product.name(),
@@ -422,13 +398,52 @@ AND LENGTH(TRIM(r.comment))>=20 ORDER BY r.created_at DESC,r.id DESC LIMIT 20
                                                 product.categoryId(),
                                                 r.average(),
                                                 r.count(),
-                                                excerpt);
+                                                excerpts.get(r.productId()));
                                     })
                             .toList();
             return new Discovery(offerings.published(id), rating, top);
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos, BranchDiscoveryService.class, "get(long)");
+        }
+    }
+
+    /** Reads at most twenty excerpt candidates per ranked dish in one database round trip. */
+    private java.util.Map<Long, Excerpt> excerpts(long branchId, List<Long> ids) {
+        long started =
+                MethodTiming.start(BranchDiscoveryService.class, "excerpts(long,List<Long>)");
+        try {
+            var result = new java.util.HashMap<Long, Excerpt>();
+            if (ids.isEmpty()) return result;
+            jdbc.query(
+                    """
+SELECT dish.id, excerpt.comment, excerpt.overall_rating
+FROM unnest(ARRAY[%s]::bigint[]) AS dish(id)
+CROSS JOIN LATERAL (
+    SELECT r.comment,r.overall_rating,r.created_at,r.id
+    FROM reviews r JOIN review_items ri ON ri.review_id=r.id JOIN orders o ON o.id=r.order_id
+    WHERE r.branch_id=? AND ri.product_id=dish.id AND r.review_status='PUBLISHED'
+      AND o.order_status IN ('PICKED_UP','DELIVERED') AND LENGTH(TRIM(r.comment))>=20
+    ORDER BY r.created_at DESC,r.id DESC LIMIT 20
+) AS excerpt
+ORDER BY dish.id,excerpt.created_at DESC,excerpt.id DESC
+"""
+                            .formatted(
+                                    String.join(
+                                            ",", java.util.Collections.nCopies(ids.size(), "?"))),
+                    (org.springframework.jdbc.core.RowCallbackHandler)
+                            rs -> {
+                                var comment = publicComment(rs.getString(2));
+                                if (comment != null)
+                                    result.putIfAbsent(
+                                            rs.getLong(1), new Excerpt(comment, rs.getInt(3)));
+                            },
+                    java.util.stream.Stream.concat(
+                                    ids.stream(), java.util.stream.Stream.of(branchId))
+                            .toArray());
+            return result;
+        } finally {
+            MethodTiming.finish(started, BranchDiscoveryService.class, "excerpts(long,List<Long>)");
         }
     }
 }

@@ -137,97 +137,41 @@ ORDER BY p.created_at DESC, p.id DESC LIMIT 20
 """,
                             Long.class,
                             branchId);
-            Map<Long, Boolean> checked = new HashMap<>();
+            var candidates =
+                    java.util.stream.Stream.concat(trending.stream(), recent.stream())
+                            .distinct()
+                            .filter(products::containsKey)
+                            .map(
+                                    id -> {
+                                        var product = products.get(id);
+                                        boolean weighted =
+                                                product.saleMode() == ProductSaleMode.WEIGHT;
+                                        return new CreateOrderItemRequest(
+                                                id,
+                                                weighted ? null : 1,
+                                                weighted ? product.minimumWeightGrams() : null);
+                                    })
+                            .toList();
+            Set<Long> bookable;
+            try {
+                bookable = availability.bookableHighlights(branchId, today, candidates);
+            } catch (IllegalArgumentException | IllegalStateException exception) {
+                log.warn(
+                        "Omitting unorderable storefront highlights: branchId={}, reason={}",
+                        branchId,
+                        exception.getMessage());
+                bookable = Set.of();
+            }
+            var availableIds = bookable;
             return new Highlights(
-                    availableIds(branchId, today, trending, products, checked),
-                    availableIds(
-                            branchId, today,
-                            recent, // The latest-items display is a catalog preview; pickup
-                            products, // suitability is checked for the chosen date.
-                            checked),
+                    trending.stream().filter(availableIds::contains).limit(8).toList(),
+                    recent.stream().filter(availableIds::contains).limit(8).toList(),
                     latest.stream().filter(products::containsKey).limit(8).toList());
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
                     StorefrontHighlightsController.class,
                     "loadHighlights(Long,LocalDate)");
-        }
-    }
-
-    /**
-     * Availables ids.
-     *
-     * @param branchId the branch id
-     * @param today the today
-     * @param ids the ids
-     * @param products the products
-     * @param checked the checked
-     * @return the available ids result
-     */
-    private List<Long> availableIds(
-            Long branchId,
-            LocalDate today,
-            List<Long> ids,
-            Map<Long, MenuProductResponse> products,
-            Map<Long, Boolean> checked) {
-        final long __gokulMethodStartedNanos =
-                MethodTiming.start(
-                        StorefrontHighlightsController.class,
-                        "availableIds(Long,LocalDate,List<Long>,Map<Long,MenuProductResponse>,Map<Long,Boolean>)");
-        try {
-            return ids.stream()
-                    .filter(products::containsKey)
-                    .filter(
-                            id ->
-                                    checked.computeIfAbsent(
-                                            id,
-                                            ignored -> {
-                                                var product = products.get(id);
-                                                boolean weighted =
-                                                        product.saleMode()
-                                                                == ProductSaleMode.WEIGHT;
-                                                try {
-                                                    return availability
-                                                            .check(
-                                                                    branchId,
-                                                                    today,
-                                                                    features.getFutureOrderingDays()
-                                                                            + 1,
-                                                                    List.of(
-                                                                            new CreateOrderItemRequest(
-                                                                                    id,
-                                                                                    weighted
-                                                                                            ? null
-                                                                                            : 1,
-                                                                                    weighted
-                                                                                            ? product
-                                                                                                    .minimumWeightGrams()
-                                                                                            : null)))
-                                                            .dates()
-                                                            .stream()
-                                                            .anyMatch(
-                                                                    CartAvailabilityService
-                                                                                    .DateAvailability
-                                                                            ::available);
-                                                } catch (IllegalArgumentException
-                                                        | IllegalStateException exception) {
-                                                    log.warn(
-                                                            "Omitting unorderable storefront"
-                                                                    + " highlight: branchId={},"
-                                                                    + " productId={}, reason={}",
-                                                            branchId,
-                                                            id,
-                                                            exception.getMessage());
-                                                    return false;
-                                                }
-                                            }))
-                    .limit(8)
-                    .toList();
-        } finally {
-            MethodTiming.finish(
-                    __gokulMethodStartedNanos,
-                    StorefrontHighlightsController.class,
-                    "availableIds(Long,LocalDate,List<Long>,Map<Long,MenuProductResponse>,Map<Long,Boolean>)");
         }
     }
 
