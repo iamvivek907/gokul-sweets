@@ -6,3 +6,5 @@
 .card :global(.menu-group-caption),
 .card :global(.pickup-attention-action) {position:relative;z-index:2}
 .card :global(.menu-save-dish) {z-index:2}
+.card :global(.menu-group-caption) {pointer-events:none}
+.card :global(.menu-group-caption) button {pointer-events:auto}

@@ -38,7 +38,7 @@ public class VersionedMenuPreviewController {
     /** Reads an opted-in one-day preview; the flag-OFF path still performs fresh legacy checks. */
     @PostMapping(
             value = "/api/branches/{branchId}/availability",
-            params = {"menuPreview=true", "compact=true", "versioned=true"})
+            params = {"menuPreview=true", "compact=true", "versioned=true", "!slotId"})
     public ResponseEntity<?> check(
             @PathVariable long branchId,
             @Valid @RequestBody CartAvailabilityController.Request request) {
@@ -47,13 +47,46 @@ public class VersionedMenuPreviewController {
                         VersionedMenuPreviewController.class,
                         "check(long,CartAvailabilityController.Request)");
         try {
+            return check(branchId, request, null);
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    VersionedMenuPreviewController.class,
+                    "check(long,CartAvailabilityController.Request)");
+        }
+    }
+
+    /** Checks a saved slot without evaluating every pickup time on that date. */
+    @PostMapping(
+            value = "/api/branches/{branchId}/availability",
+            params = {"menuPreview=true", "compact=true", "versioned=true", "slotId"})
+    public ResponseEntity<?> check(
+            @PathVariable long branchId,
+            @Valid @RequestBody CartAvailabilityController.Request request,
+            @RequestParam Long slotId) {
+        long started =
+                MethodTiming.start(
+                        VersionedMenuPreviewController.class,
+                        "check(long,CartAvailabilityController.Request,Long)");
+        try {
             if (!features.isSmartAvailability()) return ResponseEntity.notFound().build();
             if (request.days() != 1)
                 throw new IllegalArgumentException("Menu previews require one date.");
+            if (slotId != null && slotId <= 0)
+                throw new IllegalArgumentException("Invalid pickup slot.");
             var result =
                     enabled
-                            ? previews.check(branchId, request.startDate(), request.items())
-                            : legacy.check(branchId, request.startDate(), request.items());
+                            ? (slotId == null
+                                    ? previews.check(branchId, request.startDate(), request.items())
+                                    : previews.check(
+                                            branchId, request.startDate(), request.items(), slotId))
+                            : (slotId == null
+                                    ? legacy.check(branchId, request.startDate(), request.items())
+                                    : legacy.check(
+                                            branchId,
+                                            request.startDate(),
+                                            request.items(),
+                                            slotId));
             return ResponseEntity.ok()
                     .cacheControl(CacheControl.noStore())
                     .header("X-Gokul-Menu-Preview-Cache", enabled ? "enabled" : "disabled")
@@ -62,7 +95,7 @@ public class VersionedMenuPreviewController {
             MethodTiming.finish(
                     started,
                     VersionedMenuPreviewController.class,
-                    "check(long,CartAvailabilityController.Request)");
+                    "check(long,CartAvailabilityController.Request,Long)");
         }
     }
 

@@ -27,15 +27,17 @@ export function refreshMenuAvailability(branchId:number,signal?:AbortSignal):Pro
     return readAvailability(branchId,signal,0);
 }
 async function readAvailability(branchId:number,signal:AbortSignal|undefined,attempt:number):Promise<MenuCategory[]> {
+    const requestStartedMonotonic=typeof performance!=="undefined"?performance.now():Date.now();
     const live=await apiClient<Availability|MenuCategory[]>(`/api/menu?branchId=${encodeURIComponent(branchId)}&view=availability`,{signal});
-    if(Array.isArray(live))return stampMenuServiceAvailability(live);
+    if(Array.isArray(live))return stampMenuServiceAvailability(live,undefined,requestStartedMonotonic);
     const receivedMonotonic=typeof performance!=="undefined"?performance.now():Date.now();
     let catalog=catalogs.get(branchId);
     if(!catalog||catalog.revision!==live.revision) {
         let fresh:Catalog|MenuCategory[];
+        const catalogStarted=typeof performance!=="undefined"?performance.now():Date.now();
         try{fresh=await apiClient<Catalog|MenuCategory[]>(`/api/menu/catalog/${encodeURIComponent(branchId)}/${live.revision}`,{signal,cacheMode:"default"});}
         catch(error){if(error instanceof ApiError&&error.status===409&&attempt<1)return readAvailability(branchId,signal,attempt+1);throw error;}
-        if(Array.isArray(fresh))return stampMenuServiceAvailability(fresh);
+        if(Array.isArray(fresh))return stampMenuServiceAvailability(fresh,undefined,catalogStarted);
         rememberCatalog(branchId,fresh);catalog=fresh;
         if(catalog.revision!==live.revision){if(attempt<1)return readAvailability(branchId,signal,attempt+1);throw new Error("Menu changed while checking availability. Please retry.");}
     }
@@ -44,12 +46,12 @@ async function readAvailability(branchId:number,signal:AbortSignal|undefined,att
         const state=states.get(product.id);
         if(!state||!live.serviceWindowsEnabled&&!state.available)return [];
         return [{...product,catalogAvailable:product.available,available:state.available,availabilityRevision:String(live.revision),serviceAvailability:state.serviceAvailability?{...state.serviceAvailability,evaluatedAt:live.observedAt??state.serviceAvailability.evaluatedAt}:state.serviceAvailability}];
-    })})).filter(category=>category.products.length),receivedMonotonic);
+    })})).filter(category=>category.products.length),receivedMonotonic,requestStartedMonotonic);
 }
 
-export function stampMenuServiceAvailability(data:MenuCategory[],receivedMonotonic=typeof performance!=="undefined"?performance.now():Date.now()):MenuCategory[] {
+export function stampMenuServiceAvailability(data:MenuCategory[],receivedMonotonic=typeof performance!=="undefined"?performance.now():Date.now(),requestStartedMonotonic=receivedMonotonic):MenuCategory[] {
     if(!data.some(category=>category.products.some(product=>product.serviceAvailability)))return data;
-    return data.map(category=>({...category,products:category.products.map(product=>product.serviceAvailability?{...product,serviceAvailability:{...product.serviceAvailability,receivedMonotonic}}:product)}));
+    return data.map(category=>({...category,products:category.products.map(product=>product.serviceAvailability?{...product,serviceAvailability:{...product.serviceAvailability,receivedMonotonic,requestStartedMonotonic}}:product)}));
 }
 
 async function loadMenu(

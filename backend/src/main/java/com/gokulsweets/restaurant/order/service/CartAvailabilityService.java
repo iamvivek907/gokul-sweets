@@ -83,6 +83,87 @@ public class CartAvailabilityService {
     }
 
     /**
+     * Finds independently bookable highlights using one batch of product rules, stock and slots. A
+     * candidate never depends on another candidate being bookable in the same slot.
+     */
+    @Transactional(readOnly = true)
+    public Set<Long> bookableHighlights(
+            Long branchId, LocalDate today, List<CreateOrderItemRequest> requested) {
+        long started =
+                MethodTiming.start(
+                        CartAvailabilityService.class,
+                        "bookableHighlights(Long,LocalDate,List<CreateOrderItemRequest>)");
+        try {
+            if (requested.isEmpty()) return Set.of();
+            var validated = validation.validateHighlights(branchId, requested);
+            if (validated.items().isEmpty()) return Set.of();
+            var ids = validated.items().stream().map(item -> item.branchProduct().getId()).toList();
+            var policies =
+                    policyRepository.findByBranchProductIdIn(ids).stream()
+                            .collect(
+                                    Collectors.toMap(
+                                            policy -> policy.getBranchProduct().getId(),
+                                            Function.identity()));
+            var settings = settingsRepository.findByBranchId(branchId).orElse(null);
+            int bookingDays = rules.bookingDays(branchId, settings);
+            LocalDate lastDate = today.plusDays(Math.max(0, bookingDays));
+            var allocations =
+                    inventoryProperties.isEnforcementEnabled()
+                            ? allocationRepository
+                                    .findByBranchProductIdInAndServiceDateBetween(
+                                            ids, today, lastDate)
+                                    .stream()
+                                    .collect(
+                                            Collectors.toMap(
+                                                    a ->
+                                                            new StockKey(
+                                                                    a.getBranchProduct().getId(),
+                                                                    a.getServiceDate()),
+                                                    Function.identity()))
+                            : Map.<StockKey, InventoryDailyAllocation>of();
+            var slots =
+                    slotRepository.findByBranchIdAndSlotDateBetweenOrderBySlotDateAscStartTimeAsc(
+                            branchId, today, lastDate);
+            Set<Long> bookable = new HashSet<>();
+            Map<StockKey, ItemAvailability> stock = new HashMap<>();
+            for (var slot : slots) {
+                if (rules.windowReason(slot, settings, bookingDays) != null
+                        || (slot.getBookedCount() >= slot.getCapacity()
+                                && (!slot.isPriorityEnabled()
+                                        || slot.getPriorityBookedCount()
+                                                >= slot.getPriorityCapacity()))) continue;
+                var date = slot.getSlotDate();
+                var service = validated.serviceAt().apply(date.atTime(slot.getStartTime()));
+                for (var item : validated.items()) {
+                    long productId = item.product().getId();
+                    if (bookable.contains(productId)) continue;
+                    long branchProductId = item.branchProduct().getId();
+                    var key = new StockKey(branchProductId, date);
+                    var policy = policies.get(branchProductId);
+                    var allocation = allocations.get(key);
+                    var dated =
+                            stock.computeIfAbsent(
+                                    key,
+                                    ignored -> stockForDate(item, date, policy, allocation, today));
+                    if (dated.available()
+                            && (policy == null
+                                    || rules.preparationReason(slot, policy, allocation) == null)
+                            && (service.status(productId) == null
+                                    || service.status(productId).available()))
+                        bookable.add(productId);
+                }
+                if (bookable.size() == validated.items().size()) break;
+            }
+            return bookable;
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    CartAvailabilityService.class,
+                    "bookableHighlights(Long,LocalDate,List<CreateOrderItemRequest>)");
+        }
+    }
+
+    /**
      * Menu discovery spans individual product horizons; order validation still checks every item.
      *
      * @param branchId the branch id
@@ -103,6 +184,46 @@ public class CartAvailabilityService {
                 MethodTiming.start(
                         CartAvailabilityService.class,
                         "check(Long,LocalDate,int,List<CreateOrderItemRequest>,boolean)");
+        try {
+            return checkAvailability(branchId, startDate, days, requested, menuPreview, null);
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    CartAvailabilityService.class,
+                    "check(Long,LocalDate,int,List<CreateOrderItemRequest>,boolean)");
+        }
+    }
+
+    /** Evaluates one saved pickup using the same stock, preparation, and service rules. */
+    @Transactional(readOnly = true)
+    public Availability checkMenuSlot(
+            Long branchId, LocalDate date, List<CreateOrderItemRequest> requested, long slotId) {
+        long started =
+                MethodTiming.start(
+                        CartAvailabilityService.class,
+                        "checkMenuSlot(Long,LocalDate,List<CreateOrderItemRequest>,long)");
+        try {
+            return checkAvailability(branchId, date, 1, requested, true, slotId);
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    CartAvailabilityService.class,
+                    "checkMenuSlot(Long,LocalDate,List<CreateOrderItemRequest>,long)");
+        }
+    }
+
+    /** Builds the requested date or selected-slot snapshot from live data. */
+    private Availability checkAvailability(
+            Long branchId,
+            LocalDate startDate,
+            int days,
+            List<CreateOrderItemRequest> requested,
+            boolean menuPreview,
+            Long slotId) {
+        long started =
+                MethodTiming.start(
+                        CartAvailabilityService.class,
+                        "checkAvailability(Long,LocalDate,int,List<CreateOrderItemRequest>,boolean,Long)");
         try {
             Instant evaluatedAt = inventoryClock.instant();
             LocalDate today = LocalDate.now(inventoryClock);
@@ -147,12 +268,22 @@ public class CartAvailabilityService {
                                                                     a.getServiceDate()),
                                                     Function.identity()))
                             : Map.of();
-            Map<LocalDate, List<PickupSlot>> slotsByDate =
-                    slotRepository
-                            .findByBranchIdAndSlotDateBetweenOrderBySlotDateAscStartTimeAsc(
-                                    branchId, startDate, lastDate)
-                            .stream()
-                            .collect(Collectors.groupingBy(PickupSlot::getSlotDate));
+            var pickupSlots =
+                    slotId == null
+                            ? slotRepository
+                                    .findByBranchIdAndSlotDateBetweenOrderBySlotDateAscStartTimeAsc(
+                                            branchId, startDate, lastDate)
+                            : slotRepository.findWithBranchById(slotId).stream()
+                                    .filter(
+                                            slot ->
+                                                    Objects.equals(
+                                                                    slot.getBranch().getId(),
+                                                                    branchId)
+                                                            && slot.getSlotDate().equals(startDate)
+                                                            && slot.getOccasionEnquiryId() == null)
+                                    .toList();
+            var slotsByDate =
+                    pickupSlots.stream().collect(Collectors.groupingBy(PickupSlot::getSlotDate));
             var serviceAt = validated.serviceAt();
             List<DateAvailability> dates = new ArrayList<>();
             for (LocalDate date = startDate; !date.isAfter(lastDate); date = date.plusDays(1)) {
@@ -308,9 +439,9 @@ public class CartAvailabilityService {
             return new Availability("PICKUP", today, maximumDate, dates, recheckAt);
         } finally {
             MethodTiming.finish(
-                    __gokulMethodStartedNanos,
+                    started,
                     CartAvailabilityService.class,
-                    "check(Long,LocalDate,int,List<CreateOrderItemRequest>,boolean)");
+                    "checkAvailability(Long,LocalDate,int,List<CreateOrderItemRequest>,boolean,Long)");
         }
     }
 

@@ -4,9 +4,9 @@ const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??'
 const browser=await chromium.launch({headless:true}),base=process.env.BROWSER_BASE??'http://127.0.0.1:3311';
 const branch={id:1,name:'Test branch',active:true,operational:true,pickupAvailable:true};
 const product={id:1,name:'Fresh sweet',categoryId:1,categoryName:'Sweets',price:100,saleMode:'UNIT',available:true};
-try{for(const mode of ['shared','branch-timeout','menu-timeout','inbox-timeout']){
+try{for(const mode of ['shared','branch-timeout','menu-timeout','menu-transient','inbox-timeout']){
  const context=await browser.newContext({viewport:{width:390,height:900},serviceWorkers:'block'}),page=await context.newPage();page.setDefaultTimeout(15000);
- let holdBranch=mode!=='menu-timeout',holdMenu=mode==='menu-timeout',holdInbox=mode==='inbox-timeout',releaseBranch,releaseMenu,releaseInbox,branchReads=0;
+ let holdBranch=!['menu-timeout','menu-transient'].includes(mode),holdMenu=mode==='menu-timeout',holdInbox=mode==='inbox-timeout',releaseBranch,releaseMenu,releaseInbox,branchReads=0,menuFailures=0;
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await context.addInitScript(branch=>localStorage.setItem('gokul-selected-branch',JSON.stringify(branch)),branch);
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,OPTIONS','Access-Control-Allow-Headers':'content-type'};
@@ -23,7 +23,7 @@ try{for(const mode of ['shared','branch-timeout','menu-timeout','inbox-timeout']
   }
   else if(path==='/api/branches')json=[branch];
   else if(path==='/api/branches/1'){branchReads++;if(holdBranch)await new Promise(resolve=>releaseBranch=resolve);json=branch;}
-  else if(path==='/api/menu'){if(holdMenu)await new Promise(resolve=>releaseMenu=resolve);json=[{id:1,name:'Sweets',products:[product]}];}
+  else if(path==='/api/menu'){if(mode==='menu-transient'&&menuFailures<2){menuFailures++;return route.fulfill({status:503,headers,json:{message:'Temporary outage'}});}if(holdMenu)await new Promise(resolve=>releaseMenu=resolve);json=[{id:1,name:'Sweets',products:[product]}];}
   else if(path==='/api/menu/portion-groups')json={groups:[]};
   try{return await route.fulfill({headers,json});}catch{/* Timed-out reads are cancelled. */}
  });
@@ -37,6 +37,12 @@ try{for(const mode of ['shared','branch-timeout','menu-timeout','inbox-timeout']
   console.log('Notification controls height',Math.round(card.y-heading.y));
   await page.screenshot({path:'/tmp/compact-notification-loading-fix.png'});
   assert.ok(card.y-heading.y<300,'notification controls no longer consume most of the first screen');
+ }else if(mode==='menu-transient'){
+  await page.addInitScript(()=>{window.menuErrorSeen=false;new MutationObserver(()=>{if(document.body?.innerText.includes('Unable to load menu'))window.menuErrorSeen=true;}).observe(document,{childList:true,subtree:true});});
+  await page.goto(`${base}/menu`);
+  await page.getByRole('heading',{name:'Fresh sweet',exact:true}).waitFor();
+  assert.equal(menuFailures,2);
+  assert.equal(await page.evaluate(()=>window.menuErrorSeen),false);
  }else{
   await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
   if(mode==='menu-timeout')await page.getByRole('region',{name:'Loading menu',exact:true}).waitFor();

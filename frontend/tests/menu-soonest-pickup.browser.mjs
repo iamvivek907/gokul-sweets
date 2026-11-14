@@ -14,15 +14,17 @@ const browser=await chromium.launch({headless:true});
 try{for(const width of [320,390,1280]){
  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();page.setDefaultTimeout(15000);
  await page.clock.install({time:new Date(`${today}T22:00:00+05:30`)});
- let outage=false,holdDiscovery=false,release=null,discoveries=0;const dateDiscoveryGates=[];let holdDateDiscovery=false;const checks=[],errors=[];page.on('pageerror',e=>errors.push(e.message));
+ let outage=false,holdDiscovery=false,release=null,discoveries=0;const dateDiscoveryGates=[];let holdDateDiscovery=false;let showCompanion=false, holdConfirmation=false, shrinkBookingWindow=false, releaseConfirmation;
+ let pickerReads=0;
+ const checks=[],errors=[];page.on('pageerror',e=>errors.push(e.message));
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key'};
  await context.route('**/api/**',async route=>{
-  const request=route.request(),path=new URL(request.url()).pathname;let json=[];
+  const request=route.request(),path=new URL(request.url()).pathname;let json=[],heldConfirmation=false;
   if(request.method()==='OPTIONS')return route.fulfill({status:204,headers});
   if(path==='/api/storefront/features')json={futuristicStorefrontV2:true,checkoutExperienceV2:true,contextualStorefrontV2:true,smartAvailability:true,today,futureOrderingDays:7};
   else if(path==='/api/branches')json=[branch];else if(path==='/api/branches/1')json=branch;
-  else if(path==='/api/menu')json={revision:'ready-future',serviceWindowsEnabled:true,observedAt:new Date().toISOString(),items:[{productId:1,available:false,serviceAvailability:{available:false,code:'SERVICE_WINDOW',message:'Available tomorrow morning',nextChangeAt:null}},{productId:2,available:false}]};
-  else if(path==='/api/menu/catalog/1/ready-future')json={revision:'ready-future',categories:[{id:1,name:'Breakfast',products:[product,{...product,id:2,name:'Disabled Paratha',available:false}]}]};
+  else if(path==='/api/menu')json={revision:'ready-future',serviceWindowsEnabled:true,observedAt:new Date().toISOString(),items:[{productId:1,available:false,serviceAvailability:{available:false,code:'SERVICE_WINDOW',message:'Available tomorrow morning',nextChangeAt:null}},{productId:2,available:false},{productId:3,available:showCompanion,serviceAvailability:showCompanion?null:{available:false,code:'SOLD_OUT',message:'Sold out',nextChangeAt:null}}]};
+  else if(path==='/api/menu/catalog/1/ready-future')json={revision:'ready-future',categories:[{id:1,name:'Breakfast',products:[product,{...product,id:2,name:'Disabled Paratha',available:false},{...product,id:3,name:'Companion Paratha'}]}]};
   else if(path==='/api/menu/portion-groups')json={groups:[]};
   else if(path==='/api/storefront/customer-identity')json={enabled:false};
   else if(path.endsWith('/pickup-discovery')){
@@ -32,11 +34,26 @@ try{for(const width of [320,390,1280]){
    if(outage)return route.fulfill({status:503,headers,json:{message:'Offline'}});
    json={today,maximumDate:later,dates:[today,tomorrow,later].map((date,index)=>({date,slots:[{slot:slot(date,index+1),normalAvailable:true,issues:[]}]}))};
   }else if(path.endsWith('/availability')){
-   const date=request.postDataJSON().startDate;checks.push(date);
+   const payload=request.postDataJSON(),date=payload.startDate;checks.push(date);
+   if(payload.days>1)pickerReads++;
+   if(holdConfirmation&&payload.days===1&&!new URL(request.url()).searchParams.has('menuPreview')){
+    holdConfirmation=false;heldConfirmation=true;
+    await new Promise(resolve=>{releaseConfirmation=resolve;});
+   }
    if(outage)return route.fulfill({status:503,headers,json:{message:'Offline'}});
-   json={today,maximumDate:later,dates:[{date,available:true,items:[{productId:1,productName:product.name,available:true}],slots:[{slot:slot(date,[today,tomorrow,later].indexOf(date)+1),normalAvailable:true,issues:[]}]}]};
+   if(shrinkBookingWindow&&payload.days===1&&date===later&&!new URL(request.url()).searchParams.has('menuPreview')){
+    return route.fulfill({status:400,headers,json:{code:'INVALID_REQUEST',message:'Choose a date within the advance ordering window.'}});
+   }
+   const dates=payload.days===1?[date]:shrinkBookingWindow?[tomorrow]:[tomorrow,later];
+   if(payload.items.some(item=>item.productId===3&&!showCompanion)){
+    return route.fulfill({status:400,headers,json:{code:'INVALID_REQUEST',message:'Companion Paratha is sold out.'}});
+   }
+   json={today,maximumDate:dates.at(-1),dates:dates.map(value=>({
+    date:value,available:true,items:payload.items.map(item=>({productId:item.productId,available:item.productId!==3||showCompanion})),
+    slots:[{slot:slot(value,[today,tomorrow,later].indexOf(value)+1),normalAvailable:true,issues:[]}]
+   }))};
   }
-  await route.fulfill({headers,json});
+  try{await route.fulfill({headers,json});}catch(error){if(!heldConfirmation)throw error;}
  });
  // Empty-cart branch switches retain the old branch's pickup; it must not block the new default.
  await context.addInitScript(({branch,oldPickup})=>{
@@ -95,6 +112,100 @@ try{for(const width of [320,390,1280]){
  const dialog=page.getByRole('dialog',{name:'Choose pickup date & time'});
  await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-menu-pickup-mode:v1')).mode),'soonest','cancelling the picker preserves automatic mode');
+ if(width===390){
+  // An unrelated catalogue change must leave the modal open.
+  await page.evaluate(product=>{
+   localStorage.setItem('gokul-cart',JSON.stringify({branchId:1,items:[{product,quantity:1,weightGrams:null}]}));
+   window.dispatchEvent(new Event('gokul-cart-change'));
+  },product);
+  await pickup.getByRole('button',{name:'Change time',exact:true}).click();
+  const confirm=dialog.getByRole('button',{name:'Use this pickup',exact:true});
+  const standard=dialog.getByRole('button',{name:/08:00.*Standard/});
+  await standard.waitFor();
+  const companion='#gokul-product-3';
+  await page.locator(`${companion} [data-sold-out="true"]`).waitFor({state:'attached'});
+  const readsBefore=pickerReads;
+  showCompanion=true;
+  await page.clock.runFor(31000);
+  await page.waitForFunction(selector=>document.querySelector(`${selector} button[data-ordering-target="add"]`)?.disabled===false,companion);
+  assert.equal(await dialog.isVisible(),true);
+  assert.equal(pickerReads,readsBefore,'an unrelated dish change does not reload pickup options');
+  const previous=await saved();
+  const laterDate=dialog.getByRole('button',{name:later,exact:true});
+  await laterDate.click();
+  await standard.click();
+  holdConfirmation=true;
+  await confirm.click();
+  await dialog.getByRole('button',{name:'Checking pickup…',exact:true}).waitFor();
+  const deadline=Date.now()+5000;
+  while(!releaseConfirmation&&Date.now()<deadline)await page.waitForTimeout(50);
+  assert.ok(releaseConfirmation,'confirmation is in flight');
+  try{
+   const refreshed=page.waitForResponse(response=>{
+    if(!response.url().endsWith('/availability')||response.request().method()!=='POST')return false;
+    const payload=response.request().postDataJSON();
+    return payload.days>1&&payload.items.some(item=>item.productId===1&&item.quantity===2);
+   });
+   shrinkBookingWindow=true;
+   await page.evaluate(()=>{
+    const cart=JSON.parse(localStorage.getItem('gokul-cart'));
+    cart.items[0].quantity=2;
+    localStorage.setItem('gokul-cart',JSON.stringify(cart));
+    window.dispatchEvent(new Event('gokul-cart-change'));
+   });
+   await refreshed;
+   await standard.waitFor();
+   assert.equal(await laterDate.count(),0,'the refreshed booking window removed the selected day');
+   assert.equal(await dialog.getByRole('button',{name:tomorrow,exact:true}).getAttribute('aria-pressed'),'true');
+   assert.equal(await dialog.getByRole('alert').count(),0,'cancelling a stale check is silent');
+   assert.deepEqual(await saved(),previous,'stale confirmation leaves the saved pickup intact');
+  }finally{releaseConfirmation();}
+  await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
+  shrinkBookingWindow=false;
+  await pickup.getByRole('button',{name:'Change time',exact:true}).click();
+  await laterDate.click();
+  await standard.click();
+  shrinkBookingWindow=true;
+  const recoveredWindow=page.waitForResponse(response=>
+   response.url().endsWith('/availability')&&response.request().method()==='POST'
+   &&response.request().postDataJSON().days>1);
+  await confirm.click();
+  assert.equal((await recoveredWindow).status(),200);
+  const tomorrowDate=dialog.getByRole('button',{name:tomorrow,exact:true});
+  await tomorrowDate.waitFor();
+  await page.waitForFunction(date=>document.querySelector(`.mobile-pickup-dates button[aria-label="${date}"]`)?.getAttribute('aria-pressed')==='true',tomorrow);
+  assert.equal(await laterDate.count(),0,'confirmation recovery shows the remaining booking window');
+  assert.equal(await standard.isEnabled(),true);
+  await standard.click();
+  assert.equal(await confirm.isEnabled(),true,'a remaining slot can be confirmed after the date rejection');
+  assert.deepEqual(await saved(),previous,'reloading the booking window leaves the saved pickup intact');
+  await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
+  shrinkBookingWindow=false;
+  await page.evaluate(()=>window.dispatchEvent(new CustomEvent('gokul-request-menu-pickup',{detail:{productId:3}})));
+  await dialog.getByText('Companion Paratha',{exact:true}).waitFor();
+  const recheck=page.waitForResponse(response=>{
+   if(!response.url().endsWith('/availability')||response.request().method()!=='POST')return false;
+   const payload=response.request().postDataJSON();
+   return payload.days>1&&payload.items.some(item=>item.productId===3);
+  });
+  showCompanion=false;
+  await page.clock.runFor(31000);
+  assert.equal((await recheck).status(),400);
+  await dialog.getByRole('alert').getByText('Companion Paratha is sold out.',{exact:true}).waitFor();
+  assert.equal(await confirm.isDisabled(),true);
+  assert.deepEqual(await saved(),previous,'a sold-out dish leaves the saved pickup intact');
+  assert.equal(await dialog.isVisible(),true,'the dish that opened the picker triggers an in-place recheck');
+  showCompanion=true;
+  await page.clock.runFor(31000);
+  await standard.waitFor();
+  assert.equal(await dialog.getByRole('alert').count(),0,'the open picker recovers when the dish returns');
+  await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
+  await page.evaluate(()=>{
+   localStorage.removeItem('gokul-cart');
+   window.dispatchEvent(new Event('gokul-cart-change'));
+  });
+  showCompanion=false;shrinkBookingWindow=false;
+ }
  // At midnight tomorrow's valid first slot stays put, now labelled Today with the actual date.
  await page.clock.fastForward(2*60*60*1000+1000);await pickup.getByText(/Today, .*8:00/).waitFor();assert.equal((await saved()).date,tomorrow);
  // An expired automatic slot advances while empty, including to a future date.

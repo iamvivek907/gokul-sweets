@@ -391,10 +391,10 @@ class CustomerIdentityControllerTest {
         var subject = UUID.randomUUID();
         when(sessions.subject(eq(ConsentEnvironment.DEV), eq("session-token"), any()))
                 .thenReturn(Optional.of(subject));
-        when(subjects.verifiedPhone(ConsentEnvironment.DEV, subject))
-                .thenReturn(Optional.of("+919876543210"));
-        when(subjects.displayName(ConsentEnvironment.DEV, subject))
-                .thenReturn(Optional.of("Vivek"));
+        when(subjects.profile(ConsentEnvironment.DEV, subject))
+                .thenReturn(
+                        Optional.of(
+                                new VerifiedCustomerPhoneLookup.Profile("+919876543210", "Vivek")));
         assertThat(controller.me(request).getBody())
                 .containsEntry("authenticated", true)
                 .containsEntry("phone", "+919876543210")

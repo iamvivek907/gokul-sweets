@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.sql.Date;
 import java.time.*;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -59,8 +60,8 @@ class StorefrontHighlightsControllerTest {
         when(jdbc.queryForList(anyString(), eq(Long.class), anyLong(), any(Date.class)))
                 .thenReturn(List.of(11L));
         when(jdbc.queryForList(anyString(), eq(Long.class), anyLong())).thenReturn(List.of(11L));
-        when(availability.check(anyLong(), any(LocalDate.class), anyInt(), anyList()))
-                .thenReturn(result(true));
+        when(availability.bookableHighlights(anyLong(), any(LocalDate.class), anyList()))
+                .thenReturn(Set.of(11L));
     }
 
     @Test
@@ -73,10 +74,9 @@ class StorefrontHighlightsControllerTest {
         assertThat(first.latestProductIds()).containsExactly(11L);
         verify(menu).getMenu(1L);
         verify(availability)
-                .check(
+                .bookableHighlights(
                         1L,
                         LocalDate.now(clock),
-                        31,
                         List.of(new CreateOrderItemRequest(11L, null, 250)));
         verify(jdbc)
                 .queryForList(
@@ -90,15 +90,15 @@ class StorefrontHighlightsControllerTest {
     void refreshesAtExpiryAndKeepsLatestCatalogWhenPickupIsUnavailable() {
         controller.highlights(1L);
         when(clock.instant()).thenReturn(now.plusSeconds(30));
-        when(availability.check(anyLong(), any(LocalDate.class), anyInt(), anyList()))
-                .thenReturn(result(false));
+        when(availability.bookableHighlights(anyLong(), any(LocalDate.class), anyList()))
+                .thenReturn(Set.of());
         var refreshed = controller.highlights(1L);
         assertThat(refreshed.trendingProductIds()).isEmpty();
         assertThat(refreshed.newProductIds()).isEmpty();
         assertThat(refreshed.latestProductIds()).containsExactly(11L);
         assertThat(controller.highlights(1L)).isSameAs(refreshed);
         verify(menu, times(2)).getMenu(1L);
-        verify(availability, times(2)).check(eq(1L), any(LocalDate.class), eq(31), anyList());
+        verify(availability, times(2)).bookableHighlights(eq(1L), any(LocalDate.class), anyList());
     }
 
     @Test
@@ -131,9 +131,9 @@ class StorefrontHighlightsControllerTest {
         controller.highlights(1L);
         features.setFutureOrderingDays(10);
         controller.highlights(1L);
-        verify(availability).check(eq(1L), eq(LocalDate.of(2026, 9, 22)), eq(31), anyList());
-        verify(availability).check(eq(1L), eq(LocalDate.of(2026, 9, 23)), eq(31), anyList());
-        verify(availability).check(eq(1L), eq(LocalDate.of(2026, 9, 23)), eq(11), anyList());
+        verify(availability).bookableHighlights(eq(1L), eq(LocalDate.of(2026, 9, 22)), anyList());
+        verify(availability, times(2))
+                .bookableHighlights(eq(1L), eq(LocalDate.of(2026, 9, 23)), anyList());
     }
 
     @Test
@@ -163,12 +163,12 @@ class StorefrontHighlightsControllerTest {
         var loading = new CountDownLatch(1);
         var release = new CountDownLatch(1);
         var secondStarted = new CountDownLatch(1);
-        when(availability.check(eq(1L), any(LocalDate.class), anyInt(), anyList()))
+        when(availability.bookableHighlights(eq(1L), any(LocalDate.class), anyList()))
                 .thenAnswer(
                         invocation -> {
                             loading.countDown();
                             assertThat(release.await(5, TimeUnit.SECONDS)).isTrue();
-                            return result(true);
+                            return Set.of(11L);
                         });
         try (var executor = Executors.newFixedThreadPool(3)) {
             var first = executor.submit(() -> controller.highlights(1L));
@@ -193,17 +193,6 @@ class StorefrontHighlightsControllerTest {
                 release.countDown();
             }
         }
-        verify(availability).check(eq(1L), any(LocalDate.class), anyInt(), anyList());
-    }
-
-    private CartAvailabilityService.Availability result(boolean available) {
-        var today = LocalDate.ofInstant(now, ZoneId.of("Asia/Kolkata"));
-        return new CartAvailabilityService.Availability(
-                "PICKUP",
-                today,
-                today.plusDays(30),
-                List.of(
-                        new CartAvailabilityService.DateAvailability(
-                                today, available, List.of(), List.of(), null, false)));
+        verify(availability).bookableHighlights(eq(1L), any(LocalDate.class), anyList());
     }
 }

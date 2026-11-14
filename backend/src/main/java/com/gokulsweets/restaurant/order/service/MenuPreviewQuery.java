@@ -54,6 +54,23 @@ public class MenuPreviewQuery {
                         MenuPreviewQuery.class,
                         "check(long,LocalDate,List<CreateOrderItemRequest>)");
         try {
+            return check(branchId, date, items, null);
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    MenuPreviewQuery.class,
+                    "check(long,LocalDate,List<CreateOrderItemRequest>)");
+        }
+    }
+
+    /** Reads a preview scoped to the selected slot when supplied. */
+    public CartAvailabilityService.Availability check(
+            long branchId, LocalDate date, List<CreateOrderItemRequest> items, Long slotId) {
+        long started =
+                MethodTiming.start(
+                        MenuPreviewQuery.class,
+                        "check(long,LocalDate,List<CreateOrderItemRequest>,Long)");
+        try {
             try {
                 return transaction.execute(
                         status -> {
@@ -61,7 +78,9 @@ public class MenuPreviewQuery {
                                     "SET LOCAL statement_timeout='"
                                             + AppConstant.MENU_PREVIEW_TIMEOUT_SECONDS
                                             + "s'");
-                            return service.check(branchId, date, 1, items, true);
+                            return slotId == null
+                                    ? service.check(branchId, date, 1, items, true)
+                                    : service.checkMenuSlot(branchId, date, items, slotId);
                         });
             } catch (TransientDataAccessException
                     | TransactionTimedOutException
@@ -75,7 +94,7 @@ public class MenuPreviewQuery {
             MethodTiming.finish(
                     started,
                     MenuPreviewQuery.class,
-                    "check(long,LocalDate,List<CreateOrderItemRequest>)");
+                    "check(long,LocalDate,List<CreateOrderItemRequest>,Long)");
         }
     }
 }

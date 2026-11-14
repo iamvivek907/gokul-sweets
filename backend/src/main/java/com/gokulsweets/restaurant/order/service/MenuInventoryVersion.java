@@ -23,6 +23,7 @@ public class MenuInventoryVersion {
     public String read(long branchId, LocalDate date) {
         long started = MethodTiming.start(MenuInventoryVersion.class, "read(long,LocalDate)");
         try {
+            int futureDays = features.getFutureOrderingDays();
             String token =
                     jdbc.queryForObject(
                             """
@@ -32,19 +33,28 @@ SELECT r.token::text || ':' ||
     JOIN branch_products bp ON bp.id=a.branch_product_id
     WHERE bp.branch_id=? AND a.service_date=?), 'empty') || ':' ||
   COALESCE((SELECT md5(string_agg(s.availability_token::text, ',' ORDER BY s.id))
-    FROM pickup_slots s WHERE s.branch_id=? AND s.slot_date=? AND s.occasion_enquiry_id IS NULL), 'empty')
+    FROM pickup_slots s WHERE s.branch_id=? AND s.slot_date=? AND s.occasion_enquiry_id IS NULL), 'empty') || ':' ||
+  LEAST(?, COALESCE(
+    (SELECT maintain_days - 1 FROM rolling_branch_schedules WHERE branch_id=? AND enabled),
+    (SELECT advance_booking_days FROM branch_pickup_settings WHERE branch_id=?),
+    ?
+  ))::text
 FROM menu_catalog_revision r WHERE r.id=true
 """,
                             String.class,
                             branchId,
                             date,
                             branchId,
-                            date);
+                            date,
+                            futureDays,
+                            branchId,
+                            branchId,
+                            futureDays);
             return token
                     + ":"
                     + features.isSmartAvailability()
                     + ":"
-                    + features.getFutureOrderingDays()
+                    + futureDays
                     + ":"
                     + features.isPlannedPickupProduction()
                     + ":"
