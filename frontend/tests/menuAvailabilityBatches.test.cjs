@@ -4,7 +4,7 @@ class ApiError extends Error {
   super(code);Object.assign(this,{status,code,retryAfterMs});
  }
 }
-function fixture(respond){const calls=[],box={exports:{},TypeError,AbortController,DOMException,setTimeout,clearTimeout,require:()=>({ApiError,apiClient:async(path,options)=>{const body=JSON.parse(options.body);calls.push({path,body,signal:options.signal});return respond(body,calls.length);}})};vm.runInNewContext(ts.transpileModule(fs.readFileSync('services/availabilityApi.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,box);return {...box.exports,calls};}
+function fixture(respond,timers={setTimeout,clearTimeout}){const calls=[],box={exports:{},TypeError,AbortController,DOMException,...timers,require:()=>({ApiError,apiClient:async(path,options)=>{const body=JSON.parse(options.body);calls.push({path,body,signal:options.signal});return respond(body,calls.length);}})};vm.runInNewContext(ts.transpileModule(fs.readFileSync('services/availabilityApi.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,box);return {...box.exports,calls};}
 const items=Array.from({length:215},(_,i)=>({productId:i+1,quantity:i===0?7:1,weightGrams:null}));
 const response=body=>({fulfilmentType:'PICKUP',today:'2026-10-07',maximumDate:'2026-10-10',dates:[{date:body.startDate,available:true,items:body.items.map(p=>({productId:p.productId,available:true})),slots:[{slot:{id:1,remainingCapacity:10},normalAvailable:true,priorityAvailable:false,issues:[]}]}]});
 test('full catalogue uses bounded two-request waves and preserves actual cart quantities',async()=>{const f=fixture(response);const data=await f.checkMenuAvailability(1,'2026-10-08',1,items);assert.deepEqual(f.calls.map(c=>c.body.items.length),[100,100,15]);assert.equal(f.calls[0].body.items[0].quantity,7);assert.ok(f.calls.every(c=>c.path.endsWith('?menuPreview=true&compact=true&versioned=true')));assert.deepEqual(Array.from(data.dates[0].items,p=>p.productId),items.map(p=>p.productId));});
@@ -163,4 +163,36 @@ test('cancelling a stalled attempt aborts the request without a retry', async()=
  assert.equal(signals.length,1);
  assert.equal(signals[0].aborted,true);
  assert.equal(getEventListeners(parent.signal,'abort').length,0);
+});
+
+test('a slow successful menu read retains the original eight-second window',async()=>{
+ const scheduled = new Map();
+ const f=fixture(response,{
+  setTimeout(callback,delay){const token=Symbol();scheduled.set(token,{callback,delay});return token;},
+  clearTimeout(token){scheduled.delete(token);}
+ });
+ let resolveRead, attemptSignal;
+ const pending=f.retryMenuRead(signal=>{
+  attemptSignal=signal;
+  return new Promise(resolve=>{resolveRead=resolve;});
+ });
+ for(const timer of scheduled.values())if(timer.delay<=6500)timer.callback();
+ assert.equal(attemptSignal.aborted,false);
+ resolveRead('ready');
+ assert.equal(await pending,'ready');
+ assert.equal(scheduled.size,0);
+ assert.ok(f.MENU_READ_RETRY_DEADLINE_MS>=16000+180,'a timeout leaves a full retry window');
+});
+
+test('cart pickup recovery retries the same whole cart without using the menu preview',async()=>{
+ const f=fixture((body,attempt)=>{
+  if(attempt===1)throw new ApiError(503,'UNAVAILABLE');
+  return response(body);
+ });
+ await f.retryMenuRead(signal=>f.checkCartAvailability(1,'2026-10-08',1,items.slice(0,2),signal));
+ assert.equal(f.calls.length,2);
+ assert.equal(f.calls[0].path,'/api/branches/1/availability');
+ assert.equal(f.calls[1].path,f.calls[0].path);
+ assert.deepEqual(f.calls[1].body,f.calls[0].body);
+ assert.equal(f.calls[1].body.items[0].quantity,7);
 });

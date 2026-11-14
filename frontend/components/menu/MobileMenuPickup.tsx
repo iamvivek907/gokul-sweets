@@ -9,7 +9,7 @@ import {savePickupSlot,getPickupSlotSnapshot,clearPickupSlot} from "@/lib/checko
 import {savePickupIntent} from "@/hooks/usePickupIntent";
 import {getStoredBranchSnapshot} from "@/lib/branchStorage";
 import {getCartSnapshot,parseCart} from "@/lib/cartStorage";
-import {availabilityItems,checkCartAvailability,discoverPickupDates,retryMenuRead,type CartAvailability} from "@/services/availabilityApi";
+import {availabilityItems,checkCartAvailability,discoverPickupDates,MENU_READ_RETRY_DEADLINE_MS,retryMenuRead,type CartAvailability} from "@/services/availabilityApi";
 import {cartPickupOptions,branchPickupOptions} from "@/lib/menuPickupOptions";
 import {T,useLanguage,translate} from "@/lib/language";
 import type {MenuProduct} from "@/types/menu";
@@ -88,7 +88,7 @@ export default function MobileMenuPickup({compactHeader=false,showHelp=false,bra
    if(cart.items.length&&cart.branchId!==branchId)throw new Error("Choose your cart’s branch before changing pickup.");
    const items=requestedItems(cart);
    if(items.length>100)throw new Error("Review this large cart at checkout before changing pickup.");
-   const signal=AbortSignal.any([c.signal,AbortSignal.timeout(15000)]);
+   const signal=AbortSignal.any([c.signal,AbortSignal.timeout(MENU_READ_RETRY_DEADLINE_MS)]);
    const value=await retryMenuRead(attempt => items.length
     ? checkCartAvailability(branchId,today,days+1,items,attempt)
     : discoverPickupDates(branchId,today,days+1,attempt), signal);
@@ -125,7 +125,7 @@ export default function MobileMenuPickup({compactHeader=false,showHelp=false,bra
   const amounts=new Map(cartItems.map(item=>[item.productId,item]));
   const requested=cartItems;
   const c=new AbortController();controller.current=c;
-  const signal=AbortSignal.any([c.signal,AbortSignal.timeout(15000)]);
+  const signal=AbortSignal.any([c.signal,AbortSignal.timeout(MENU_READ_RETRY_DEADLINE_MS)]);
   const fresh=await retryMenuRead(attempt => cartItems.length
    ? checkCartAvailability(branchId,value.date,1,requested,attempt)
    : discoverPickupDates(branchId,value.date,1,attempt), signal);

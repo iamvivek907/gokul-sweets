@@ -14,7 +14,7 @@ import {useCart} from "@/hooks/useCart";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {savePickupIntent, usePickupIntent} from "@/hooks/usePickupIntent";
-import {availabilityItems, checkCartAvailability, checkMenuAvailability, discoverPickupDates, menuPreviewDeadline, retryMenuRead, type CartAvailability} from "@/services/availabilityApi";
+import {availabilityItems, checkCartAvailability, checkMenuAvailability, discoverPickupDates, menuPreviewDeadline, MENU_READ_RETRY_DEADLINE_MS, retryMenuRead, type CartAvailability} from "@/services/availabilityApi";
 import CartSwitchDialog from "@/components/cart/CartSwitchDialog";
 import {clearPickupSlot, getPickupSlotSnapshot, savePickupSlot} from "@/lib/checkoutStorage";
 import {getCartSnapshot, parseCart} from "@/lib/cartStorage";
@@ -78,10 +78,10 @@ export function useDateAvailability(products?: MenuProduct[]) {
         const timer = window.setTimeout(() => {
             const started = performance.now();
             const items = JSON.parse(itemsJson);
-            const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]);
+            const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(MENU_READ_RETRY_DEADLINE_MS)]);
             const read = menuPreview
                 ? checkMenuAvailability(branch.id, requestDate, 1, items, signal, previewSlotId)
-                : checkCartAvailability(branch.id, requestDate, 1, items, signal);
+                : retryMenuRead(attempt => checkCartAvailability(branch.id, requestDate, 1, items, attempt), signal);
             void read
                 .then(data => {
                     if (controller.signal.aborted) return;

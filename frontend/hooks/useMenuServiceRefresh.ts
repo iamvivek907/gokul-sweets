@@ -1,7 +1,7 @@
 "use client";
 import {useEffect, type Dispatch, type SetStateAction} from "react";
 import {refreshMenuAvailability} from "@/services/menuApi";
-import {retryMenuRead} from "@/services/availabilityApi";
+import {MENU_READ_RETRY_DEADLINE_MS, retryMenuRead} from "@/services/availabilityApi";
 import type {MenuCategory} from "@/types/menu";
 
 /** Refresh server decisions at the next IST service boundary; never trust the device's hour. */
@@ -24,7 +24,7 @@ export function useMenuServiceRefresh(
    if(expired)setCategories(current=>current.map(c=>({...c,products:c.products.map(p=>p.serviceAvailability?.nextChangeAt&&Date.parse(p.serviceAvailability.nextChangeAt)<=serverStart+elapsed()?{...p,available:false,serviceAvailability:{...p.serviceAvailability,code:"CHECKING",message:"Checking current availability…"}}:p)})));
    if(busy||!navigator.onLine||document.visibilityState!=="visible")return;
    busy=true;
-   const signal=AbortSignal.any([controller.signal,AbortSignal.timeout(8000)]);
+   const signal=AbortSignal.any([controller.signal,AbortSignal.timeout(MENU_READ_RETRY_DEADLINE_MS)]);
    try{const fresh=await retryMenuRead(attempt=>refreshMenuAvailability(branchId!,attempt),signal);if(!controller.signal.aborted)onRefresh(fresh);}catch{/* A failed refresh keeps cart and last menu; expired items remain blocked. */}finally{busy=false;}
   }
   const timer=window.setInterval(()=>void refresh(expired()),30000);

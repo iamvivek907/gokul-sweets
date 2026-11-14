@@ -16,7 +16,7 @@ const original={date,slot:slot(date),pickupType:'NORMAL'};
 try{
  for(const width of [320,390,640,1280]){
   const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',reducedMotion:width===640?'reduce':'no-preference',hasTouch:true}),page=await context.newPage();page.setDefaultTimeout(15000);
-  const errors=[],checks=[];let failSettings=false,portionReads=0;
+  const errors=[],checks=[];let failSettings=false,portionReads=0,portionFailures=width===390?3:1;
   page.on('pageerror',e=>errors.push(e.message));
   const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,PUT,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key'};
   await context.route('**/api/**',async route=>{
@@ -30,7 +30,7 @@ try{
    else if(path==='/api/menu')json=[{id:1,name:'Snacks',products:products.filter(p=>p.categoryId===1)},{id:2,name:'Sweets',products:products.filter(p=>p.categoryId===2)}];
    else if(path==='/api/menu/details')json=[{productId:5,servingInfo:null,ingredients:null,allergens:null,spiceLevel:'MEDIUM',photoFocusX:50,photoFocusY:50,chefPick:true,version:1}];
    else if(path==='/api/menu/portion-groups'){
-    if(++portionReads===1)return route.fulfill({status:503,headers,json:{message:'Temporary outage'}});
+    if(++portionReads<=portionFailures)return route.fulfill({status:503,headers,json:{message:'Temporary outage'}});
     json={groups:[{key:'burger',title:'Paneer Burger',choices:[{productId:1,label:'Half'},{productId:2,label:'Full'}]}]};
    }
    else if(path==='/api/storefront/customer-identity')json={enabled:true,guestCheckoutEnabled:false};
@@ -51,6 +51,13 @@ try{
    if(!localStorage.getItem('gokul-selected-pickup-slot'))localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify(original));
   },{branch,original,products});
   await page.clock.install();await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
+  if(width===390){
+   const notice=page.locator('.menu-refresh-notice').filter({hasText:'Dish sizes could not load'});
+   await notice.waitFor();
+   assert.equal(portionReads,3,'the notice follows the automatic retries');
+   await notice.getByRole('button',{name:'Try again',exact:true}).click();
+   await notice.waitFor({state:'hidden'});
+  }
   const group=page.locator('#gokul-product-1').getByRole('button',{name:'Choose options for Paneer Burger',exact:true});
   await group.waitFor();
   assert.ok(portionReads>=2,'the group loads after a transient failure without reloading');

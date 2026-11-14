@@ -100,9 +100,12 @@ export async function discoverPickupDates(branchId:number,startDate:string,days:
     return readAvailability(await apiClient<CartAvailability>(`/api/branches/${branchId}/pickup-discovery?startDate=${encodeURIComponent(startDate)}&days=${days}`,{signal}));
 }
 
+// Keep the normal eight-second request window and leave a second window for recovery.
+export const MENU_READ_RETRY_DEADLINE_MS = 17000;
+
 /** Give transient menu reads up to two quiet retries within the caller's deadline. */
 export async function retryMenuRead<T>(
-    read: (signal: AbortSignal) => Promise<T>, signal?: AbortSignal, attemptTimeout = 5500
+    read: (signal: AbortSignal) => Promise<T>, signal?: AbortSignal, attemptTimeout = 8000
 ): Promise<T> {
     const delays = [180, 450] as const;
     for (let attempt = 0; ; attempt++) {

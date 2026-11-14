@@ -271,7 +271,7 @@ function CartContent() {
                             {inPlaceBranchSwitch && branch && !cartMatchesSelectedBranch &&
                                 <BranchConflictReview branchId={branch.id} items={items} snapshot={snapshot} removeItem={handleRemoveItem} clearCart={clearCart} />}
 
-                            {(pickupCheck.selectionUnavailable || pickupCheck.items?.some(item => !item.available)) &&
+                            {(pickupCheck.error || pickupCheck.selectionUnavailable || pickupCheck.items?.some(item => !item.available)) &&
                                 <PickupContext check={pickupCheck} cart />}
 
                             <div

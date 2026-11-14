@@ -32,7 +32,7 @@ import LinkFeedback from "@/components/common/LinkFeedback";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {usePhoneViewport} from "@/hooks/usePhoneViewport";
 import {apiClient} from "@/services/apiClient";
-import {retryMenuRead} from "@/services/availabilityApi";
+import {MENU_READ_RETRY_DEADLINE_MS, retryMenuRead} from "@/services/availabilityApi";
 import {matchesMobileFilters,mobileMenuRows,type PortionGroup} from "@/lib/mobileMenu";
 import {progressiveBatches} from "@/lib/progressiveBatches";
 import {readMenuBrowse,writeMenuBrowse,browserMenuStorage,type MenuBrowseState} from "@/lib/menuBrowseState";
@@ -335,7 +335,7 @@ export default function MenuScreen() {
 
                 try {
 
-                    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]);
+                    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(MENU_READ_RETRY_DEADLINE_MS)]);
                     const result =
                         await retryMenuRead(attempt => getMenu(
                             selectedBranch.id,
@@ -736,11 +736,12 @@ export default function MenuScreen() {
         return()=>{save();window.removeEventListener("scroll",scroll);window.removeEventListener("pagehide",save);};
     },[branch,restoredBrowse]);
     const [portionSnapshot,setPortionSnapshot]=useState<{branchId:number;groups:PortionGroup[]}|null>(null);
+    const [portionFailure, setPortionFailure] = useState<string | null>(null);
     const portionGroups=useMemo(()=>portionSnapshot?.branchId===branch?.id?portionSnapshot?.groups??[]:[],[portionSnapshot,branch?.id]);
     useEffect(() => {
-        if (!groupedMenu || branchId === undefined) return;
+        if (!groupedMenu || branchId === undefined || loadKey === null) return;
         const controller = new AbortController();
-        const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]);
+        const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(MENU_READ_RETRY_DEADLINE_MS)]);
         void retryMenuRead(attempt => apiClient<{groups: PortionGroup[]}>(
             `/api/menu/portion-groups?branchId=${branchId}`, {signal: attempt}
         ), signal).then(value => {
@@ -752,9 +753,15 @@ export default function MenuScreen() {
                 )
             ) : [];
             setPortionSnapshot({branchId, groups});
-        }).catch(() => { /* Individual dishes remain browsable if group metadata is unavailable. */ });
+            setPortionFailure(null);
+        }).catch(() => {
+            if (!controller.signal.aborted) setPortionFailure(loadKey);
+        });
         return () => controller.abort();
-    }, [groupedMenu, branchId]);
+    }, [groupedMenu, branchId, loadKey]);
+    const menuRefreshNotice = refreshError ?? (groupedMenu && !error && portionFailure !== null
+        && portionFailure === loadKey && portionSnapshot?.branchId !== branchId
+        ? "Dish sizes could not load. Try again to group them." : null);
     const pickupCheck = useDateAvailability(allProducts);
     const pickupChecking = !!pickupCheck.features?.smartAvailability && (pickupCheck.pickupRequired || pickupCheck.findingSoonest || !pickupCheck.items || !!pickupCheck.error || !!pickupCheck.automaticError);
     const pickupStatusMessage = pickupCheck.error || pickupCheck.automaticError ? "Pickup check failed. Please retry."
@@ -1428,7 +1435,7 @@ export default function MenuScreen() {
                 </header>}
 
 
-                {refreshError&&<aside className="menu-refresh-notice" role="status"><T text={refreshError}/><button type="button" onClick={retryMenu}><T text="Try again"/></button></aside>}
+                {menuRefreshNotice&&<aside className="menu-refresh-notice" role="status"><T text={menuRefreshNotice}/><button type="button" onClick={retryMenu}><T text="Try again"/></button></aside>}
                 {groupedMenu&&!!appearance?.banners.length&&<div className="menu-leading-campaign"><MenuCampaignBanners {...campaignControls} banners={appearance.banners} categories={categories} onSelect={id => {jumpMenuCategory(id);setBrowseCategory({branchId:branch.id,id});}} compact={phoneMenu}/></div>}
                 <MenuToolbar enabled={phoneMenu}>
                 {!mobileFeatures?.smartAvailability&&(mobileFeatures?.futuristicStorefrontV2||mobileFeatures?.checkoutExperienceV2)&&<button type="button" className="menu-pickup-help ordering-tour-replay" aria-label={translate("How to order")} onClick={()=>window.dispatchEvent(new Event(OPEN_ORDERING_TOUR))}><span aria-hidden="true">?</span></button>}
