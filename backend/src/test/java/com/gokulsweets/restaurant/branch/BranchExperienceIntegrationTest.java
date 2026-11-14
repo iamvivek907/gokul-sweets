@@ -70,7 +70,11 @@ class BranchExperienceIntegrationTest {
             assertThat(branches.getBranch(id).coverImageUrl()).isNull();
             assertThat(branches.getBranch(id).pickupAvailable()).isFalse();
             jdbc.update(
-                    "INSERT INTO branch_pickup_settings(branch_id,enabled) VALUES (?,true)", id);
+                    """
+                    INSERT INTO branch_pickup_settings(branch_id, enabled, opening_time, closing_time)
+                    VALUES (?, true, TIME '09:00', TIME '21:00')
+                    """,
+                    id);
             var live = experience.publish(id, media.editVersion());
             assertThat(live.publishedRevision()).isEqualTo(1);
             assertThat(branches.getBranch(id).coverImageUrl())
