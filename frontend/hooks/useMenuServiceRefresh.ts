@@ -25,7 +25,7 @@ export function useMenuServiceRefresh(
    if(busy||!navigator.onLine||document.visibilityState!=="visible")return;
    busy=true;
    const signal=AbortSignal.any([controller.signal,AbortSignal.timeout(8000)]);
-   try{const fresh=await retryMenuRead(()=>refreshMenuAvailability(branchId!,signal),signal);if(!controller.signal.aborted)onRefresh(fresh);}catch{/* A failed refresh keeps cart and last menu; expired items remain blocked. */}finally{busy=false;}
+   try{const fresh=await retryMenuRead(attempt=>refreshMenuAvailability(branchId!,attempt),signal);if(!controller.signal.aborted)onRefresh(fresh);}catch{/* A failed refresh keeps cart and last menu; expired items remain blocked. */}finally{busy=false;}
   }
   const timer=window.setInterval(()=>void refresh(expired()),30000);
   const transition=boundary===null?null:window.setTimeout(()=>void refresh(true),Math.max(0,boundary-serverStart-elapsed()+100));

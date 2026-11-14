@@ -89,9 +89,9 @@ export default function MobileMenuPickup({compactHeader=false,showHelp=false,bra
    const items=requestedItems(cart);
    if(items.length>100)throw new Error("Review this large cart at checkout before changing pickup.");
    const signal=AbortSignal.any([c.signal,AbortSignal.timeout(15000)]);
-   const value=await retryMenuRead(() => items.length
-    ? checkCartAvailability(branchId,today,days+1,items,signal)
-    : discoverPickupDates(branchId,today,days+1,signal), signal);
+   const value=await retryMenuRead(attempt => items.length
+    ? checkCartAvailability(branchId,today,days+1,items,attempt)
+    : discoverPickupDates(branchId,today,days+1,attempt), signal);
    if(!c.signal.aborted&&branchSnapshot===getStoredBranchSnapshot()&&cartSnapshot===getCartSnapshot()){
     setCartIds(items.map(item=>item.productId));setData(value);setOpen(true);
    }else if(!c.signal.aborted&&controller.current===c){setOpen(false);onChoosingChange?.(false);setError("Your cart or branch changed. Open pickup times again.");}
@@ -126,9 +126,9 @@ export default function MobileMenuPickup({compactHeader=false,showHelp=false,bra
   const requested=cartItems;
   const c=new AbortController();controller.current=c;
   const signal=AbortSignal.any([c.signal,AbortSignal.timeout(15000)]);
-  const fresh=await retryMenuRead(() => cartItems.length
-   ? checkCartAvailability(branchId,value.date,1,requested,signal)
-   : discoverPickupDates(branchId,value.date,1,signal), signal);
+  const fresh=await retryMenuRead(attempt => cartItems.length
+   ? checkCartAvailability(branchId,value.date,1,requested,attempt)
+   : discoverPickupDates(branchId,value.date,1,attempt), signal);
   if(c.signal.aborted||branch!==getStoredBranchSnapshot()||pickup!==getPickupSlotSnapshot()||cartSnapshot!==getCartSnapshot())return false;
   const slot=fresh.dates.find(day=>day.date===value.date)?.slots.find(slot=>slot.slot.id===value.slot.id);
   const conflict=slot?.issues?.find(issue=>!issue.available&&amounts.has(issue.productId));

@@ -20,7 +20,7 @@ import {clearPickupSlot, getPickupSlotSnapshot, savePickupSlot} from "@/lib/chec
 import {getCartSnapshot, parseCart} from "@/lib/cartStorage";
 import {getStoredBranchSnapshot} from "@/lib/branchStorage";
 import {findSoonestMenuPickup} from "@/lib/soonestMenuPickup";
-import {branchPickupOptions} from "@/lib/menuPickupOptions";
+import {branchPickupOptions, menuItemsForPickup} from "@/lib/menuPickupOptions";
 import {getMenuPickupModeSnapshot} from "@/lib/menuPickupMode";
 import type {CartSwitchPreview} from "@/services/cartSwitchPreview";
 import type {MenuProduct} from "@/types/menu";
@@ -147,13 +147,9 @@ export function useDateAvailability(products?: MenuProduct[]) {
             ? !selectedSlot.slot.priorityEnabled || selectedSlot.slot.priorityRemainingCapacity <= 0
             : selectedSlot.slot.remainingCapacity <= 0)
         || selectedSlot.issues?.some(issue => cartIds.has(issue.productId)));
-    const slotUnavailable = !!intent.selection && !!day && (!selectedSlot || selectedSlot.code === "PICKUP_WINDOW"
-        || (intent.selection.pickupType === "PRIORITY" ? !selectedSlot.slot.priorityEnabled || selectedSlot.slot.priorityRemainingCapacity <= 0 : selectedSlot.slot.remainingCapacity <= 0));
-    const items = useMemo(()=>{
-        const slotIssues = new Map(selectedSlot?.issues?.map(issue => [issue.productId, issue]));
-        return day?.items?.map(item => slotUnavailable ? {...item, available: false, code: selectedSlot?.code ?? "NO_SLOTS", reason: selectedSlot?.reason ?? "Choose another pickup time."}
-            : slotIssues.get(item.productId) ?? item);
-    },[day,selectedSlot,slotUnavailable]);
+    const pickupType = intent.selection?.pickupType;
+    const items = useMemo(() => menuItemsForPickup(day?.items, selectedSlot, pickupType),
+        [day, selectedSlot, pickupType]);
     // Match the date-intent snapshot guard below: date-only changes must abort
     // the old verification and start a new one, even when slot/mode stay equal.
     const autoKey = JSON.stringify([branch?.id,today,features?.futureOrderingDays,itemsJson,intent.dateRaw,intent.pickupRaw,intent.modeRaw,revision,menuRevision,choosing,cart.isEmpty]);
@@ -174,9 +170,9 @@ export function useDateAvailability(products?: MenuProduct[]) {
         const release = refresh.acquire();
         const timer = window.setTimeout(() => {
             setAutomaticResult({key:autoKey});
-            void retryMenuRead(()=>discoverPickupDates(branch.id,today,features.futureOrderingDays+1,signal),signal)
+            void retryMenuRead(attempt=>discoverPickupDates(branch.id,today,features.futureOrderingDays+1,attempt),signal)
                 .then(discovery=>findSoonestMenuPickup(discovery,JSON.parse(itemsJson).map((item:{productId:number})=>item.productId),today,features.futureOrderingDays,
-                    date => retryMenuRead(() => checkCartAvailability(branch.id, date, 1, actualCart, signal), signal),
+                    date => retryMenuRead(attempt => checkCartAvailability(branch.id, date, 1, actualCart, attempt), signal),
                     signal,()=>new Date(),!!actualCart.length))
                 .then(first=>{
                     if (controller.signal.aborted) return;

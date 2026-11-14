@@ -337,11 +337,11 @@ export default function MenuScreen() {
 
                     const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]);
                     const result =
-                        await retryMenuRead(() => getMenu(
+                        await retryMenuRead(attempt => getMenu(
                             selectedBranch.id,
-                            signal,
+                            attempt,
                             catalog => {
-                                if (signal.aborted || (lastCatalog.current?.branchId === selectedBranch.id
+                                if (attempt.aborted || (lastCatalog.current?.branchId === selectedBranch.id
                                     && lastCatalog.current.categories.length)) return;
                                 renderStarted.current = performance.now();
                                 lastCatalog.current={branchId:selectedBranch.id,categories:catalog};
@@ -737,7 +737,24 @@ export default function MenuScreen() {
     },[branch,restoredBrowse]);
     const [portionSnapshot,setPortionSnapshot]=useState<{branchId:number;groups:PortionGroup[]}|null>(null);
     const portionGroups=useMemo(()=>portionSnapshot?.branchId===branch?.id?portionSnapshot?.groups??[]:[],[portionSnapshot,branch?.id]);
-    useEffect(()=>{if(!groupedMenu||!branch)return;const controller=new AbortController();void apiClient<{groups:PortionGroup[]}>(`/api/menu/portion-groups?branchId=${branch.id}`,{signal:controller.signal}).then(value=>{if(!controller.signal.aborted)setPortionSnapshot({branchId:branch.id,groups:Array.isArray(value?.groups)?value.groups.filter(group=>typeof group?.key==="string"&&typeof group.title==="string"&&Array.isArray(group.choices)&&group.choices.every(choice=>Number.isSafeInteger(choice?.productId)&&typeof choice.label==="string")):[]});}).catch(()=>{});return()=>controller.abort();},[groupedMenu,branch]);
+    useEffect(() => {
+        if (!groupedMenu || branchId === undefined) return;
+        const controller = new AbortController();
+        const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]);
+        void retryMenuRead(attempt => apiClient<{groups: PortionGroup[]}>(
+            `/api/menu/portion-groups?branchId=${branchId}`, {signal: attempt}
+        ), signal).then(value => {
+            if (controller.signal.aborted) return;
+            const groups = Array.isArray(value?.groups) ? value.groups.filter(group =>
+                typeof group?.key === "string" && typeof group.title === "string"
+                && Array.isArray(group.choices) && group.choices.every(choice =>
+                    Number.isSafeInteger(choice?.productId) && typeof choice.label === "string"
+                )
+            ) : [];
+            setPortionSnapshot({branchId, groups});
+        }).catch(() => { /* Individual dishes remain browsable if group metadata is unavailable. */ });
+        return () => controller.abort();
+    }, [groupedMenu, branchId]);
     const pickupCheck = useDateAvailability(allProducts);
     const pickupChecking = !!pickupCheck.features?.smartAvailability && (pickupCheck.pickupRequired || pickupCheck.findingSoonest || !pickupCheck.items || !!pickupCheck.error || !!pickupCheck.automaticError);
     const pickupStatusMessage = pickupCheck.error || pickupCheck.automaticError ? "Pickup check failed. Please retry."

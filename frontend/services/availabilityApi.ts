@@ -101,31 +101,45 @@ export async function discoverPickupDates(branchId:number,startDate:string,days:
 }
 
 /** Give transient menu reads up to two quiet retries within the caller's deadline. */
-export async function retryMenuRead<T>(read:()=>Promise<T>,signal?:AbortSignal):Promise<T>{
-    for (const delay of [180, 450, null]) {
+export async function retryMenuRead<T>(
+    read: (signal: AbortSignal) => Promise<T>, signal?: AbortSignal, attemptTimeout = 5500
+): Promise<T> {
+    const delays = [180, 450] as const;
+    for (let attempt = 0; ; attempt++) {
         signal?.throwIfAborted();
+        const request = new AbortController();
+        const cancel = () => request.abort(signal?.reason);
+        signal?.addEventListener("abort", cancel, {once: true});
+        const timer = setTimeout(() => request.abort(new DOMException("Request timed out", "TimeoutError")), attemptTimeout);
+        let delay: number;
         try {
-            const value = await read();
-            signal?.throwIfAborted();
+            const value = await read(request.signal);
+            request.signal.throwIfAborted();
             return value;
         } catch (error) {
             signal?.throwIfAborted();
             const apiError = typeof ApiError === "function" && error instanceof ApiError ? error : null;
-            const transient = error instanceof TypeError || apiError?.code === "CONNECTION_FAILED"
+            const timedOut = request.signal.aborted;
+            const transient = timedOut || error instanceof TypeError || apiError?.code === "CONNECTION_FAILED"
                 || !!apiError && [408,429,500,502,503,504].includes(apiError.status);
             const retryAfter = apiError?.retryAfterMs ?? 0;
-            if (delay === null || !transient || retryAfter > 1500) throw error;
-            await new Promise<void>((resolve, reject) => {
-                const abort = () => {clearTimeout(timer); reject(signal?.reason);};
-                const timer = setTimeout(() => {
-                    signal?.removeEventListener("abort", abort);
-                    resolve();
-                }, Math.max(delay, retryAfter));
-                signal?.addEventListener("abort", abort, {once: true});
-            });
+            if (attempt >= delays.length || !transient || retryAfter > 1500) {
+                throw timedOut ? request.signal.reason : error;
+            }
+            delay = Math.max(delays[attempt], retryAfter);
+        } finally {
+            clearTimeout(timer);
+            signal?.removeEventListener("abort", cancel);
         }
+        await new Promise<void>((resolve, reject) => {
+            const abort = () => {clearTimeout(backoff); reject(signal?.reason);};
+            const backoff = setTimeout(() => {
+                signal?.removeEventListener("abort", abort);
+                resolve();
+            }, delay);
+            signal?.addEventListener("abort", abort, {once: true});
+        });
     }
-    throw new Error("Menu read did not complete.");
 }
 
 /** Check the full menu without exceeding the endpoint's 100-item request limit.
@@ -148,7 +162,7 @@ export async function checkMenuAvailability(
             const complete = await Promise.all(batches.map(async batch => {
                 controller.signal.throwIfAborted();
                 return retryMenuRead(
-                    () => checkCartAvailability(branchId, startDate, days, batch, controller.signal, true, slotId),
+                    attempt => checkCartAvailability(branchId, startDate, days, batch, attempt, true, slotId),
                     controller.signal
                 );
             }));
