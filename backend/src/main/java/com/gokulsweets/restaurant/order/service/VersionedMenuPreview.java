@@ -57,7 +57,8 @@ public class VersionedMenuPreview {
     /**
      * Complete request identity; quantities, weights and order must never share another preview.
      */
-    private record Key(long branchId, LocalDate date, List<CreateOrderItemRequest> items) {}
+    private record Key(
+            long branchId, LocalDate date, List<CreateOrderItemRequest> items, Long slotId) {}
 
     /** A completed snapshot plus its clock validity and bounded retained item/issue count. */
     private record Entry(
@@ -79,7 +80,24 @@ public class VersionedMenuPreview {
                         VersionedMenuPreview.class,
                         "check(long,LocalDate,List<CreateOrderItemRequest>)");
         try {
-            Key key = new Key(branchId, date, List.copyOf(items));
+            return check(branchId, date, items, null);
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    VersionedMenuPreview.class,
+                    "check(long,LocalDate,List<CreateOrderItemRequest>)");
+        }
+    }
+
+    /** Reads a preview scoped to the selected slot when supplied. */
+    public CartAvailabilityService.Availability check(
+            long branchId, LocalDate date, List<CreateOrderItemRequest> items, Long slotId) {
+        long started =
+                MethodTiming.start(
+                        VersionedMenuPreview.class,
+                        "check(long,LocalDate,List<CreateOrderItemRequest>,Long)");
+        try {
+            Key key = new Key(branchId, date, List.copyOf(items), slotId);
             try {
                 Entry evaluated =
                         transaction.execute(
@@ -105,7 +123,11 @@ public class VersionedMenuPreview {
                                                     "gokul.menu.preview.lookups", "outcome", "miss")
                                             .increment();
                                     Instant evaluatedAt = clock.instant();
-                                    var result = service.check(branchId, date, 1, items, true);
+                                    var result =
+                                            slotId == null
+                                                    ? service.check(branchId, date, 1, items, true)
+                                                    : service.checkMenuSlot(
+                                                            branchId, date, items, slotId);
                                     Instant expires = evaluatedAt.plusSeconds(300);
                                     if (result.recheckAt() == null) expires = evaluatedAt;
                                     if (result.recheckAt() != null
@@ -159,7 +181,7 @@ public class VersionedMenuPreview {
             MethodTiming.finish(
                     started,
                     VersionedMenuPreview.class,
-                    "check(long,LocalDate,List<CreateOrderItemRequest>)");
+                    "check(long,LocalDate,List<CreateOrderItemRequest>,Long)");
         }
     }
 

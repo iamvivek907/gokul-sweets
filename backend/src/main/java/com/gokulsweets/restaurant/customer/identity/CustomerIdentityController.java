@@ -210,25 +210,22 @@ public class CustomerIdentityController {
                             .contains(request.getHeader(HttpHeaders.ORIGIN))) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN);
             }
-            var phone =
-                    subjects.verifiedPhone(environment, subject.get())
+            var profile =
+                    subjects.profile(environment, subject.get())
                             .orElseThrow(
                                     () -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-            var name = subjects.displayName(environment, subject.get());
             return ResponseEntity.ok()
                     .cacheControl(CacheControl.noStore())
                     .body(
-                            name.<Map<String, Object>>map(
-                                            value ->
-                                                    Map.of(
-                                                            "authenticated",
-                                                            true,
-                                                            "phone",
-                                                            phone,
-                                                            "name",
-                                                            value))
-                                    .orElseGet(
-                                            () -> Map.of("authenticated", true, "phone", phone)));
+                            profile.name() == null
+                                    ? Map.of("authenticated", true, "phone", profile.phone())
+                                    : Map.of(
+                                            "authenticated",
+                                            true,
+                                            "phone",
+                                            profile.phone(),
+                                            "name",
+                                            profile.name()));
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,

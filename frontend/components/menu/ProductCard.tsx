@@ -29,6 +29,7 @@ interface ProductCardProps {
     unavailableForPickup?: boolean;
     pickupMessage?: string;
     pickupChecking?: boolean;
+    soldOut?: boolean;
     product: MenuProduct;
     ratingSummary: Pick<ProductRatingSummary, "averageRating" | "ratingCount"> | null;
     ratingLoading: boolean;
@@ -89,6 +90,7 @@ export default function ProductCard({
     pickupMessage,
     pickupChecking = false,
     product,
+    soldOut = product.available === false && product.serviceAvailability?.code === "SOLD_OUT",
     ratingSummary,
     ratingLoading,
     quantity,
@@ -103,6 +105,11 @@ export default function ProductCard({
     const locale=useLanguage();
     const {details}=useMenuExperience();
     const memberIds=groupProductIds??[product.id];
+    const dishFacts = details[product.id];
+    const chefPick = memberIds.every(id => details[id]?.chefPick);
+    const spiceLevel = dishFacts?.spiceLevel;
+    const sharedSpiceLevel = spiceLevel && memberIds.every(id => details[id]?.spiceLevel === spiceLevel)
+        ? spiceLevel : null;
     const [showDetails,setShowDetails]=useState(false);
     const previous=comparisonPrice(product);
     const description=refined?menuDescription(product):product.description;
@@ -118,6 +125,7 @@ export default function ProductCard({
         isWeighted
             ? weightGrams !== null
             : quantity > 0;
+    const showSoldOutControl = refined && soldOut && !isInCart && !purchaseControl;
 
     const selectionLabel =
         isWeighted
@@ -132,6 +140,7 @@ export default function ProductCard({
     return (
         <>
         <article
+            data-sold-out={refined && soldOut ? "true" : undefined}
             onPointerDownCapture={event=>{if(unavailableForPickup&&!pickupChecking&&pickupMessage!=="Checking pickup"&&product.serviceAvailability?.code!=="CHECKING"&&event.target instanceof Element&&event.target.closest("button:disabled"))window.dispatchEvent(new Event("gokul-pickup-attention"));}}
             className={`
                 gokul-product-card group
@@ -294,6 +303,12 @@ export default function ProductCard({
                     }
                 </h3>
 
+                {refined && (chefPick || sharedSpiceLevel) && (
+                    <div className="menu-card-facts">
+                        {chefPick && <span className="menu-card-chef-pick"><span aria-hidden="true">★</span><span><T text="Chef’s pick" /></span></span>}
+                        {sharedSpiceLevel && <span className="menu-card-spice"><span aria-hidden="true">🌶</span><span className="sr-only"><T text="Spice level" />{" "}</span><T text={{MILD: "Mild", MEDIUM: "Medium", HOT: "Hot"}[sharedSpiceLevel]} /></span>}
+                    </div>
+                )}
 
                 {
                     description
@@ -317,7 +332,7 @@ export default function ProductCard({
                 }
 
 
-                {product.serviceAvailability?.code!=="CHECKING"&&(!pickupChecking||pickupMessage||!isAvailable)&&(refined ? (!purchaseControl && (!isAvailable || unavailableForPickup)) : (!isAvailable && !!product.serviceAvailability?.message)) && (
+                {!showSoldOutControl&&product.serviceAvailability?.code!=="CHECKING"&&(!pickupChecking||pickupMessage||!isAvailable)&&(refined ? (!purchaseControl && (!isAvailable || unavailableForPickup)) : (!isAvailable && !!product.serviceAvailability?.message)) && (
                     <p className="menu-availability-note my-1 text-xs leading-5 text-[#a94d39]" role="status"><span>
                         <T text={!isAvailable ? (refined && product.serviceAvailability?.code === "SOLD_OUT" ? "Sold out" : product.serviceAvailability?.message ?? "Unavailable") : pickupMessage ?? "Not at this time"}/>
                     </span></p>
@@ -495,7 +510,7 @@ export default function ProductCard({
                                 isInCart
                             }
                             onClick={() => { menuTapFeedback(); onAdd(product); }}
-                            aria-label={`Add ${product.name} to cart`}
+                            aria-label={showSoldOutControl ? undefined : `Add ${product.name} to cart`}
                             className={`
                                 absolute
                                 inset-0
@@ -526,7 +541,7 @@ export default function ProductCard({
                                 }
                             `}
                         >
-                            <T text="ADD" /></button>
+                            <T text={refined && soldOut ? "Sold out" : "ADD"} /></button>
 
 
                         {/* Quantity */}

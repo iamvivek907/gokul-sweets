@@ -5,7 +5,7 @@ import {GroupDietaryLabel} from "./DietaryLabel";
 import {menuTapFeedback} from "@/lib/menuHaptics";
 import ProductCard from "./ProductCard";
 import MenuVariantPicker from "./MenuVariantPicker";
-import {T} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 import {groupedRatingSummary} from "@/lib/menuPresentationDetails";
 import type {PortionGroup} from "@/lib/mobileMenu";
 import type {MenuProduct} from "@/types/menu";
@@ -14,6 +14,7 @@ import type {ItemAvailability} from "@/services/availabilityApi";
 const money=(value:number)=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",minimumFractionDigits:0,maximumFractionDigits:2}).format(value);
 export default function MobilePortionCard({compact=true,group,products,quantities,onAdd,onIncrease,onDecrease,ratings,loading,pickupItems,dateAware,pickupChecking,pickupStatusMessage}:{compact?:boolean;group:PortionGroup;products:MenuProduct[];quantities:Record<number,number>;onAdd:(p:MenuProduct)=>void;onIncrease:(id:number)=>void;onDecrease:(id:number)=>void;ratings:Record<number,ProductRatingSummary>;loading:boolean;pickupItems?:ItemAvailability[];dateAware?:boolean;pickupChecking?:boolean;pickupStatusMessage?:string}){
  const [open,setOpen]=useState(false);
+ const t=useTranslation();
  // Serving details describe an individual SKU, not every size at the starting price.
  const product=products.find(p=>p.imageUrl)??products[0];
  const count=products.reduce((sum,p)=>sum+(quantities[p.id]??0),0);
@@ -24,7 +25,12 @@ export default function MobilePortionCard({compact=true,group,products,quantitie
  const availableSizes=eligibleProducts.length;
  const minimum=Math.min(...(eligibleProducts.length?eligibleProducts:products).map(p=>p.price));
  const unavailableForPickup=catalogueAvailable&&availableSizes===0;
- const status=!catalogueAvailable?"Currently unavailable":unavailableForPickup?pickupChecking?pickupStatusMessage??"Checking pickup":"Not at this time":`${availableSizes} ${availableSizes===1?"size":"sizes"} available`;
+ const soldOut=availableSizes===0&&products.every(product=>{
+  if(!product.available)return product.serviceAvailability?.code==="SOLD_OUT";
+  const pickup=pickupItems?.find(item=>item.productId===product.id);
+  return dateAware&&!pickupChecking&&pickup?.available===false&&pickup.code==="SOLD_OUT";
+ });
+ const status=soldOut?"Sold out":!catalogueAvailable?"Currently unavailable":unavailableForPickup?pickupChecking?pickupStatusMessage??"Checking pickup":"Not at this time":`${availableSizes} ${availableSizes===1?"size":"sizes"} available`;
  const portion=labels.every(label=>/half|full|portion|हाफ|फुल/i.test(label));
  const rawNotes=dateAware&&!pickupChecking?products.flatMap(p=>{
   const item=pickupItems?.find(i=>i.productId===p.id);
@@ -35,7 +41,7 @@ export default function MobilePortionCard({compact=true,group,products,quantitie
  return <div className={compact?"mobile-portion-card":"desktop-portion-card"}>
   <ProductCard onOpenDetails={()=>setOpen(true)} portionOptions={<><div className="menu-group-caption">{count>0&&<span>{count} · {money(total)}</span>}<button type="button" onClick={()=>setOpen(true)}><T text={count>0?"Manage sizes":labels.join(" / ")}/><span aria-hidden="true"> ›</span></button></div>{serviceNotes.map(note=><p key={note.reason} role="status" className="menu-availability-note"><strong>{note.labels}:</strong>{" "}<T text={note.reason}/></p>)}
   {!serviceNotes.length&&availableSizes===0&&status&&<p role="status" className="menu-availability-note"><T text={status}/></p>}
-  {unavailableForPickup&&!pickupChecking&&<button type="button" className="pickup-attention-action" onClick={()=>requestMenuPickup(products.find(p=>p.available)!.id)}><T text="Choose another pickup"/></button>}</>} groupProductIds={products.map(p=>p.id)} pickupChecking={pickupChecking} dietaryLabel={<GroupDietaryLabel products={products}/>} refined premium={compact} priceFrom product={{...product,name:group.title,price:minimum,available:catalogueAvailable,description:null}} unavailableForPickup={unavailableForPickup} pickupMessage={pickupChecking?pickupStatusMessage??"Checking pickup":"Not at this time"} quantity={0} weightGrams={null} ratingSummary={groupedRatingSummary(products,ratings)} ratingLoading={loading} purchaseControl={<button data-ordering-target="add" type="button" className="product-card-controls menu-group-control" onClick={()=>{if(count===0)menuTapFeedback();setOpen(true);}} disabled={availableSizes===0&&count===0} aria-label={`Choose options for ${group.title}`}><T text={count>0?"Manage":portion?"Add":"Choose size"}/>{count>0&&<span> · {count}</span>}</button>} onAdd={()=>setOpen(true)} onIncrease={onIncrease} onDecrease={onDecrease}/>
+  {unavailableForPickup&&!pickupChecking&&<button type="button" className="pickup-attention-action" onClick={()=>requestMenuPickup(products.find(p=>p.available)!.id)}><T text="Choose another pickup"/></button>}</>} groupProductIds={products.map(p=>p.id)} pickupChecking={pickupChecking} dietaryLabel={<GroupDietaryLabel products={products}/>} refined premium={compact} priceFrom soldOut={soldOut} product={{...product,name:group.title,price:minimum,available:catalogueAvailable,description:null}} unavailableForPickup={unavailableForPickup} pickupMessage={pickupChecking?pickupStatusMessage??"Checking pickup":"Not at this time"} quantity={0} weightGrams={null} ratingSummary={groupedRatingSummary(products,ratings)} ratingLoading={loading} purchaseControl={<button data-ordering-target="add" type="button" className="product-card-controls menu-group-control" onClick={()=>{if(count===0)menuTapFeedback();setOpen(true);}} disabled={availableSizes===0&&count===0} aria-label={soldOut&&count===0?`${t("Sold out")} · ${group.title}`:`Choose options for ${group.title}`}><T text={count>0?"Manage":soldOut?"Sold out":portion?"Add":"Choose size"}/>{count>0&&<span> · {count}</span>}</button>} onAdd={()=>setOpen(true)} onIncrease={onIncrease} onDecrease={onDecrease}/>
   {open&&<MenuVariantPicker group={group} products={products} quantities={quantities} pickupItems={pickupItems} dateAware={dateAware} pickupChecking={pickupChecking} onAdd={onAdd} onIncrease={onIncrease} onDecrease={onDecrease} onClose={()=>setOpen(false)}/>}
  </div>;
 }

@@ -20,6 +20,35 @@ public class VerifiedCustomerPhoneLookup {
 
     private final JdbcTemplate jdbc;
 
+    /** Customer details read together from the same environment-scoped subject row. */
+    public record Profile(String phone, String name) {}
+
+    /** Reads the phone and optional display name for an authenticated customer. */
+    @Transactional(readOnly = true)
+    public Optional<Profile> profile(ConsentEnvironment environment, UUID subjectId) {
+        long started =
+                MethodTiming.start(
+                        VerifiedCustomerPhoneLookup.class, "profile(ConsentEnvironment,UUID)");
+        try {
+            Objects.requireNonNull(environment);
+            Objects.requireNonNull(subjectId);
+            return jdbc.query(
+                    """
+                    SELECT verified_phone, display_name FROM verified_customer_subjects
+                    WHERE environment = ? AND id = ?
+                    """,
+                    rs ->
+                            rs.next()
+                                    ? Optional.of(new Profile(rs.getString(1), rs.getString(2)))
+                                    : Optional.empty(),
+                    environment.name(),
+                    subjectId);
+        } finally {
+            MethodTiming.finish(
+                    started, VerifiedCustomerPhoneLookup.class, "profile(ConsentEnvironment,UUID)");
+        }
+    }
+
     /**
      * Verifieds phone.
      *

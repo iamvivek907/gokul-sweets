@@ -32,7 +32,7 @@ export interface MenuProduct {
     /** Live menu revision used to invalidate dated service-hour previews. */
     availabilityRevision?: string;
 
-    serviceAvailability?: {available: boolean; code: string; message: string | null; nextChangeAt: string | null; evaluatedAt?: string | null; receivedMonotonic?: number} | null;
+    serviceAvailability?: {available: boolean; code: string; message: string | null; nextChangeAt: string | null; evaluatedAt?: string | null; receivedMonotonic?: number; requestStartedMonotonic?: number} | null;
 
     saleMode: ProductSaleMode;
 

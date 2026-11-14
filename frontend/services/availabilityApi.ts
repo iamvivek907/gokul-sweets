@@ -21,6 +21,7 @@ export interface CartAvailability {
     recheckAt?: string | null;
     observedAt?: string | null;
     receivedMonotonic?: number;
+    requestStartedMonotonic?: number;
     fulfilmentType: "PICKUP";
     today: string;
     maximumDate: string;
@@ -77,19 +78,39 @@ export function availabilityItems(items: CartItem[], adjustedCart?: CartState) {
 
 export async function checkCartAvailability(
     branchId: number, startDate: string, days: number,
-    items: ReturnType<typeof availabilityItems>, signal?: AbortSignal, menuPreview = false
+    items: ReturnType<typeof availabilityItems>, signal?: AbortSignal, menuPreview = false, slotId?: number
 ) {
-    const data = await apiClient<CartAvailability | CompactMenuAvailability>(`/api/branches/${branchId}/availability${menuPreview ? "?menuPreview=true&compact=true&versioned=true" : ""}`, {
+    const previewQuery = menuPreview
+        ? `?menuPreview=true&compact=true&versioned=true${slotId === undefined ? "" : `&slotId=${encodeURIComponent(slotId)}`}`
+        : "";
+    const requestStartedMonotonic = typeof performance === "undefined" ? 0 : performance.now();
+    const data = await apiClient<CartAvailability | CompactMenuAvailability>(`/api/branches/${branchId}/availability${previewQuery}`, {
         method: "POST", signal, body: JSON.stringify({startDate, days, items: items.map(({productId,quantity,weightGrams})=>({productId,quantity,weightGrams})), fulfilmentType: "PICKUP"})
     });
-    return {...readAvailability(data), receivedMonotonic: typeof performance === "undefined" ? 0 : performance.now()};
+    return {...readAvailability(data), requestStartedMonotonic, receivedMonotonic: typeof performance === "undefined" ? 0 : performance.now()};
 }
 
 /** Server-relative boundary; older servers retain the existing periodic refresh fallback. */
 export function menuPreviewDeadline(data: CartAvailability): number | null {
-    if (!data.observedAt || !data.recheckAt || !Number.isFinite(data.receivedMonotonic)) return null;
+    // Server observation cannot precede the request. Using that lower bound
+    // charges transit and parsing time without comparing device and server clocks.
+    const anchor = data.requestStartedMonotonic ?? data.receivedMonotonic;
+    if (!data.observedAt || !data.recheckAt || anchor === undefined || !Number.isFinite(anchor)) return null;
     const remaining = Date.parse(data.recheckAt) - Date.parse(data.observedAt);
-    return Number.isFinite(remaining) ? data.receivedMonotonic! + Math.max(0, remaining) : null;
+    return Number.isFinite(remaining) ? anchor + Math.max(0, remaining) : null;
+}
+
+/** Give a preview that crossed a service boundary one fresh read before reporting failure. */
+export async function readFreshMenuPreview(
+    read: () => Promise<CartAvailability>, signal: AbortSignal
+): Promise<CartAvailability> {
+    for (let attempt = 0; attempt < 2; attempt++) {
+        signal.throwIfAborted();
+        const data = await read();
+        signal.throwIfAborted();
+        if (performance.now() < (menuPreviewDeadline(data) ?? Infinity)) return data;
+    }
+    throw new Error("Pickup availability changed while checking the menu.");
 }
 
 /** Branch capacity only; item validation follows on the selected date. */
@@ -97,23 +118,48 @@ export async function discoverPickupDates(branchId:number,startDate:string,days:
     return readAvailability(await apiClient<CartAvailability>(`/api/branches/${branchId}/pickup-discovery?startDate=${encodeURIComponent(startDate)}&days=${days}`,{signal}));
 }
 
-/** Retry a transient advisory failure once; never delay a superseded branch or pickup. */
-export async function retryMenuRead<T>(read:()=>Promise<T>,signal?:AbortSignal):Promise<T>{
-    try{return await read();}
-    catch(error){
+// Keep the normal eight-second request window and leave a second window for recovery.
+export const MENU_READ_RETRY_DEADLINE_MS = 17000;
+
+/** Give transient menu reads up to two quiet retries within the caller's deadline. */
+export async function retryMenuRead<T>(
+    read: (signal: AbortSignal) => Promise<T>, signal?: AbortSignal, attemptTimeout = 8000
+): Promise<T> {
+    const delays = [180, 450] as const;
+    for (let attempt = 0; ; attempt++) {
         signal?.throwIfAborted();
-        const transient=error instanceof TypeError
-            || typeof ApiError==="function"&&error instanceof ApiError&&[408,429,500,502,503,504].includes(error.status);
-        if(!transient)throw error;
-        const retryAfter=typeof ApiError==="function"&&error instanceof ApiError?error.retryAfterMs:null;
-        if(retryAfter!==null&&retryAfter>1500)throw error;
-        await new Promise<void>((resolve,reject)=>{
-            const abort=()=>{clearTimeout(timer);reject(signal?.reason);};
-            const timer=setTimeout(()=>{signal?.removeEventListener("abort",abort);resolve();},Math.max(180,retryAfter??0));
-            signal?.addEventListener("abort",abort,{once:true});
+        const request = new AbortController();
+        const cancel = () => request.abort(signal?.reason);
+        signal?.addEventListener("abort", cancel, {once: true});
+        const timer = setTimeout(() => request.abort(new DOMException("Request timed out", "TimeoutError")), attemptTimeout);
+        let delay: number;
+        try {
+            const value = await read(request.signal);
+            request.signal.throwIfAborted();
+            return value;
+        } catch (error) {
+            signal?.throwIfAborted();
+            const apiError = typeof ApiError === "function" && error instanceof ApiError ? error : null;
+            const timedOut = request.signal.aborted;
+            const transient = timedOut || error instanceof TypeError || apiError?.code === "CONNECTION_FAILED"
+                || !!apiError && [408,429,500,502,503,504].includes(apiError.status);
+            const retryAfter = apiError?.retryAfterMs ?? 0;
+            if (attempt >= delays.length || !transient || retryAfter > 1500) {
+                throw timedOut ? request.signal.reason : error;
+            }
+            delay = Math.max(delays[attempt], retryAfter);
+        } finally {
+            clearTimeout(timer);
+            signal?.removeEventListener("abort", cancel);
+        }
+        await new Promise<void>((resolve, reject) => {
+            const abort = () => {clearTimeout(backoff); reject(signal?.reason);};
+            const backoff = setTimeout(() => {
+                signal?.removeEventListener("abort", abort);
+                resolve();
+            }, delay);
+            signal?.addEventListener("abort", abort, {once: true});
         });
-        signal?.throwIfAborted();
-        return read();
     }
 }
 
@@ -123,37 +169,61 @@ export async function retryMenuRead<T>(read:()=>Promise<T>,signal?:AbortSignal):
  */
 export async function checkMenuAvailability(
     branchId: number, startDate: string, days: number,
-    items: ReturnType<typeof availabilityItems>, signal?: AbortSignal
+    items: ReturnType<typeof availabilityItems>, signal?: AbortSignal, slotId?: number
 ): Promise<CartAvailability> {
     const responses: CartAvailability[] = [];
-    for (let offset = 0; offset < items.length; offset += 200) {
-        signal?.throwIfAborted();
-        const batches = [items.slice(offset, offset + 100), items.slice(offset + 100, offset + 200)].filter(batch => batch.length);
-        const complete = await Promise.all(batches.map(async batch => {
-            signal?.throwIfAborted();
-            return retryMenuRead(()=>checkCartAvailability(branchId, startDate, days, batch, signal, true),signal);
-        }));
-        responses.push(...complete);
+    const controller = new AbortController();
+    const abort = () => controller.abort(signal?.reason);
+    signal?.throwIfAborted();
+    signal?.addEventListener("abort", abort, {once: true});
+    try {
+        for (let offset = 0; offset < items.length; offset += 200) {
+            controller.signal.throwIfAborted();
+            const batches = [items.slice(offset, offset + 100), items.slice(offset + 100, offset + 200)].filter(batch => batch.length);
+            const complete = await Promise.all(batches.map(async batch => {
+                controller.signal.throwIfAborted();
+                return retryMenuRead(
+                    attempt => checkCartAvailability(branchId, startDate, days, batch, attempt, true, slotId),
+                    controller.signal
+                );
+            }));
+            responses.push(...complete);
+        }
+        controller.signal.throwIfAborted();
+    } catch (error) {
+        controller.abort(error);
+        throw error;
+    } finally {
+        signal?.removeEventListener("abort", abort);
     }
     const first = responses[0];
     const boundaries = responses.map(value => value.recheckAt).filter((value): value is string => !!value).sort((left, right) => Date.parse(left) - Date.parse(right));
     const timed = responses.filter(value => menuPreviewDeadline(value) !== null)
         .sort((left, right) => menuPreviewDeadline(left)! - menuPreviewDeadline(right)!)[0];
     return {...first, recheckAt: timed?.recheckAt ?? boundaries[0] ?? first.recheckAt,
-        observedAt: timed?.observedAt, receivedMonotonic: timed?.receivedMonotonic, dates: first.dates.map(day => {
+        observedAt: timed?.observedAt, receivedMonotonic: timed?.receivedMonotonic,
+        requestStartedMonotonic: timed?.requestStartedMonotonic, dates: first.dates.map(day => {
         const parts = responses.map(response => response.dates.find(value => value.date === day.date));
         return {...day,
             available: parts.every(part => part?.available === true),
             items: parts.flatMap(part => part?.items ?? []),
-            slots: day.slots.map(slot => {
+            slots: day.slots.flatMap(slot => {
                 const matches = parts.map(part => part?.slots.find(value => value.slot.id === slot.slot.id));
-                const blocked = matches.find(value => value && !value.normalAvailable && !value.priorityAvailable);
-                return {...slot,
-                    normalAvailable: matches.every(value => value?.normalAvailable === true),
-                    priorityAvailable: matches.every(value => value?.priorityAvailable === true),
-                    code: matches.some(value => value?.code === "PICKUP_WINDOW") ? "PICKUP_WINDOW" : blocked?.code ?? slot.code,
+                // A slot removed mid-read cannot be offered from an earlier batch.
+                const confirmed = matches.filter((value): value is SlotAvailability => value !== undefined);
+                if (confirmed.length !== parts.length) return [];
+                const closed = confirmed.find(value => value.code === "PICKUP_WINDOW");
+                const blocked = closed ?? confirmed.find(value => !value.normalAvailable && !value.priorityAvailable);
+                return [{...slot,
+                    slot: {...slot.slot,
+                        remainingCapacity: Math.min(...confirmed.map(value => value.slot.remainingCapacity)),
+                        priorityEnabled: confirmed.every(value => value.slot.priorityEnabled),
+                        priorityRemainingCapacity: Math.min(...confirmed.map(value => value.slot.priorityRemainingCapacity ?? 0))},
+                    normalAvailable: confirmed.every(value => value.normalAvailable === true),
+                    priorityAvailable: confirmed.every(value => value.priorityAvailable === true),
+                    code: blocked?.code ?? slot.code,
                     reason: blocked?.reason ?? slot.reason,
-                    issues: matches.flatMap(value => value?.issues ?? [])};
+                    issues: confirmed.flatMap(value => value.issues ?? [])}];
             })};
     })};
 }

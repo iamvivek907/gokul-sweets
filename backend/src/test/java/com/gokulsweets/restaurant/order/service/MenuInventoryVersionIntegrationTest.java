@@ -74,6 +74,7 @@ VALUES(?,?,'READY','PIECE',10,10,now(),now()) RETURNING id
 
     @AfterEach
     void cleanup() {
+        jdbc.update("DELETE FROM rolling_branch_schedules WHERE branch_id=?", branch);
         jdbc.update("DELETE FROM pickup_slots WHERE branch_id=?", branch);
         jdbc.update("DELETE FROM branch_pickup_settings WHERE branch_id=?", branch);
         jdbc.update("DELETE FROM inventory_daily_allocations WHERE branch_product_id=?", bp);
@@ -82,6 +83,42 @@ VALUES(?,?,'READY','PIECE',10,10,now(),now()) RETURNING id
         jdbc.update("DELETE FROM products WHERE id=?", product);
         jdbc.update("DELETE FROM categories WHERE id=?", category);
         jdbc.update("DELETE FROM branches WHERE id=?", branch);
+    }
+
+    @Test
+    void shorteningRollingHorizonInvalidatesACachedSelectedSlot() {
+        jdbc.update(
+                """
+INSERT INTO rolling_branch_schedules
+    (branch_id,enabled,opening_time,closing_time,slot_minutes,capacity,maintain_days,weekdays,updated_by)
+VALUES (?,true,'10:00','18:00',30,10,7,127,'test')
+""",
+                branch);
+        var items =
+                java.util.List.of(
+                        new com.gokulsweets.restaurant.order.dto.CreateOrderItemRequest(
+                                product, 1, null));
+        var validUntil = java.time.Instant.now().plusSeconds(60);
+        var open =
+                new CartAvailabilityService.Availability(
+                        "PICKUP", date, date, java.util.List.of(), validUntil);
+        var closed =
+                new CartAvailabilityService.Availability(
+                        "PICKUP", date, date.minusDays(1), java.util.List.of(), validUntil);
+        org.mockito.Mockito.when(service.checkMenuSlot(branch, date, items, slot))
+                .thenReturn(open, closed);
+
+        var before = versions.read(branch, date);
+        assertThat(previews.check(branch, date, items, slot)).isSameAs(open);
+        assertThat(previews.check(branch, date, items, slot)).isSameAs(open);
+
+        jdbc.update(
+                "UPDATE rolling_branch_schedules SET maintain_days=1 WHERE branch_id=?", branch);
+        assertThat(versions.read(branch, date)).isNotEqualTo(before);
+        assertThat(previews.check(branch, date, items, slot)).isSameAs(closed);
+        assertThat(previews.check(branch, date, items, slot)).isSameAs(closed);
+        org.mockito.Mockito.verify(service, org.mockito.Mockito.times(2))
+                .checkMenuSlot(branch, date, items, slot);
     }
 
     @Test

@@ -4,13 +4,13 @@ const vm=require('node:vm');
 const test=require('node:test');
 const ts=require('typescript');
 const code=ts.transpileModule(fs.readFileSync(require('node:path').join(__dirname,'../services/menuApi.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
-function setup(catalogDelay=0){
+function setup(catalogDelay=0,availabilityDelay=0){
  const calls=[];let revision=1,available=true,enabled=true,now=0;
  const categories=[{id:1,name:'Sweets',products:[{id:1,name:'Sweet',price:400,available:true,saleMode:'WEIGHT',minimumWeightGrams:250,weightStepGrams:250}]}];
  const exports={};
  vm.runInNewContext(code,{exports,process:{env:{}},performance:{now:()=>now},Date,DOMException,AbortController,AbortSignal,setTimeout,clearTimeout,require:name=>name.includes('apiClient')?{apiClient:async(path,options)=>{
   calls.push({path,options});
-  if(path.includes('view=availability'))return {revision,observedAt:"2026-10-06T04:29:59.750Z",serviceWindowsEnabled:enabled,items:[{productId:1,available,serviceAvailability:{available,code:available?'AVAILABLE':'SOLD_OUT'}}]};
+  if(path.includes('view=availability')){now+=availabilityDelay;return {revision,observedAt:"2026-10-06T04:29:59.750Z",serviceWindowsEnabled:enabled,items:[{productId:1,available,serviceAvailability:{available,code:available?'AVAILABLE':'SOLD_OUT'}}]};}
   now+=catalogDelay;return {revision,categories:categories.map(c=>({...c,products:c.products.map(p=>({...p,price:revision*400}))}))};
  }}:name.includes('mobileConnection')?{constrainedPhoneConnection:()=>true}:{getMockMenu:()=>[]}});
  return {api:exports,calls,change:value=>{revision=value;},sold:()=>{available=false;},disable:()=>{enabled=false;}};
@@ -41,4 +41,11 @@ test('current service closure retains the independent catalog toggle for dated p
  const f=setup();await f.api.getMenu(1);f.sold();const menu=await f.api.refreshMenuAvailability(1);
  assert.equal(menu[0].products[0].available,false);
  assert.equal(menu[0].products[0].catalogAvailable,true,'a closed current service window must not suppress future pickup discovery');
+});
+
+test('slow live service data retains both request and receipt times across catalog loading',async()=>{
+ const f=setup(5000,2000);const menu=await f.api.getMenu(1);
+ const status=menu[0].products[0].serviceAvailability;
+ assert.equal(status.requestStartedMonotonic,0);
+ assert.equal(status.receivedMonotonic,2000);
 });

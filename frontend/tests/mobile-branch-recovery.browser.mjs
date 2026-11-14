@@ -19,7 +19,9 @@ try{for(const missing of ['none','any','both']){
   else if(path==='/api/menu')json=[{id:1,name:'Sweets',products}];else if(path==='/api/menu/portion-groups')json={groups:[]};
   return route.fulfill({headers,json});
  });
- await page.goto(base+'/menu');await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});const search=page.getByLabel('Find a favourite',{exact:true});await search.fill('Fresh');
+ await page.goto(base+'/menu');await page.locator('.gokul-mobile-launch[data-launch-initialized="true"]:not([open])').waitFor({state:'attached'});
+ const search=page.getByLabel('Find a favourite',{exact:true});await search.fill('Fresh');
+ await page.locator('#gokul-menu-items .menu-result-heading[data-filtered="true"]').waitFor();
  // Preserve component identity as well as input value through a failed background read.
  await search.evaluate(n=>n.dataset.reviewMarker='retained');
  await page.getByRole('button',{name:'Browse all item categories',exact:true}).click();
