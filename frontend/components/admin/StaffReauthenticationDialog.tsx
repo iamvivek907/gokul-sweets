@@ -8,6 +8,7 @@ export default function StaffReauthenticationDialog() {
     const {login, profile} = useAdminAuth();
     const dialog = useRef<HTMLDialogElement>(null);
     const submitting = useRef(false);
+    const [isOpen, setIsOpen] = useState(false);
     const [password, setPassword] = useState("");
     const [code, setCode] = useState("");
     const [busy, setBusy] = useState(false);
@@ -22,11 +23,16 @@ export default function StaffReauthenticationDialog() {
             setCode("");
             setError("");
             setConfirmed(false);
-            element.showModal();
+            setIsOpen(true);
         }
         window.addEventListener(staffReauthenticationEvent, open);
         return () => window.removeEventListener(staffReauthenticationEvent, open);
     }, []);
+
+    useEffect(() => {
+        const element = dialog.current;
+        if (isOpen && element && !element.open) element.showModal();
+    }, [isOpen]);
 
     function clearCredentials() {
         setPassword("");
@@ -58,9 +64,12 @@ export default function StaffReauthenticationDialog() {
     return <>
         <dialog ref={dialog} aria-labelledby="staff-reauth-title"
             className="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border border-[#eadfd6] bg-white p-5 text-[#241715] backdrop:bg-black/40"
-            onClose={clearCredentials}
+            onClose={() => {
+                setIsOpen(false);
+                clearCredentials();
+            }}
             onCancel={event => {if (submitting.current) event.preventDefault();}}>
-            <form onSubmit={submit} className="space-y-4">
+            {isOpen && <form onSubmit={submit} className="space-y-4">
                 <h2 id="staff-reauth-title" className="text-xl font-bold">Confirm your sign-in</h2>
                 <p className="text-sm">Sign in again as {profile?.username} to allow sensitive changes, then retry the original action.</p>
                 <input type="text" name="username" autoComplete="username" value={profile?.username ?? ""} readOnly hidden />
@@ -81,7 +90,7 @@ export default function StaffReauthenticationDialog() {
                         {busy ? "Confirming…" : "Confirm sign-in"}
                     </button>
                 </div>
-            </form>
+            </form>}
         </dialog>
         <div role="status" className="sr-only">{confirmed ? "Sign-in confirmed. Retry the original action." : ""}</div>
     </>;
