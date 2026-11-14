@@ -14,7 +14,7 @@ const browser=await chromium.launch({headless:true});
 try{for(const width of [320,390,1280]){
  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();page.setDefaultTimeout(15000);
  await page.clock.install({time:new Date(`${today}T22:00:00+05:30`)});
- let outage=false,holdDiscovery=false,release=null,discoveries=0;const dateDiscoveryGates=[];let holdDateDiscovery=false;let showCompanion=false, holdConfirmation=false, releaseConfirmation;
+ let outage=false,holdDiscovery=false,release=null,discoveries=0;const dateDiscoveryGates=[];let holdDateDiscovery=false;let showCompanion=false, holdConfirmation=false, shrinkBookingWindow=false, releaseConfirmation;
  const checks=[],errors=[];page.on('pageerror',e=>errors.push(e.message));
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key'};
  await context.route('**/api/**',async route=>{
@@ -39,7 +39,11 @@ try{for(const width of [320,390,1280]){
     await new Promise(resolve=>{releaseConfirmation=resolve;});
    }
    if(outage)return route.fulfill({status:503,headers,json:{message:'Offline'}});
-   json={today,maximumDate:later,dates:[{date,available:true,items:[{productId:1,productName:product.name,available:true}],slots:[{slot:slot(date,[today,tomorrow,later].indexOf(date)+1),normalAvailable:true,issues:[]}]}]};
+   const dates=payload.days===1?[date]:shrinkBookingWindow?[tomorrow]:[tomorrow,later];
+   json={today,maximumDate:dates.at(-1),dates:dates.map(value=>({
+    date:value,available:true,items:[{productId:1,productName:product.name,available:true}],
+    slots:[{slot:slot(value,[today,tomorrow,later].indexOf(value)+1),normalAvailable:true,issues:[]}]
+   }))};
   }
   try{await route.fulfill({headers,json});}catch(error){if(!heldConfirmation)throw error;}
  });
@@ -115,6 +119,8 @@ try{for(const width of [320,390,1280]){
   await page.locator('#gokul-product-3').waitFor({state:'attached'});
   assert.equal(await dialog.isVisible(),true);
   const previous=await saved();
+  const laterDate=dialog.getByRole('button',{name:later,exact:true});
+  await laterDate.click();
   await standard.click();
   holdConfirmation=true;
   await confirm.click();
@@ -128,6 +134,7 @@ try{for(const width of [320,390,1280]){
     const payload=response.request().postDataJSON();
     return payload.days>1&&payload.items.some(item=>item.productId===1&&item.quantity===2);
    });
+   shrinkBookingWindow=true;
    await page.evaluate(()=>{
     const cart=JSON.parse(localStorage.getItem('gokul-cart'));
     cart.items[0].quantity=2;
@@ -136,6 +143,9 @@ try{for(const width of [320,390,1280]){
    });
    await refreshed;
    await standard.waitFor();
+   assert.equal(await laterDate.count(),0,'the refreshed booking window removed the selected day');
+   assert.equal(await dialog.getByRole('button',{name:tomorrow,exact:true}).getAttribute('aria-pressed'),'true');
+   assert.equal(await dialog.getByRole('alert').count(),0,'cancelling a stale check is silent');
    assert.deepEqual(await saved(),previous,'stale confirmation leaves the saved pickup intact');
   }finally{releaseConfirmation();}
   await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
@@ -143,7 +153,7 @@ try{for(const width of [320,390,1280]){
    localStorage.removeItem('gokul-cart');
    window.dispatchEvent(new Event('gokul-cart-change'));
   });
-  showCompanion=false;
+  showCompanion=false;shrinkBookingWindow=false;
  }
  // At midnight tomorrow's valid first slot stays put, now labelled Today with the actual date.
  await page.clock.fastForward(2*60*60*1000+1000);await pickup.getByText(/Today, .*8:00/).waitFor();assert.equal((await saved()).date,tomorrow);
