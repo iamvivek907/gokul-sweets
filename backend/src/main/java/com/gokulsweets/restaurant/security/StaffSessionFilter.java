@@ -100,24 +100,27 @@ public class StaffSessionFilter extends OncePerRequestFilter {
                 try {
                     sessions.requireCsrf(verified, request.getHeader("X-Staff-CSRF"));
                 } catch (org.springframework.security.access.AccessDeniedException error) {
-                    response.sendError(403);
+                    rejectWrite(response, "STAFF_CSRF_INVALID");
                     return;
                 }
             }
+            boolean administrator = StaffSessionService.isAdministrator(current);
             if (changing
                     && (path.startsWith("/api/admin/staff")
                             || path.startsWith("/api/admin/payroll")
                             || path.contains("refund")
                             || path.startsWith("/api/admin/approvals"))) {
-                if (verified.createdAt().plusSeconds(600).isBefore(java.time.Instant.now())) {
-                    response.sendError(401, "Sign in again before this action.");
+                if (!administrator
+                        && verified.createdAt()
+                                .plusSeconds(600)
+                                .isBefore(java.time.Instant.now())) {
+                    rejectWrite(response, "STAFF_REAUTH_REQUIRED");
                     return;
                 }
                 sessions.auditSensitiveAction(verified.staffId());
             }
             String token = StaffSessionService.cookie(request);
-            if (!path.equals("/api/admin/auth/logout")
-                    && !StaffSessionService.isAdministrator(current)) {
+            if (!path.equals("/api/admin/auth/logout") && !administrator) {
                 if (!sessions.renewStaff(verified, token, current)) {
                     response.sendError(401);
                     return;
@@ -143,6 +146,28 @@ public class StaffSessionFilter extends OncePerRequestFilter {
                     __gokulMethodStartedNanos,
                     StaffSessionFilter.class,
                     "doFilterInternal(HttpServletRequest,HttpServletResponse,FilterChain)");
+        }
+    }
+
+    /**
+     * Returns a structured rejection before an authenticated write reaches its handler.
+     *
+     * @param response the response for the rejected request
+     * @param code the staff session error code recognized by the admin client
+     * @throws IOException if the error response cannot be written
+     */
+    private static void rejectWrite(HttpServletResponse response, String code) throws IOException {
+        final long started =
+                MethodTiming.start(
+                        StaffSessionFilter.class, "rejectWrite(HttpServletResponse,String)");
+        try {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.setHeader("Cache-Control", "no-store");
+            response.setContentType("application/json");
+            response.getWriter().write("{\"code\":\"" + code + "\"}");
+        } finally {
+            MethodTiming.finish(
+                    started, StaffSessionFilter.class, "rejectWrite(HttpServletResponse,String)");
         }
     }
 }

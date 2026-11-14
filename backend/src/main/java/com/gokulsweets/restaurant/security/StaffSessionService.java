@@ -21,6 +21,7 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.sql.Timestamp;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
@@ -32,6 +33,8 @@ public class StaffSessionService {
 
     /** The cookie name value. */
     public static final String COOKIE_NAME = AppConstant.STAFF_SESSION_SERVICE_COOKIE_NAME;
+
+    private static final Duration ADMIN_SESSION_LIFETIME = Duration.ofHours(12);
 
     private final EnhancementProperties flags;
 
@@ -320,13 +323,11 @@ WHERE e.token_hash = ? AND e.expires_at > ? AND u.active AND e.staff_updated_at=
      * @param user the user
      * @return the session lifetime result
      */
-    public static java.time.Duration sessionLifetime(StaffUser user) {
+    public static Duration sessionLifetime(StaffUser user) {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(StaffSessionService.class, "sessionLifetime(StaffUser)");
         try {
-            return isAdministrator(user)
-                    ? java.time.Duration.ofHours(15)
-                    : java.time.Duration.ofDays(365);
+            return isAdministrator(user) ? ADMIN_SESSION_LIFETIME : Duration.ofDays(365);
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
@@ -387,6 +388,7 @@ WHERE e.token_hash = ? AND e.expires_at > ? AND u.active AND e.staff_updated_at=
                 MethodTiming.start(StaffSessionService.class, "verify(String)");
         try {
             if (token == null || !token.matches("[A-Za-z0-9_-]{43}")) return null;
+            Instant now = Instant.now(inventoryClock);
             return jdbc
                     .query(
                             """
@@ -404,8 +406,8 @@ WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ?
                                             rs.getString(3),
                                             rs.getTimestamp(4).toInstant()),
                             hash(token),
-                            Timestamp.from(Instant.now(inventoryClock)),
-                            Timestamp.from(Instant.now(inventoryClock).minusSeconds(15 * 3600)))
+                            Timestamp.from(now),
+                            Timestamp.from(now.minus(ADMIN_SESSION_LIFETIME)))
                     .stream()
                     .findFirst()
                     .orElse(null);

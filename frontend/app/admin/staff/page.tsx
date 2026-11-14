@@ -5,6 +5,7 @@ import {T} from "@/lib/language";
 import {
     useEffect,
     useMemo,
+    useRef,
     useState
 } from "react";
 
@@ -193,6 +194,16 @@ function todayInBusinessZone() {
 }
 
 
+function sameStaffDetails(original: AdminStaff, current: AdminStaff) {
+    return original.id === current.id
+        && original.fullName === current.fullName
+        && original.phone === current.phone
+        && original.roleName === current.roleName
+        && original.active === current.active
+        && original.branchIds.length === current.branchIds.length
+        && original.branchIds.every(id => current.branchIds.includes(id));
+}
+
 export default function AdminStaffPage() {
 
     const {
@@ -300,6 +311,12 @@ export default function AdminStaffPage() {
         );
 
 
+    const [loadAttempt, setLoadAttempt] = useState(0);
+    const loadedStaff = useRef(false);
+    const mutation = useRef<AbortController | null>(null);
+    const [editingSnapshot, setEditingSnapshot] = useState<AdminStaff | null>(null);
+    useEffect(() => () => mutation.current?.abort(), []);
+
     const [
         saving,
         setSaving
@@ -369,6 +386,9 @@ export default function AdminStaffPage() {
             ]
         );
 
+
+    const draftConflict = !createMode && editingSnapshot !== null
+        && (!selectedStaff || !sameStaffDetails(editingSnapshot, selectedStaff));
 
     const filteredStaff =
         useMemo(
@@ -471,65 +491,28 @@ export default function AdminStaffPage() {
                 new AbortController();
 
 
-            Promise.all([
-                getAdminStaff(
-                    authorization,
-                    controller.signal
-                ),
-                getAdminStaffOptions(
-                    authorization,
-                    controller.signal
-                )
-            ])
-                .then(
-                    ([
-                        staffResult,
-                        optionsResult
-                    ]) => {
+            const initialLoad = !loadedStaff.current;
+            const listRequest = getAdminStaff(authorization, controller.signal);
+            const optionsRequest = initialLoad ? getAdminStaffOptions(authorization, controller.signal) : null;
 
-                        const firstStaff =
-                            staffResult[0]
-                            ?? null;
-
-
-                        setStaff(
-                            staffResult
-                        );
-
-
-                        setOptions(
-                            optionsResult
-                        );
-
-
-                        setSelectedStaffId(
-                            firstStaff?.id
-                            ?? null
-                        );
-
-
-                        setForm(
-                            firstStaff
-                                ? toFormState(
-                                    firstStaff
-                                )
-                                : EMPTY_FORM
-                        );
-
-
-                        setLoading(
-                            false
-                        );
+            Promise.all([listRequest, optionsRequest])
+                .then(([staffResult, optionsResult]) => {
+                    if (controller.signal.aborted) return;
+                    setStaff(staffResult);
+                    if (optionsResult) {
+                        const firstStaff = staffResult[0] ?? null;
+                        setOptions(optionsResult);
+                        setSelectedStaffId(firstStaff?.id ?? null);
+                        setEditingSnapshot(firstStaff);
+                        setForm(firstStaff ? toFormState(firstStaff) : EMPTY_FORM);
+                        loadedStaff.current = true;
                     }
-                )
+                    setLoading(false);
+                })
                 .catch(
                     exception => {
 
-                        if (
-                            exception instanceof DOMException
-                            &&
-                            exception.name === "AbortError"
-                        ) {
+                        if (controller.signal.aborted) {
 
                             return;
                         }
@@ -557,7 +540,8 @@ export default function AdminStaffPage() {
         },
         [
             authorization,
-            canManage
+            canManage,
+            loadAttempt
         ]
     );
 
@@ -586,6 +570,7 @@ export default function AdminStaffPage() {
     function selectStaff(
         item: AdminStaff
     ) {
+        setEditingSnapshot(item);
 
         setCreateMode(
             false
@@ -631,6 +616,7 @@ export default function AdminStaffPage() {
 
 
     function beginCreate() {
+        setEditingSnapshot(null);
 
         setCreateMode(
             true
@@ -683,55 +669,23 @@ export default function AdminStaffPage() {
     }
 
 
-    async function refreshStaff(
-        preferredStaffId?: number | null
-    ) {
+    function reloadStaffList() {
+        if (loading || saving) return;
+        setLoading(true);
+        setError(null);
+        setLoadAttempt(attempt => attempt + 1);
+    }
 
-        if (
-            authorization === null
-        ) {
-
-            return;
-        }
-
-
-        const staffResult =
-            await getAdminStaff(
-                authorization
-            );
-
-
-        setStaff(
-            staffResult
-        );
-
-
-        const nextStaff =
-            preferredStaffId !== undefined
-                ? staffResult.find(
-                    item =>
-                        item.id
-                        === preferredStaffId
-                )
-                ?? staffResult[0]
-                ?? null
-                : staffResult[0]
-                ?? null;
-
-
-        setSelectedStaffId(
-            nextStaff?.id
-            ?? null
-        );
-
-
-        setForm(
-            nextStaff
-                ? toFormState(
-                    nextStaff
-                )
-                : EMPTY_FORM
-        );
+    function applySavedStaff(saved: AdminStaff) {
+        setEditingSnapshot(saved);
+        setStaff(current => {
+            const next = current.some(member => member.id === saved.id)
+                ? current.map(member => member.id === saved.id ? saved : member)
+                : [...current, saved];
+            return next.sort((a, b) => a.fullName.localeCompare(b.fullName));
+        });
+        setSelectedStaffId(saved.id);
+        setForm(toFormState(saved));
     }
 
 
@@ -740,13 +694,17 @@ export default function AdminStaffPage() {
         if (
             authorization === null
             ||
-            saving
+            loading
+            ||
+            saving || draftConflict || mutation.current
         ) {
 
             return;
         }
 
 
+        const controller = new AbortController();
+        mutation.current = controller;
         setSaving(
             true
         );
@@ -1071,8 +1029,10 @@ export default function AdminStaffPage() {
                 const created =
                     await createAdminStaff(
                         request,
-                        authorization
+                        authorization,
+                        controller.signal
                     );
+                if (controller.signal.aborted) return;
 
 
                 setCreateMode(
@@ -1085,9 +1045,7 @@ export default function AdminStaffPage() {
                 );
 
 
-                await refreshStaff(
-                    created.id
-                );
+                applySavedStaff(created);
 
 
                 return;
@@ -1130,8 +1088,10 @@ export default function AdminStaffPage() {
                 await updateAdminStaff(
                     selectedStaffId,
                     request,
-                    authorization
+                    authorization,
+                    controller.signal
                 );
+            if (controller.signal.aborted) return;
 
 
             setSuccess(
@@ -1139,23 +1099,20 @@ export default function AdminStaffPage() {
             );
 
 
-            await refreshStaff(
-                updated.id
-            );
+            applySavedStaff(updated);
 
         } catch (exception) {
+            if (controller.signal.aborted) return;
 
             setError(
-                exception instanceof Error
-                    ? exception.message
-                    : "Unable to save staff member."
+                (exception instanceof TypeError || (exception instanceof DOMException && exception.name === "TimeoutError"))
+                    ? "The server did not confirm this save. Refresh the staff list to check before trying again."
+                    : exception instanceof Error ? exception.message : "Unable to save staff member."
             );
 
         } finally {
-
-            setSaving(
-                false
-            );
+            mutation.current = null;
+            if (!controller.signal.aborted) setSaving(false);
         }
     }
 
@@ -1167,7 +1124,9 @@ export default function AdminStaffPage() {
             ||
             selectedStaff === null
             ||
-            saving
+            loading
+            ||
+            saving || draftConflict || mutation.current
         ) {
 
             return;
@@ -1201,6 +1160,8 @@ export default function AdminStaffPage() {
         }
 
 
+        const controller = new AbortController();
+        mutation.current = controller;
         setSaving(
             true
         );
@@ -1221,8 +1182,10 @@ export default function AdminStaffPage() {
             await resetAdminStaffPassword(
                 selectedStaff.id,
                 newPassword,
-                authorization
+                authorization,
+                controller.signal
             );
+            if (controller.signal.aborted) return;
 
 
             setPasswordResetOpen(
@@ -1241,22 +1204,23 @@ export default function AdminStaffPage() {
 
 
             setSuccess(
-                `Password reset for ${selectedStaff.fullName}.`
+                selectedStaff.id === profile?.staffId
+                    ? "Your password was reset. Sign in again with your new password."
+                    : `Password reset for ${selectedStaff.fullName}.`
             );
 
         } catch (exception) {
+            if (controller.signal.aborted) return;
 
             setError(
-                exception instanceof Error
-                    ? exception.message
-                    : "Unable to reset password."
+                (exception instanceof TypeError || (exception instanceof DOMException && exception.name === "TimeoutError"))
+                    ? "The server did not confirm the reset. Check the password before trying again."
+                    : exception instanceof Error ? exception.message : "Unable to reset password."
             );
 
         } finally {
-
-            setSaving(
-                false
-            );
+            mutation.current = null;
+            if (!controller.signal.aborted) setSaving(false);
         }
     }
 
@@ -1371,32 +1335,42 @@ export default function AdminStaffPage() {
                     </div>
 
 
-                    <button
-                        type="button"
-                        disabled={
-                            loading
-                            ||
-                            saving
-                        }
-                        onClick={
-                            beginCreate
-                        }
-                        className="
-                            min-h-11
-                            rounded-xl
-                            bg-[#7a1625]
-                            px-5
-                            text-sm
-                            font-semibold
-                            text-white
+                    <div className="flex flex-wrap gap-2">
+                        {options && (
+                            <button type="button" disabled={loading || saving} onClick={reloadStaffList}
+                                className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-semibold disabled:opacity-50">
+                                {loading ? "Refreshing…" : "Refresh staff list"}
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            disabled={
+                                loading
+                                ||
+                                saving
+                                ||
+                                !options
+                            }
+                            onClick={
+                                beginCreate
+                            }
+                            className="
+                                min-h-11
+                                rounded-xl
+                                bg-[#7a1625]
+                                px-5
+                                text-sm
+                                font-semibold
+                                text-white
 
-                            hover:bg-[#5d0f1b]
+                                hover:bg-[#5d0f1b]
 
-                            disabled:opacity-50
-                        "
-                    >
-                        Add Staff
-                    </button>
+                                disabled:opacity-50
+                            "
+                        >
+                            Add Staff
+                        </button>
+                    </div>
 
                 </div>
 
@@ -1462,11 +1436,27 @@ export default function AdminStaffPage() {
                             "
                         >
                             {error}
+                            {!options && !loading && (
+                                <button type="button" className="ml-3 underline" onClick={reloadStaffList}>Retry loading staff</button>
+                            )}
                         </div>
 
                     )
                 }
 
+
+                {draftConflict && (
+                    <div role="alert" className="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm">
+                        {selectedStaff
+                            ? "This staff record changed after you started editing. Review the latest details before saving."
+                            : "This staff record is no longer available. Select another staff member to continue."}
+                        {selectedStaff && (
+                            <button type="button" className="ml-3 underline" onClick={() => selectStaff(selectedStaff)}>
+                                Discard draft and load latest details
+                            </button>
+                        )}
+                    </div>
+                )}
 
                 {
                     success
@@ -2707,7 +2697,7 @@ export default function AdminStaffPage() {
                                             <button
                                                 type="button"
                                                 disabled={
-                                                    saving
+                                                    loading || saving || draftConflict
                                                 }
                                                 onClick={
                                                     () => {
@@ -2806,30 +2796,14 @@ export default function AdminStaffPage() {
                                                         }
                                                         onClick={
                                                             () => {
-
-                                                                setCreateMode(
-                                                                    false
-                                                                );
-
-
-                                                                const firstStaff =
-                                                                    staff[0]
-                                                                    ?? null;
-
-
-                                                                setSelectedStaffId(
-                                                                    firstStaff?.id
-                                                                    ?? null
-                                                                );
-
-
-                                                                setForm(
-                                                                    firstStaff
-                                                                        ? toFormState(
-                                                                            firstStaff
-                                                                        )
-                                                                        : EMPTY_FORM
-                                                                );
+                                                                const firstStaff = staff[0];
+                                                                if (firstStaff) {
+                                                                    selectStaff(firstStaff);
+                                                                } else {
+                                                                    setCreateMode(false);
+                                                                    setEditingSnapshot(null);
+                                                                    setForm(EMPTY_FORM);
+                                                                }
                                                             }
                                                         }
                                                         className="
@@ -2931,7 +2905,7 @@ export default function AdminStaffPage() {
                                                             <button
                                                                 type="button"
                                                                 disabled={
-                                                                    saving
+                                                                    loading || saving || draftConflict
                                                                     ||
                                                                     newPassword.length < 8
                                                                     ||

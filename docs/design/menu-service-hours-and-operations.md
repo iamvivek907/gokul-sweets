@@ -22,7 +22,7 @@ Unavailable scheduled items remain visible with a readable availability reason a
 
 The kitchen sound preference is saved per staff account/browser/API environment. Refresh restores the enabled choice and polling; browsers require a user gesture before sound can resume. “Resume kitchen sound” and an explanation communicate that restriction, and “Disable kitchen alarm” clears the saved choice. Existing persistent Web Push registration, permissions, branch filtering and duplicate-alarm protection are retained.
 
-Non-admin secure staff sessions have a 365-day idle lifetime renewed by valid authenticated requests. Renewal retains the token and therefore its push subscription binding. Roles whose names contain ADMIN receive an absolute 15-hour session with no sliding renewal. Existing shorter admin cookies keep their original expiry until the next login. Logout, account disabling, user changes, expiry, CSRF, MFA and the existing ten-minute sensitive-action reauthentication still apply. Renewal never revives expired or revoked sessions.
+Non-admin secure staff sessions have a 365-day idle lifetime renewed by valid authenticated requests. Renewal retains the token and therefore its push subscription binding. Roles whose names contain ADMIN receive an absolute 12-hour session with no sliding renewal. The server enforces the 12-hour limit on existing admin sessions as well. Admins can perform sensitive actions allowed by their role throughout the session. Non-admin staff still need a sign-in within the last ten minutes for sensitive actions. Logout, account disabling, user changes, expiry, CSRF and sign-in MFA still apply. Renewal never revives expired or revoked sessions.
 
 ## Regression coverage
 
