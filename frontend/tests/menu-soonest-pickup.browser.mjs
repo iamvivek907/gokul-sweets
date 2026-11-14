@@ -41,6 +41,9 @@ try{for(const width of [320,390,1280]){
     await new Promise(resolve=>{releaseConfirmation=resolve;});
    }
    if(outage)return route.fulfill({status:503,headers,json:{message:'Offline'}});
+   if(shrinkBookingWindow&&payload.days===1&&date===later&&!new URL(request.url()).searchParams.has('menuPreview')){
+    return route.fulfill({status:400,headers,json:{code:'INVALID_REQUEST',message:'Choose a date within the advance ordering window.'}});
+   }
    const dates=payload.days===1?[date]:shrinkBookingWindow?[tomorrow]:[tomorrow,later];
    if(payload.items.some(item=>item.productId===3&&!showCompanion)){
     return route.fulfill({status:400,headers,json:{code:'INVALID_REQUEST',message:'Companion Paratha is sold out.'}});
@@ -157,6 +160,23 @@ try{for(const width of [320,390,1280]){
    assert.equal(await dialog.getByRole('alert').count(),0,'cancelling a stale check is silent');
    assert.deepEqual(await saved(),previous,'stale confirmation leaves the saved pickup intact');
   }finally{releaseConfirmation();}
+  await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
+  shrinkBookingWindow=false;
+  await pickup.getByRole('button',{name:'Change time',exact:true}).click();
+  await laterDate.click();
+  await standard.click();
+  shrinkBookingWindow=true;
+  const recoveredWindow=page.waitForResponse(response=>
+   response.url().endsWith('/availability')&&response.request().method()==='POST'
+   &&response.request().postDataJSON().days>1);
+  await confirm.click();
+  assert.equal((await recoveredWindow).status(),200);
+  const tomorrowDate=dialog.getByRole('button',{name:tomorrow,exact:true});
+  await tomorrowDate.waitFor();
+  await page.waitForFunction(date=>document.querySelector(`.mobile-pickup-dates button[aria-label="${date}"]`)?.getAttribute('aria-pressed')==='true',tomorrow);
+  assert.equal(await laterDate.count(),0,'confirmation recovery shows the remaining booking window');
+  assert.equal(await standard.isEnabled(),true);
+  assert.deepEqual(await saved(),previous,'reloading the booking window leaves the saved pickup intact');
   await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
   shrinkBookingWindow=false;
   await page.evaluate(()=>window.dispatchEvent(new CustomEvent('gokul-request-menu-pickup',{detail:{productId:3}})));

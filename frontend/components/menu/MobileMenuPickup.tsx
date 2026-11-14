@@ -3,7 +3,7 @@ import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import {REQUEST_MENU_PICKUP} from "@/lib/menuPickupRecovery";
 import {confirmWalkthroughPickup,OPEN_ORDERING_TOUR} from "@/lib/orderingTour";
 import Dialog from "@/components/checkout/MobilePickupDialog";
-import {useEffect,useLayoutEffect,useMemo,useRef,useState,useSyncExternalStore} from "react";
+import {useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState,useSyncExternalStore} from "react";
 import {createPortal} from "react-dom";
 import {savePickupSlot,getPickupSlotSnapshot,getServerPickupSlotSnapshot,subscribeToPickupSlot,clearPickupSlot} from "@/lib/checkoutStorage";
 import {savePickupIntent} from "@/hooks/usePickupIntent";
@@ -75,6 +75,14 @@ export default function MobileMenuPickup({compactHeader=false,showHelp=false,bra
  const controller=useRef<AbortController|null>(null);
  const [pickerTrigger,setPickerTrigger]=useState<HTMLElement|null>(null);
 
+ const readPickupOptions=useCallback((startDate:string,dayCount:number,signal:AbortSignal)=>
+  retryMenuRead(attempt=>requested.length
+   ? checkCartAvailability(branchId,startDate,dayCount,requested,attempt)
+   : discoverPickupDates(branchId,startDate,dayCount,attempt),signal),[branchId,requested]);
+ const isCurrentPickupRequest=(signal:AbortSignal)=>!signal.aborted
+  &&getMatchingStoredBranchSnapshot(branchId)!==null
+  &&pickupSnapshot===getPickupSlotSnapshot()&&cartSnapshot===getCartSnapshot();
+
  useLayoutEffect(()=>{
   if(!open)return;
   const c=new AbortController();
@@ -90,9 +98,7 @@ export default function MobileMenuPickup({compactHeader=false,showHelp=false,bra
     }
     if(requested.length>100)throw new Error("Review this large cart at checkout before changing pickup.");
     const signal=AbortSignal.any([c.signal,AbortSignal.timeout(MENU_READ_RETRY_DEADLINE_MS)]);
-    const value=await retryMenuRead(attempt => requested.length
-     ? checkCartAvailability(branchId,today,days+1,requested,attempt)
-     : discoverPickupDates(branchId,today,days+1,attempt), signal);
+    const value=await readPickupOptions(today,days+1,signal);
     if(c.signal.aborted || cartSnapshot!==getCartSnapshot() || pickupSnapshot!==getPickupSlotSnapshot())return;
     if(getMatchingStoredBranchSnapshot(branchId)===null)throw new Error("Your branch changed. Open pickup times again.");
     setData(value);
@@ -109,7 +115,7 @@ export default function MobileMenuPickup({compactHeader=false,showHelp=false,bra
    }
   });
   return()=>{c.abort();controller.current?.abort();};
- },[open,branchId,today,days,cart,cartSnapshot,pickupSnapshot,requested,candidateMissing,candidateAvailable,onChoosingChange]);
+ },[open,branchId,today,days,cart,cartSnapshot,pickupSnapshot,requested,candidateMissing,candidateAvailable,onChoosingChange,readPickupOptions]);
 
  function choose(trigger:HTMLElement,id:number|null=null){
   if(busy||open)return;
@@ -148,19 +154,27 @@ export default function MobileMenuPickup({compactHeader=false,showHelp=false,bra
   const amounts=new Set(requested.map(item=>item.productId));
   const c=new AbortController();controller.current=c;
   const signal=AbortSignal.any([c.signal,AbortSignal.timeout(MENU_READ_RETRY_DEADLINE_MS)]);
-  const fresh=await retryMenuRead(attempt => requested.length
-   ? checkCartAvailability(branchId,value.date,1,requested,attempt)
-   : discoverPickupDates(branchId,value.date,1,attempt), signal).catch(error=>{
-    if(c.signal.aborted||getMatchingStoredBranchSnapshot(branchId)===null
-     ||pickupSnapshot!==getPickupSlotSnapshot()||cartSnapshot!==getCartSnapshot())return null;
-    if(error instanceof ApiError&&error.status===400){
-     setData(null);
-     setPickerError(error.message);
-     return null;
-    }
-    throw error;
-   });
-  if(!fresh||c.signal.aborted||getMatchingStoredBranchSnapshot(branchId)===null||pickupSnapshot!==getPickupSlotSnapshot()||cartSnapshot!==getCartSnapshot())return null;
+  let fresh: CartAvailability;
+  try{
+   fresh=await readPickupOptions(value.date,1,signal);
+  }catch(error){
+   if(!isCurrentPickupRequest(c.signal))return null;
+   if(!(error instanceof ApiError)||error.status!==400)throw error;
+   // A rejection for one date does not establish that the entire booking window is closed.
+   try{
+    const window=await readPickupOptions(today,days+1,signal);
+    if(!isCurrentPickupRequest(c.signal))return null;
+    setData(window);
+    return false;
+   }catch(refreshError){
+    if(!isCurrentPickupRequest(c.signal))return null;
+    if(!(refreshError instanceof ApiError)||refreshError.status!==400)throw refreshError;
+    setData(null);
+    setPickerError(refreshError.message);
+    return null;
+   }
+  }
+  if(!isCurrentPickupRequest(c.signal))return null;
   const slot=fresh.dates.find(day=>day.date===value.date)?.slots.find(slot=>slot.slot.id===value.slot.id);
   const conflict=slot?.issues?.find(issue=>!issue.available&&amounts.has(issue.productId));
   if(conflict)throw new Error(`${conflict.productName}: ${conflict.reason??"Not available for this pickup."} Adjust your cart or choose another time. Your previous pickup is saved.`);
