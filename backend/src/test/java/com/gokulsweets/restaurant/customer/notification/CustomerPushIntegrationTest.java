@@ -154,8 +154,8 @@ VALUES ('DEV', ?, ?, 'PAYMENT_PAID', 'ORDER', 'TEST-ORDER', 'Payment received', 
         var registration = preferences.subscribe("DEV", subject, token, browser);
         jdbc.update(
                 "UPDATE verified_customer_sessions SET issued_at=CURRENT_TIMESTAMP - INTERVAL '1"
-                    + " hour', expires_at=CURRENT_TIMESTAMP - INTERVAL '1 minute' WHERE"
-                    + " verified_subject_id=?",
+                        + " hour', expires_at=CURRENT_TIMESTAMP - INTERVAL '1 minute' WHERE"
+                        + " verified_subject_id=?",
                 subject);
         long event = event();
         dispatcher.dispatchBatch();
