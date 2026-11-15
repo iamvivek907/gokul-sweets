@@ -5,6 +5,7 @@ const {chromium} = require(process.env.PLAYWRIGHT_MODULE ?? "playwright");
 const browser = await chromium.launch({headless: true});
 const context = await browser.newContext({viewport: {width: 390, height: 844}, timezoneId: "America/Los_Angeles"});
 let testingEmail = false, restoreFailures = 0, restored = 0;
+let bindingBeforeRestore;
 let enabled = true, registered = false, read = false, denied = true, failDisable = true, failRead = true;
 let orderStatus = "CONFIRMED", firstPreparation = true, mutations = 0;
 const registrationId = "d1779266-3814-48cf-8f6d-8c23b832c1c3";
@@ -47,6 +48,10 @@ await context.route("**/api/**", async route => {
         if (payload.pausePrevious) return route.fulfill({json: {id: null}});
         if (payload.registrationId) {
             assert.equal(payload.registrationId, registrationId);
+            bindingBeforeRestore = await page.evaluate(async () => {
+                const cache = await caches.open("gokul-order-push-binding-v1");
+                return (await cache.match("/.__gokul-order-push/staff"))?.json();
+            });
             if (restoreFailures > 0) {
                 restoreFailures--;
                 return route.fulfill({status: 503, json: {}});
@@ -154,6 +159,10 @@ try {
     assert.equal(await page.evaluate(() => window._permissionRequests), 0);
     registered = false;
     restoreFailures = 1;
+    await page.evaluate(async () => {
+        const cache = await caches.open("gokul-order-push-binding-v1");
+        await cache.put("/.__gokul-order-push/staff", new Response(JSON.stringify({owner: "", registrationId: null})));
+    });
     await page.clock.install();
     await page.reload();
     const reconnect = page.getByRole("region", {name: "Reconnect phone alerts"});
@@ -161,6 +170,8 @@ try {
     await page.clock.fastForward(31_000);
     await reconnect.waitFor({state: "hidden"});
     assert.equal(restored, 1, "a transient failure is retried without another permission request");
+    assert.deepEqual(bindingBeforeRestore, {owner: "12", registrationId, pending: true},
+        "the phone can show a generic catch-up alert before the restore response");
     assert.equal(await page.evaluate(() => window._permissionRequests), 0);
     console.log("PASS: staff permission gesture, denial, registration, honest offline revoke/read, CSRF, modern mobile layout, exact order/actions, IST estimate and flag OFF.");
 } catch (error) {console.error("URL", page.url(), "BODY", (await page.locator("body").innerText()).slice(0,2500)); throw error;} finally {await browser.close();}

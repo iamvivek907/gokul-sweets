@@ -803,7 +803,8 @@ async function orderPushDisplay(payload, staff) {
         const response = await cache.match(key);
         const binding = response ? await response.json() : null;
         if (!binding) return payload.registrationId ? "generic" : "details";
-        return payload.registrationId && binding.registrationId === payload.registrationId ? "details" : "blocked";
+        if (!payload.registrationId || binding.registrationId !== payload.registrationId) return "blocked";
+        return binding.pending ? "generic" : "details";
     } catch {
         // Preserve the notification signal without exposing order details when an updated
         // installation has not yet confirmed the registration or local storage is unavailable.
@@ -817,6 +818,10 @@ self.addEventListener("push", event => {
     try {payload = event.data?.json();} catch {return;}
     if (!payload || !/^(?:staff:|marketing:)?[0-9]{1,20}$/.test(String(payload.eventId))) return;
     const eventId = String(payload.eventId);
+    const staff = eventId.startsWith("staff:");
+    const marketing = eventId.startsWith("marketing:");
+    const registration = !marketing && typeof payload.registrationId === "string" && payload.registrationId;
+    const seenId = registration ? JSON.stringify([registration, eventId]) : eventId;
     pushSequence = pushSequence.catch(() => {}).then(async () => {
         const key = new Request(new URL("/__push_seen", self.location.origin));
         let cache;
@@ -832,9 +837,7 @@ self.addEventListener("push", event => {
                 if (Array.isArray(stored?.staffLatest)) staffLatest = stored.staffLatest;
             }
         } catch { /* Cache errors must never prevent notification delivery. */ }
-        if (seen.includes(eventId)) return;
-        const staff = eventId.startsWith("staff:");
-        const marketing = eventId.startsWith("marketing:");
+        if (seen.includes(seenId)) return;
         const display = marketing ? "details" : await orderPushDisplay(payload, staff);
         if (display === "blocked") return;
         const target = display === "generic" ? undefined : payload.url;
@@ -844,7 +847,8 @@ self.addEventListener("push", event => {
         const title = custom && typeof payload.title === "string" ? payload.title.slice(0, 80) : staff ? "Gokul kitchen alert" : "Gokul Sweets";
         const body = custom && typeof payload.body === "string" ? payload.body.slice(0, 500)
             : staff ? "Open Staff notifications to check the latest order activity." : "Open the app to check your latest order update.";
-        const tagGroup = `gokul-${staff ? "staff" : "customer"}-${destination.split("#")[0]}`;
+        const scope = registration ? `:${encodeURIComponent(registration)}` : "";
+        const tagGroup = `gokul-${staff ? "staff" : "customer"}-${destination.split("#")[0]}${scope}`;
         // The generic staff inbox can represent unrelated events, so order only specific targets.
         const orderedStaff = staff && custom;
         const tag = marketing ? `gokul-${eventId}` : staff ? `${tagGroup}:${eventId}` : tagGroup;
@@ -879,7 +883,7 @@ self.addEventListener("push", event => {
             }
         }
         try {
-            if (cache) await cache.put(key, new Response(JSON.stringify({seen: [...seen, eventId].slice(-256), staffLatest}),
+            if (cache) await cache.put(key, new Response(JSON.stringify({seen: [...seen, seenId].slice(-256), staffLatest}),
                 {headers: {"Content-Type": "application/json"}}));
         } catch { /* The banner already displayed; its tag still replaces duplicates. */ }
         if (!marketing) {

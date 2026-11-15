@@ -42,7 +42,10 @@ export async function staffAlertsRequest<T>(path = "", init?: RequestInit, staff
 }
 
 
-export function syncStaffAlertDevice(subscription: PushSubscription, staffId: number, signal: AbortSignal, registrationId?: string) {
+export async function syncStaffAlertDevice(subscription: PushSubscription, staffId: number, signal: AbortSignal, registrationId?: string) {
+    // A restore can release queued pushes before its response reaches the browser.
+    // Allow a generic alert for this registration while the server confirms the restore.
+    if (registrationId) await setOrderPushBinding("staff", String(staffId), registrationId, signal, true);
     const keys = subscription.toJSON().keys;
     return staffAlertsRequest<{id: string | null}>("/push-subscriptions", {
         method: "POST", signal, body: JSON.stringify({

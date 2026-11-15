@@ -213,3 +213,43 @@ test('an existing staff phone gets a generic audible reminder during the binding
     assert.equal(runtime.shown[0].silent, false);
     assert.ok(!runtime.shown[0].body.includes('GS-930'));
 });
+
+test('a staff catch-up push can ring before the restore response confirms the binding', async () => {
+    const runtime = worker();
+    const key = 'https://dev.gokulsweets.in/.__gokul-order-push/staff';
+    const send = (eventId, registrationId) => new Promise(resolve => runtime.listeners.push({
+        data: {json: () => ({eventId, registrationId, title: 'Prepare order', url: '/admin/orders/GS-901'})},
+        waitUntil: resolve
+    }));
+    runtime.entries.set(key, JSON.stringify({owner: 'current', registrationId: 'current-device', pending: true}));
+    await send('staff:951', 'previous-device');
+    await send('staff:952', 'current-device');
+    assert.equal(runtime.shown.length, 1);
+    assert.equal(runtime.shown[0].data.url, '/admin/staff-notifications');
+    assert.equal(runtime.shown[0].silent, false);
+    runtime.entries.set(key, JSON.stringify({owner: 'current', registrationId: 'current-device'}));
+    await send('staff:952', 'current-device');
+    await send('staff:953', 'current-device');
+    assert.equal(runtime.shown.length, 2);
+    assert.equal(runtime.shown[1].data.url, '/admin/orders/GS-901');
+});
+
+test('staff push deduplication and ordering follow the registration on a shared phone', async () => {
+    const runtime = worker();
+    const key = 'https://dev.gokulsweets.in/.__gokul-order-push/staff';
+    const bind = registrationId => runtime.entries.set(key, JSON.stringify({owner: registrationId, registrationId}));
+    const send = (eventId, registrationId, order) => new Promise(resolve => runtime.listeners.push({
+        data: {json: () => ({eventId, registrationId, title: 'Prepare order', url: `/admin/orders/${order}`})},
+        waitUntil: resolve
+    }));
+    bind('old-device');
+    await send('staff:961', 'old-device', 'GS-901');
+    await send('staff:965', 'old-device', 'GS-902');
+    bind('new-device');
+    await send('staff:961', 'new-device', 'GS-901');
+    await send('staff:964', 'new-device', 'GS-902');
+    await send('staff:963', 'new-device', 'GS-902');
+    await send('staff:964', 'new-device', 'GS-902');
+    assert.deepEqual(runtime.shown.map(notice => notice.data.registrationId),
+        ['old-device', 'old-device', 'new-device', 'new-device']);
+});

@@ -1,5 +1,5 @@
 type Audience = "staff" | "customer";
-type Binding = {owner: string; registrationId: string | null};
+type Binding = {owner: string; registrationId: string | null; pending?: true};
 const cacheName = "gokul-order-push-binding-v1";
 const bindingKey = (audience: Audience) => `/.__gokul-order-push/${audience}`;
 
@@ -11,13 +11,13 @@ export async function readOrderPushBinding(audience: Audience): Promise<Binding 
     } catch {return null;}
 }
 
-export async function setOrderPushBinding(audience: Audience, owner: string, registrationId: string | null, signal?: AbortSignal) {
+export async function setOrderPushBinding(audience: Audience, owner: string, registrationId: string | null, signal?: AbortSignal, pending = false) {
     const cache = await caches.open(cacheName);
     const existing = await cache.match(bindingKey(audience));
     const previous = existing ? await existing.json() as Binding : null;
-    if (previous?.owner === owner && previous.registrationId === registrationId) return;
+    if (previous?.owner === owner && previous.registrationId === registrationId && (!previous.pending || pending)) return;
     signal?.throwIfAborted();
-    await cache.put(bindingKey(audience), new Response(JSON.stringify({owner, registrationId})));
+    await cache.put(bindingKey(audience), new Response(JSON.stringify({owner, registrationId, ...(pending ? {pending: true} : {})})));
 }
 
 async function closeOrderNotifications(audience: Audience) {
