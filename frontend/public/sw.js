@@ -807,7 +807,7 @@ async function orderPushDisplay(payload, staff) {
     } catch {
         // Preserve the notification signal without exposing order details when an updated
         // installation has not yet confirmed the registration or local storage is unavailable.
-        return "generic";
+        return payload.registrationId ? "generic" : "details";
     }
 }
 

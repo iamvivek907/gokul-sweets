@@ -134,7 +134,7 @@ test('cache failure still shows a pickup alert and wakes only customer clients',
         {url: 'https://dev.gokulsweets.in/admin/orders', postMessage: value => wakes.push(value.type)}
     ], true);
     let pending;
-    runtime.listeners.push({data: {json: () => ({eventId: '431', title: 'Ready for pickup', url: '/orders/GS-431'})}, waitUntil(value) {pending = value;}});
+    runtime.listeners.push({data: {json: () => ({eventId: '431', registrationId: 'enrolled-device', title: 'Ready for pickup', url: '/orders/GS-431'})}, waitUntil(value) {pending = value;}});
     await pending;
     assert.equal(runtime.shown[0].title, 'Gokul Sweets');
     assert.equal(runtime.shown[0].data.url, '/profile#account-notifications');
