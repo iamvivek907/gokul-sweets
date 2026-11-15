@@ -27,12 +27,17 @@ export async function registerCustomerPush(settings: AlertSettings): Promise<"gr
 }
 
 /** Confirm an explicit device opt-in against the verified account; never grants marketing consent. */
-export async function confirmCustomerPush(settings: AlertSettings, subscription: PushSubscription) {
-    const current = await apiClient<AlertSettings>("/api/customer/identity/notification-alerts", {credentials: "include", signal: AbortSignal.timeout(8000)});
+export async function confirmCustomerPush(settings: AlertSettings, subscription: PushSubscription, registrationId?: string, signal?: AbortSignal) {
+    const deadline = () => signal ? AbortSignal.any([signal, AbortSignal.timeout(8000)]) : AbortSignal.timeout(8000);
+    const current = await apiClient<AlertSettings>("/api/customer/identity/notification-alerts", {credentials: "include", signal: deadline()});
     if (current.scopeId !== settings.scopeId) throw new Error("Account changed");
     const keys = subscription.toJSON().keys;
     const result = await apiClient<{id: string}>("/api/customer/identity/push-subscriptions", {method: "POST", credentials: "include",
-        signal: AbortSignal.timeout(8000), body: JSON.stringify({endpoint: subscription.endpoint, publicKey: keys?.p256dh, authSecret: keys?.auth})});
+        signal: deadline(), body: JSON.stringify({registrationId, endpoint: subscription.endpoint, publicKey: keys?.p256dh, authSecret: keys?.auth})});
+    if (registrationId) {
+        // Restoration never changes local opt-in state or revives a disabled device.
+        return;
+    }
     try {localStorage.setItem(pushDeviceKey(settings.scopeId), result.id);}
     catch {
         await apiClient<void>(`/api/customer/identity/push-subscriptions/${result.id}`, {method: "DELETE", credentials: "include"});

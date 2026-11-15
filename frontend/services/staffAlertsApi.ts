@@ -1,4 +1,8 @@
+import {ADMIN_API_BASE_URL} from "@/lib/constants";
 import {adminFetch} from "@/services/adminApi";
+
+export const STAFF_ALERT_DEVICE_RESTORED = "gokul-staff-alert-device-restored";
+export const staffAlertDeviceKey = (staffId?: number) => `gokul-staff-push:${ADMIN_API_BASE_URL}:${staffId}`;
 
 export type StaffAlertSettings = {enabled: boolean; environment: string; staffId: number; pushConfigured: boolean;
     applicationServerKey: string | null; deviceActive: boolean; emailConfigured: boolean; emailTestRouting?: boolean; reminderMinutes: number; escalationMinutes: number};

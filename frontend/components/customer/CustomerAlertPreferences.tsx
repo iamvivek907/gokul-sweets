@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import {T} from "@/lib/language";
 
 import {useEffect, useState} from "react";
@@ -72,6 +73,19 @@ export default function CustomerAlertPreferences() {
             setMessage("Browser registration could not be confirmed. Retry when connected, or use the inbox.");
         } finally {setBusy(false);}
     }
+    async function testDeviceSound() {
+        setMessage("");
+        try {
+            const registration = await navigator.serviceWorker.getRegistration();
+            if (!registration || Notification.permission !== "granted") throw new Error("Device notifications are unavailable");
+            await registration.showNotification("Gokul Sweets · Sound check", {
+                body: "Your pickup alerts use this device’s notification settings.",
+                icon: "/icon-192.png", badge: "/notification-badge.svg", silent: false,
+                tag: "gokul-customer-sound-test", data: {url: "/notifications"}
+            });
+            setMessage("Test notification sent to this device. If it was silent, check Sounds, notification volume and Focus or Do Not Disturb.");
+        } catch {setMessage("The test notification could not appear. Check notification permission and try again.");}
+    }
     async function disablePush() {
         if (!pushId || !settings) return;
         setBusy(true); setMessage("");
@@ -93,13 +107,18 @@ export default function CustomerAlertPreferences() {
         {modern && <p className="permission-eyebrow"><T text="Made for your day"/></p>}
         <h3 className="font-semibold"><T text="Browser alerts and sound"/></h3>
         {modern && <div className="permission-summary"><span aria-hidden="true">♪</span><p><T text="Pickup updates, your way. Set the sound. Keep your evenings quiet."/></p></div>}
-        <p className="mt-2 text-sm leading-6"><T text="Both are optional. Push uses standard browser notifications. Custom chimes work only in an open, visible page after you activate sound in that tab; muted devices and autoplay rules may prevent sound."/></p>
+        <p className="mt-2 text-sm leading-6"><T text="Allow device notifications for pickup updates. Your phone controls their sound. You can also activate and test a separate chime while Gokul is open."/></p>
         <p className="mt-2 text-sm leading-6"><T text="On iPhone or iPad, add Gokul Sweets to your Home Screen and open that app before enabling push (iOS/iPadOS 16.4 or later). If push is unsupported, use this inbox."/></p>
+        <p className="mt-2 text-sm leading-6">
+            <Link className="font-semibold underline" href="/profile/addresses"><T text="Set up location for delivery"/></Link>
+            {" "}<T text="Choose Use my current location when adding an address. Location is optional and does not affect pickup alerts."/>
+        </p>
         {settings && draft && <>
             <div className="permission-device-actions mt-4 flex flex-wrap gap-3">
                 <button type="button" disabled={busy || !supported || !settings.pushConfigured || permission === "denied"} onClick={() => void enablePush()} className="min-h-11 rounded-xl border px-4 text-sm disabled:opacity-50"><T text={pushId ? "Check this browser registration" : "Enable push for this browser"}/></button>
                 {pushId && <button type="button" disabled={busy} onClick={() => void disablePush()} className="min-h-11 rounded-xl border px-4 text-sm"><T text="Disable push for this browser"/></button>}
             </div>
+            {pushId && permission === "granted" && supported && <button type="button" onClick={() => void testDeviceSound()} className="mt-2 min-h-11 text-sm underline"><T text="Test device notification sound"/></button>}
             {!supported && <p className="mt-2 text-xs"><T text="This browser does not support push here. Use the inbox for updates."/></p>}
             {!settings.pushConfigured && <p className="mt-2 text-xs"><T text="Push is not configured yet. The inbox and optional in-page sound remain available."/></p>}
             {permission === "denied" && <p className="mt-2 text-sm"><T text="Permission is denied. Change it in browser settings if you want push later."/></p>}

@@ -3,12 +3,12 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
-function worker(clients = []) {
+function worker(clients = [], cacheFailure = false) {
     const listeners = {}, shown = [], opened = [], entries = new Map();
     const self = {location: {origin: 'https://dev.gokulsweets.in'}, addEventListener(name, listener) {listeners[name] = listener;},
         registration: {async showNotification(title, options) {shown.push({title, ...options});}},
         clients: {async matchAll() {if(clients instanceof Error)throw clients;return clients;}, async openWindow(url) {opened.push(url);}}};
-    const caches = {async open() {return {async match(key) {const value = entries.get(key.url); return value ? new Response(value) : undefined;},
+    const caches = {async open() {if (cacheFailure) throw new Error("Cache unavailable"); return {async match(key) {const value = entries.get(key.url); return value ? new Response(value) : undefined;},
         async put(key, response) {entries.set(key.url, await response.text());}};}};
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../public/sw.js'), 'utf8'), {self, caches, URL, Request, Response, Promise, Array, String});
     return {listeners, shown, opened};
@@ -118,4 +118,29 @@ test('marketing IDs cannot collide with order IDs or open unsafe destinations', 
     runtime.listeners.push({data: {json: () => ({eventId: 'marketing:7', title: 'Snack time', url: '/branches/1'})}, waitUntil(value) {pending = value;}});
     await pending;
     assert.equal(runtime.shown.length, 2);
+});
+
+
+test('cache failure still shows a pickup alert and wakes only customer clients', async () => {
+    const wakes = [];
+    const runtime = worker([
+        {url: 'https://dev.gokulsweets.in/menu', postMessage: value => wakes.push(value.type)},
+        {url: 'https://dev.gokulsweets.in/admin/orders', postMessage: value => wakes.push(value.type)}
+    ], true);
+    let pending;
+    runtime.listeners.push({data: {json: () => ({eventId: '431', title: 'Ready for pickup', url: '/orders/GS-431'})}, waitUntil(value) {pending = value;}});
+    await pending;
+    assert.equal(runtime.shown[0].title, 'Ready for pickup');
+    assert.deepEqual(wakes, ['gokul-customer-alert']);
+});
+
+test('separate staff reminders for the same order have distinct device tags, and retries deduplicate', async () => {
+    const runtime = worker();
+    for (const eventId of ['staff:501', 'staff:502', 'staff:502']) {
+        let pending;
+        runtime.listeners.push({data: {json: () => ({eventId, title: 'Start preparation', url: '/admin/orders/GS-501'})}, waitUntil(value) {pending = value;}});
+        await pending;
+    }
+    assert.equal(runtime.shown.length, 2);
+    assert.notEqual(runtime.shown[0].tag, runtime.shown[1].tag);
 });

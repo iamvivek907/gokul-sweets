@@ -801,11 +801,16 @@ self.addEventListener("push", event => {
     if (!payload || !/^(?:staff:|marketing:)?[0-9]{1,20}$/.test(String(payload.eventId))) return;
     const eventId = String(payload.eventId);
     pushSequence = pushSequence.catch(() => {}).then(async () => {
-        const cache = await caches.open(PUSH_DEDUPE_CACHE);
         const key = new Request(new URL("/__push_seen", self.location.origin));
-        const previous = await cache.match(key);
-        const seen = previous ? await previous.json() : [];
-        if (Array.isArray(seen) && seen.includes(eventId)) return;
+        let cache;
+        let seen = [];
+        try {
+            cache = await caches.open(PUSH_DEDUPE_CACHE);
+            const previous = await cache.match(key);
+            const stored = previous ? await previous.json() : [];
+            if (Array.isArray(stored)) seen = stored;
+        } catch { /* Cache errors must never prevent notification delivery. */ }
+        if (seen.includes(eventId)) return;
         const staff = eventId.startsWith("staff:");
         const marketing = eventId.startsWith("marketing:");
         const destination = notificationDestination(payload.url, staff, marketing);
@@ -813,23 +818,37 @@ self.addEventListener("push", event => {
         const custom = destination !== "/profile#account-notifications" && destination !== "/admin/staff-notifications";
         const title = custom && typeof payload.title === "string" ? payload.title.slice(0, 80) : "Gokul Sweets";
         const body = custom && typeof payload.body === "string" ? payload.body.slice(0, 500) : "A new account update is waiting in your notification inbox.";
+        const tagGroup = `gokul-${staff ? "staff" : "customer"}-${destination.split("#")[0]}`;
+        // Fresh staff reminders get distinct tags so they can sound on platforms that
+        // suppress alerts when an existing notification is replaced.
+        const tag = marketing ? `gokul-${eventId}` : staff ? `${tagGroup}:${eventId}` : tagGroup;
         await self.registration.showNotification(title, {
             body, silent: false, ...(staff ? {vibrate: [300, 120, 300, 120, 500]} : {}), badge: "/notification-badge.svg",
-            icon: "/icon-192.png", tag: marketing ? `gokul-${eventId}` : `gokul-${staff ? "staff" : "customer"}-${destination.split("#")[0]}`, renotify: staff, requireInteraction: staff,
+            icon: "/icon-192.png", tag, renotify: staff, requireInteraction: staff,
             data: {url: destination, staff, marketing}
         });
+        try {
+            if (cache) await cache.put(key, new Response(JSON.stringify([...seen, eventId].slice(-256)),
+                {headers: {"Content-Type": "application/json"}}));
+        } catch { /* The banner already displayed; its tag still replaces duplicates. */ }
         if (staff) {
+            try {
+                const notices = await self.registration.getNotifications();
+                for (const notice of notices) {
+                    if (notice.tag === tagGroup || (notice.tag.startsWith(`${tagGroup}:staff:`) && notice.tag !== tag)) notice.close();
+                }
+            } catch { /* The new reminder has already displayed. */ }
+        }
+        if (!marketing) {
             try {
                 const windows = await self.clients.matchAll({type: "window", includeUncontrolled: true});
                 for (const client of windows) {
-                    if (new URL(client.url).pathname.startsWith("/admin")) {
-                        try {client.postMessage({type: "gokul-staff-alert"});} catch { /* Client closed. */ }
-                    }
+                    const current = new URL(client.url);
+                    if (current.origin !== self.location.origin || current.pathname.startsWith("/admin") !== staff) continue;
+                    try {client.postMessage({type: staff ? "gokul-staff-alert" : "gokul-customer-alert"});} catch { /* Client closed. */ }
                 }
-            } catch { /* Notification already displayed; client discovery cannot undo delivery or dedupe. */ }
+            } catch { /* A client discovery failure cannot undo notification delivery. */ }
         }
-        await cache.put(key, new Response(JSON.stringify([...(Array.isArray(seen) ? seen : []), eventId].slice(-256)),
-            {headers: {"Content-Type": "application/json"}}));
     });
     event.waitUntil(pushSequence);
 });

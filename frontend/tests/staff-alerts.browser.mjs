@@ -61,7 +61,7 @@ const page = await context.newPage();
 page.on("pageerror", error => console.error("BROWSER", error.message));
 try {
     await page.goto(`${base}/admin/staff-notifications`);
-    await page.getByRole("heading", {name: "Get alerts when the portal is closed"}).waitFor();
+    await page.getByRole("heading", {name: "Kitchen alerts on this phone"}).waitFor();
     await page.getByRole("link", {name: "Staff alerts, 1 unread"}).waitFor();
     assert.equal(await page.evaluate(() => window._permissionRequests), 0);
     await page.evaluate(value => {window._denyPush = value;}, denied);
@@ -69,7 +69,7 @@ try {
     await page.getByText("Push permission was not granted.", {exact: false}).waitFor();
     assert.equal(registered, false);
     denied = false; await page.reload();
-    await page.getByRole("heading", {name: "Get alerts when the portal is closed"}).waitFor();
+    await page.getByRole("heading", {name: "Kitchen alerts on this phone"}).waitFor();
     await page.evaluate(value => {window._denyPush = value;}, denied);
     await page.getByRole("button", {name: "Enable staff push for this browser"}).click();
     await page.getByRole("button", {name: "Check staff registration"}).waitFor();

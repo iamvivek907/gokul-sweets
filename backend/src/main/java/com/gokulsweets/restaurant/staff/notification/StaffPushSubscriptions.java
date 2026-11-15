@@ -33,8 +33,13 @@ public class StaffPushSubscriptions {
      * @param endpoint the endpoint
      * @param publicKey the public key
      * @param authSecret the auth secret
+     * @param registrationId the existing device id when restoring an opt-in
      */
-    public record Input(String endpoint, String publicKey, String authSecret) {}
+    public record Input(String endpoint, String publicKey, String authSecret, UUID registrationId) {
+        public Input(String endpoint, String publicKey, String authSecret) {
+            this(endpoint, publicKey, authSecret, null);
+        }
+    }
 
     /**
      * Immutable result data contract.
@@ -89,7 +94,7 @@ public class StaffPushSubscriptions {
                     jdbc.query(
                             """
 SELECT s.id, s.staff_id, s.session_hash, s.public_key, s.auth_secret,
-  s.revoked_at IS NOT NULL OR v.revoked_at IS NOT NULL OR v.expires_at <= CURRENT_TIMESTAMP OR v.staff_updated_at <> u.updated_at OR NOT u.active inactive
+  s.revoked_at IS NOT NULL OR v.revoked_at IS NOT NULL OR v.staff_updated_at <> u.updated_at OR NOT u.active inactive
 FROM staff_push_subscriptions s JOIN staff_sessions v ON v.token_hash = s.session_hash
 JOIN staff_users u ON u.id = s.staff_id WHERE s.environment = ? AND s.endpoint_hash = ? FOR UPDATE OF s
 """,
@@ -103,6 +108,30 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.environment = ? AND s.endpoint_h
                                             rs.getBoolean(6)),
                             alerts.scope(),
                             hash);
+            if (input.registrationId() != null) {
+                // Existing-device restoration must never recreate a removed subscription.
+                var restored =
+                        jdbc.query(
+                                """
+UPDATE staff_push_subscriptions s SET session_hash=?
+FROM staff_sessions old, staff_users u
+WHERE s.id=? AND s.environment=? AND s.staff_id=? AND s.endpoint_hash=?
+  AND s.public_key=? AND s.auth_secret=? AND s.revoked_at IS NULL
+  AND old.token_hash=s.session_hash AND u.id=s.staff_id AND u.active
+  AND old.staff_updated_at=u.updated_at
+RETURNING s.id
+""",
+                                (rs, row) -> rs.getObject(1, UUID.class),
+                                session,
+                                input.registrationId(),
+                                alerts.scope(),
+                                staffId,
+                                hash,
+                                input.publicKey(),
+                                input.authSecret());
+                if (restored.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+                return new Result(restored.getFirst());
+            }
             if (!existing.isEmpty()
                     && !existing.getFirst().inactive()
                     && existing.getFirst().staffId() != staffId)
@@ -115,7 +144,7 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.environment = ? AND s.endpoint_h
                             """
 SELECT COUNT(*) FROM staff_push_subscriptions s JOIN staff_sessions v ON v.token_hash = s.session_hash
 JOIN staff_users u ON u.id = s.staff_id WHERE s.environment = ? AND s.staff_id = ? AND s.endpoint_hash <> ?
-  AND s.revoked_at IS NULL AND v.revoked_at IS NULL AND v.expires_at > CURRENT_TIMESTAMP AND v.staff_updated_at = u.updated_at AND u.active
+  AND s.revoked_at IS NULL AND v.revoked_at IS NULL AND v.staff_updated_at = u.updated_at AND u.active
 """,
                             Long.class,
                             alerts.scope(),
@@ -210,7 +239,8 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                                     """
 SELECT EXISTS (SELECT 1 FROM staff_push_subscriptions s JOIN staff_sessions v ON v.token_hash = s.session_hash
 JOIN staff_users u ON u.id = s.staff_id WHERE s.id = ? AND s.environment = ? AND s.staff_id = ? AND s.session_hash = ?
-  AND s.revoked_at IS NULL AND v.revoked_at IS NULL AND v.expires_at > CURRENT_TIMESTAMP AND v.staff_updated_at = u.updated_at AND u.active)
+  AND s.revoked_at IS NULL AND v.revoked_at IS NULL AND v.expires_at > CURRENT_TIMESTAMP
+  AND v.staff_updated_at = u.updated_at AND u.active)
 """,
                                     Boolean.class,
                                     id,

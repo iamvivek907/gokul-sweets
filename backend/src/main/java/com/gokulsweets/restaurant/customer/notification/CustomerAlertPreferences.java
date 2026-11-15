@@ -73,8 +73,14 @@ public class CustomerAlertPreferences {
      * @param endpoint the endpoint
      * @param publicKey the public key
      * @param authSecret the auth secret
+     * @param registrationId the existing device id when restoring an opt-in
      */
-    public record SubscriptionInput(String endpoint, String publicKey, String authSecret) {}
+    public record SubscriptionInput(
+            String endpoint, String publicKey, String authSecret, UUID registrationId) {
+        public SubscriptionInput(String endpoint, String publicKey, String authSecret) {
+            this(endpoint, publicKey, authSecret, null);
+        }
+    }
 
     /**
      * Immutable subscription result data contract.
@@ -263,7 +269,7 @@ SELECT id FROM verified_customer_sessions WHERE environment = ? AND verified_sub
             var existing =
                     jdbc.query(
                             """
-SELECT s.id, s.subject_id, s.revoked_at IS NOT NULL OR v.revoked_at IS NOT NULL OR v.expires_at <= CURRENT_TIMESTAMP AS inactive, s.session_id, s.public_key, s.auth_secret
+SELECT s.id, s.subject_id, s.revoked_at IS NOT NULL OR v.revoked_at IS NOT NULL AS inactive, s.session_id, s.public_key, s.auth_secret
 FROM customer_push_subscriptions s JOIN verified_customer_sessions v ON v.id = s.session_id
 WHERE s.environment = ? AND s.endpoint_hash = ? FOR UPDATE OF s
 """,
@@ -277,6 +283,27 @@ WHERE s.environment = ? AND s.endpoint_hash = ? FOR UPDATE OF s
                                             rs.getString(6)),
                             environment,
                             endpointHash);
+            if (input.registrationId() != null) {
+                // Require the original opt-in and browser subscription proof.
+                var restored =
+                        jdbc.query(
+                                """
+UPDATE customer_push_subscriptions SET session_id=?
+WHERE id=? AND environment=? AND subject_id=? AND endpoint_hash=?
+  AND public_key=? AND auth_secret=? AND revoked_at IS NULL
+RETURNING id
+""",
+                                (rs, row) -> rs.getObject(1, UUID.class),
+                                session,
+                                input.registrationId(),
+                                environment,
+                                subject,
+                                endpointHash,
+                                input.publicKey(),
+                                input.authSecret());
+                if (restored.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+                return new SubscriptionResult(restored.getFirst());
+            }
             if (!existing.isEmpty()
                     && !existing.getFirst().subject().equals(subject)
                     && !existing.getFirst().inactive())
@@ -289,8 +316,7 @@ WHERE s.environment = ? AND s.endpoint_hash = ? FOR UPDATE OF s
                             "SELECT COUNT(*) FROM customer_push_subscriptions s JOIN"
                                 + " verified_customer_sessions v ON v.id = s.session_id WHERE"
                                 + " s.environment = ? AND s.subject_id = ? AND s.revoked_at IS NULL"
-                                + " AND v.revoked_at IS NULL AND v.expires_at > CURRENT_TIMESTAMP"
-                                + " AND s.endpoint_hash <> ?",
+                                + " AND v.revoked_at IS NULL AND s.endpoint_hash <> ?",
                             Long.class,
                             environment,
                             subject,

@@ -147,6 +147,45 @@ VALUES ('DEV', ?, ?, 'PAYMENT_PAID', 'ORDER', 'TEST-ORDER', 'Payment received', 
     }
 
     @Test
+    void deviceSurvivesExpiryAndRestoresOnlyWhileOptedIn() throws Exception {
+        preferences.save(
+                "DEV", subject, new CustomerAlertPreferences.Input(false, false, 1320, 480));
+        var browser = input(UUID.randomUUID().toString());
+        var registration = preferences.subscribe("DEV", subject, token, browser);
+        jdbc.update(
+                "UPDATE verified_customer_sessions SET issued_at=CURRENT_TIMESTAMP - INTERVAL '1"
+                    + " hour', expires_at=CURRENT_TIMESTAMP - INTERVAL '1 minute' WHERE"
+                    + " verified_subject_id=?",
+                subject);
+        long event = event();
+        dispatcher.dispatchBatch();
+        verify(transport)
+                .send(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(event),
+                        anyString(),
+                        anyString(),
+                        anyString());
+
+        var next = sessions.issue(ConsentEnvironment.DEV, subject, Instant.now());
+        var restoration =
+                new CustomerAlertPreferences.SubscriptionInput(
+                        browser.endpoint(),
+                        browser.publicKey(),
+                        browser.authSecret(),
+                        registration.id());
+        assertThat(preferences.subscribe("DEV", subject, next.token(), restoration).id())
+                .isEqualTo(registration.id());
+        assertThat(preferences.registered("DEV", subject, next.token(), registration.id()))
+                .isTrue();
+        preferences.unsubscribe("DEV", subject, registration.id());
+        assertThatThrownBy(() -> preferences.subscribe("DEV", subject, next.token(), restoration))
+                .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
     void statusFingerprintDetectsChangedEndpointsOrKeysWithoutExposingThem() {
         var browser = input(UUID.randomUUID().toString());
         var registration = preferences.subscribe("DEV", subject, token, browser);

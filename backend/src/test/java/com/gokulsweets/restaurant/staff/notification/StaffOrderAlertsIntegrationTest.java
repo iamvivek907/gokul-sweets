@@ -352,6 +352,77 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
     }
 
     @Test
+    void phoneDeliverySurvivesSessionExpiryButStopsOnSignOut() throws Exception {
+        subscriptions.subscribe(staff, cookie, input("persistent-phone-" + UUID.randomUUID()));
+        jdbc.update(
+                "UPDATE staff_sessions SET expires_at=CURRENT_TIMESTAMP - INTERVAL '1 minute'"
+                        + " WHERE token_hash=?",
+                StaffSessionService.hash(cookie));
+        assertThat(sessions.verify(cookie)).isNull();
+        alerts.paymentConfirmed(payment);
+        long paid = latest();
+        dispatcher.dispatchBatch();
+        verify(push)
+                .sendStaff(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(paid),
+                        anyString(),
+                        anyString(),
+                        anyString());
+
+        sessions.revoke(cookie);
+        now(17, 0);
+        alerts.generateReminders();
+        long due = latest();
+        dispatcher.dispatchBatch();
+        verify(push, never())
+                .sendStaff(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(due),
+                        anyString(),
+                        anyString(),
+                        anyString());
+    }
+
+    @Test
+    void readingADueReminderStillSendsItsPhoneAlertUntilPreparationStarts() throws Exception {
+        subscriptions.subscribe(staff, cookie, input("read-due-" + UUID.randomUUID()));
+        now(17, 0);
+        alerts.generateReminders();
+        long due = latest();
+        alerts.markRead(staff, due);
+
+        dispatcher.dispatchBatch();
+
+        verify(push)
+                .sendStaff(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(due),
+                        anyString(),
+                        anyString(),
+                        anyString());
+        now(17, 2);
+        alerts.generateReminders();
+        status("PREPARING");
+        dispatcher.dispatchBatch();
+        verify(push, times(1))
+                .sendStaff(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        anyLong(),
+                        anyString(),
+                        anyString(),
+                        anyString());
+    }
+
+    @Test
     void reminderCrossesIndiaMidnightWithoutUsingBrowserOrServerTimezone() {
         jdbc.update(
                 "UPDATE pickup_slots SET start_time = '00:30', end_time = '01:00' WHERE id = ?",

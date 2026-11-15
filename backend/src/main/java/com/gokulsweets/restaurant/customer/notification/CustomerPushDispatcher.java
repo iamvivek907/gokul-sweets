@@ -77,7 +77,7 @@ JOIN customer_push_subscriptions s ON s.environment = e.environment AND s.subjec
 JOIN verified_customer_sessions v ON v.id = s.session_id
 WHERE e.environment = ? AND (e.read_at IS NULL OR (e.auto_acknowledged AND e.kind IN ('PICKED_UP','DELIVERED'))) AND s.revoked_at IS NULL
   AND v.environment = e.environment AND v.verified_subject_id = e.subject_id
-  AND v.revoked_at IS NULL AND v.expires_at > CURRENT_TIMESTAMP
+  AND v.revoked_at IS NULL
   AND e.created_at >= s.subscribed_at AND e.created_at > CURRENT_TIMESTAMP - INTERVAL '5 minutes'
 ON CONFLICT (event_id, subscription_id) DO NOTHING
 """,
@@ -98,7 +98,6 @@ SELECT EXISTS (SELECT 1 FROM customer_push_subscriptions s
 JOIN verified_customer_sessions v ON v.id = s.session_id
 JOIN customer_notification_events e ON e.id = ?
 WHERE s.id = ? AND s.revoked_at IS NULL AND v.revoked_at IS NULL
-  AND v.expires_at > CURRENT_TIMESTAMP
   AND (e.read_at IS NULL OR (e.auto_acknowledged AND e.kind IN ('PICKED_UP','DELIVERED')))
   AND NOT EXISTS (SELECT 1 FROM customer_notification_events newer WHERE newer.environment=e.environment
     AND newer.subject_id=e.subject_id AND newer.target_type=e.target_type AND newer.target_id=e.target_id AND newer.id>e.id)

@@ -4,32 +4,58 @@ import Link from "next/link";
 import {useEffect, useState} from "react";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
 import NotificationIcon from "@/components/customer/NotificationIcon";
-import {staffAlertsRequest, type StaffAlertSettings, type StaffInbox} from "@/services/staffAlertsApi";
+import {STAFF_ALERT_DEVICE_RESTORED, staffAlertDeviceKey, staffAlertsRequest, type StaffAlertSettings, type StaffInbox} from "@/services/staffAlertsApi";
 
 export default function StaffNotificationBell() {
     const {profile, hasPermission} = useAdminAuth();
     const [count, setCount] = useState<number | null>(null);
     useEffect(() => {
         if (!profile || !hasPermission("ORDER_VIEW")) return;
-        let active = true, busy = false;
+        let active = true, busy = false, checkedDevice = false;
+        const deviceKey = staffAlertDeviceKey(profile.staffId);
         const controller = new AbortController();
         const refresh = async () => {
             if (busy || !navigator.onLine || document.visibilityState !== "visible") return;
             busy = true;
             try {
-                const settings = await staffAlertsRequest<StaffAlertSettings>("/settings", {signal: controller.signal});
+                const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]);
+                let device: string | null = null;
+                if (!checkedDevice && typeof Notification !== "undefined" && Notification.permission === "granted") {
+                    try {device = localStorage.getItem(deviceKey);} catch { /* Inbox works without device storage. */ }
+                    if (device && !/^[0-9a-f-]{36}$/i.test(device)) device = null;
+                }
+                const settings = await staffAlertsRequest<StaffAlertSettings>(`/settings${device ? `?deviceId=${encodeURIComponent(device)}` : ""}`, {signal});
                 if (!settings.enabled) {if (active) setCount(null); return;}
-                const inbox = await staffAlertsRequest<StaffInbox>("", {signal: controller.signal});
+                if (device && !settings.deviceActive && settings.pushConfigured) {
+                    try {
+                        const registration = await navigator.serviceWorker?.getRegistration();
+                        const push = await registration?.pushManager.getSubscription();
+                        signal.throwIfAborted();
+                        if (push && localStorage.getItem(deviceKey) === device) {
+                            const keys = push.toJSON().keys;
+                            await staffAlertsRequest("/push-subscriptions", {
+                                method: "POST", signal,
+                                body: JSON.stringify({registrationId: device, endpoint: push.endpoint, publicKey: keys?.p256dh, authSecret: keys?.auth})
+                            });
+                            if (active) window.dispatchEvent(new Event(STAFF_ALERT_DEVICE_RESTORED));
+                        }
+                    } catch { /* Device setup stays available in Staff notifications. */ }
+                }
+                checkedDevice = true;
+                const inbox = await staffAlertsRequest<StaffInbox>("", {signal});
                 if (active) setCount(inbox.unreadCount);
             } catch {if (active) setCount(null);}
             finally {busy = false;}
         };
+        const pushed = (event: MessageEvent) => {if (event.data?.type === "gokul-staff-alert") void refresh();};
+        navigator.serviceWorker?.addEventListener("message", pushed);
         void refresh(); const timer = window.setInterval(() => void refresh(), 30000);
         window.addEventListener("gokul-staff-inbox-changed", refresh);
         window.addEventListener("online", refresh); document.addEventListener("visibilitychange", refresh);
         return () => {active = false; controller.abort(); window.clearInterval(timer);
             window.removeEventListener("gokul-staff-inbox-changed", refresh); window.removeEventListener("online", refresh);
-            document.removeEventListener("visibilitychange", refresh);};
+            document.removeEventListener("visibilitychange", refresh);
+            navigator.serviceWorker?.removeEventListener("message", pushed);};
     }, [profile, hasPermission]);
     if (!profile || !hasPermission("ORDER_VIEW") || count === null) return null;
     return <Link href="/admin/staff-notifications" aria-label={`Staff alerts, ${count} unread`}
