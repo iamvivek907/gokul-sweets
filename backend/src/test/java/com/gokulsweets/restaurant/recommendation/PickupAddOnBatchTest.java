@@ -196,6 +196,35 @@ class PickupAddOnBatchTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void cartItemMissingFromSuggestionTaxLookupStillGetsSlotChecked() throws Exception {
+        doAnswer(
+                        call -> {
+                            var handler = (RowCallbackHandler) call.getArgument(1);
+                            for (long id = 2; id <= 4; id++) {
+                                var rs = mock(ResultSet.class);
+                                when(rs.getLong(1)).thenReturn(id);
+                                when(rs.getBigDecimal(2)).thenReturn(BigDecimal.ZERO);
+                                handler.processRow(rs);
+                            }
+                            return null;
+                        })
+                .when(jdbc)
+                .query(anyString(), any(RowCallbackHandler.class));
+        selectedSlot(10, true);
+
+        assertThat(service.recommend(1, request, null, 7L, PickupType.NORMAL))
+                .extracting(suggestion -> suggestion.product().id())
+                .containsExactly(3L, 4L);
+        verify(slots).check(
+                eq(1L),
+                eq(date),
+                eq(1),
+                argThat(items -> items.stream().map(item -> item.productId()).toList()
+                        .equals(List.of(1L, 2L, 3L, 4L))));
+    }
+
+    @Test
     void fullSlotOrUnavailableCartNeverProducesAnAddition() {
         selectedSlot(0, true);
         assertThat(service.recommend(1, request, null, 7L, PickupType.NORMAL)).isEmpty();

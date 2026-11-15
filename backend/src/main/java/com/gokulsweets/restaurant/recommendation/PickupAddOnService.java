@@ -293,7 +293,7 @@ public class PickupAddOnService {
                                     c.products()
                                             .forEach(
                                                     p -> {
-                                                        if (p.available() && p.price().signum() > 0)
+                                                        if (p.available())
                                                             products.put(p.id(), p);
                                                     }));
             boolean collectTax =
@@ -310,7 +310,11 @@ public class PickupAddOnService {
                                     tax.put(
                                             rs.getLong(1),
                                             collectTax ? rs.getBigDecimal(2) : BigDecimal.ZERO));
-            products.keySet().removeIf(id -> !tax.containsKey(id));
+            // Cart items must still be checked against pickup availability. Only suggestions
+            // need a positive price and an active tax category to produce a quoted total.
+            var candidatesWithPrices = new HashSet<>(products.keySet());
+            candidatesWithPrices.removeIf(
+                    id -> !tax.containsKey(id) || products.get(id).price().signum() <= 0);
             var cart = new HashSet<Long>();
             for (var item : request.items()) {
                 if (item == null
@@ -372,7 +376,7 @@ WHERE pairs.n>=3 AND (pairs.a IN (
                 long seed = a ? row[0] : row[1],
                         candidate = a ? row[1] : row[0],
                         seedOrders = a ? row[3] : row[4];
-                if (seedOrders < 5 || row[2] > seedOrders || !products.containsKey(candidate))
+                if (seedOrders < 5 || row[2] > seedOrders || !candidatesWithPrices.contains(candidate))
                     continue;
                 double confidence = (double) row[2] / seedOrders;
                 if (confidence < .1) continue;
@@ -402,10 +406,10 @@ WHERE pairs.n>=3 AND (pairs.a IN (
                             today.minusDays(29),
                             today)
                     .stream()
-                    .filter(id -> products.containsKey(id) && !cart.contains(id))
+                    .filter(id -> candidatesWithPrices.contains(id) && !cart.contains(id))
                     .forEach(id -> ranked.putIfAbsent(id, "A branch favourite"));
             if (browse)
-                products.keySet().stream()
+                candidatesWithPrices.stream()
                         .sorted()
                         .filter(id -> !cart.contains(id))
                         .forEach(id -> ranked.putIfAbsent(id, "From the branch menu"));
