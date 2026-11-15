@@ -313,12 +313,28 @@ WHERE s.environment = ? AND s.endpoint_hash = ? FOR UPDATE OF s
                 }
                 return new SubscriptionResult(null);
             }
+            Long count =
+                    jdbc.queryForObject(
+                            "SELECT COUNT(*) FROM customer_push_subscriptions s JOIN"
+                                + " verified_customer_sessions v ON v.id = s.session_id WHERE"
+                                + " s.environment = ? AND s.subject_id = ? AND s.revoked_at IS NULL"
+                                + " AND s.paused_at IS NULL AND v.revoked_at IS NULL AND"
+                                + " s.endpoint_hash <> ?",
+                            Long.class,
+                            environment,
+                            subject,
+                            endpointHash);
+            if (count != null && count >= 5)
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT, "Maximum five browsers per account.");
             if (input.registrationId() != null) {
                 // Require the original opt-in and browser subscription proof.
                 var restored =
                         jdbc.query(
                                 """
-UPDATE customer_push_subscriptions SET session_id=?
+UPDATE customer_push_subscriptions SET session_id=?,
+    subscribed_at=CASE WHEN paused_at IS NULL THEN subscribed_at ELSE CURRENT_TIMESTAMP END,
+    paused_at=NULL
 WHERE id=? AND environment=? AND subject_id=? AND endpoint_hash=?
   AND public_key=? AND auth_secret=? AND revoked_at IS NULL
 RETURNING id
@@ -339,19 +355,6 @@ RETURNING id
                         HttpStatus.CONFLICT,
                         "This browser is registered to another account. Disable its old"
                                 + " subscription first.");
-            Long count =
-                    jdbc.queryForObject(
-                            "SELECT COUNT(*) FROM customer_push_subscriptions s JOIN"
-                                + " verified_customer_sessions v ON v.id = s.session_id WHERE"
-                                + " s.environment = ? AND s.subject_id = ? AND s.revoked_at IS NULL"
-                                + " AND v.revoked_at IS NULL AND s.endpoint_hash <> ?",
-                            Long.class,
-                            environment,
-                            subject,
-                            endpointHash);
-            if (count != null && count >= 5)
-                throw new ResponseStatusException(
-                        HttpStatus.CONFLICT, "Maximum five browsers per account.");
             if (!existing.isEmpty()
                     && !existing.getFirst().inactive()
                     && existing.getFirst().subject().equals(subject)
@@ -439,7 +442,7 @@ INSERT INTO customer_push_subscriptions(id, environment, subject_id, session_id,
                             """
 SELECT s.endpoint,s.public_key,s.auth_secret FROM customer_push_subscriptions s
 JOIN verified_customer_sessions v ON v.id=s.session_id
-WHERE s.id=? AND s.environment=? AND s.subject_id=? AND s.revoked_at IS NULL
+WHERE s.id=? AND s.environment=? AND s.subject_id=? AND s.revoked_at IS NULL AND s.paused_at IS NULL
   AND v.environment=s.environment AND v.verified_subject_id=s.subject_id
   AND v.revoked_at IS NULL AND v.expires_at>CURRENT_TIMESTAMP AND v.token_digest=?
 """,

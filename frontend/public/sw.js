@@ -796,15 +796,19 @@ function notificationDestination(value, staff = false, marketing = false) {
     if (staff) return typeof value === "string" && (/^\/admin\/orders\/[A-Za-z0-9_%.-]{1,200}$/.test(value) || /^\/admin\/occasion-enquiries\?branch=[0-9]{1,20}&enquiry=[a-f0-9-]{36}$/.test(value)) ? value : "/admin/staff-notifications";
     return typeof value === "string" && (/^\/orders\/[A-Za-z0-9_%.-]{1,200}(?:#order-review)?$/.test(value) || /^\/occasions(?:#occasion-|\/requests\?enquiry=)[A-Za-z0-9_%.-]{1,200}$/.test(value)) ? value : "/profile#account-notifications";
 }
-async function matchesOrderPushBinding(payload, staff) {
+async function orderPushDisplay(payload, staff) {
     try {
         const cache = await caches.open(ORDER_PUSH_BINDING_CACHE);
         const key = new Request(new URL(`/.__gokul-order-push/${staff ? "staff" : "customer"}`, self.location.origin));
         const response = await cache.match(key);
         const binding = response ? await response.json() : null;
-        if (!payload.registrationId) return !binding;
-        return binding?.registrationId === payload.registrationId;
-    } catch {return !payload.registrationId;}
+        if (!binding) return payload.registrationId ? "generic" : "details";
+        return payload.registrationId && binding.registrationId === payload.registrationId ? "details" : "blocked";
+    } catch {
+        // Preserve the notification signal without exposing order details when an updated
+        // installation has not yet confirmed the registration or local storage is unavailable.
+        return "generic";
+    }
 }
 
 let pushSequence = Promise.resolve();
@@ -831,12 +835,15 @@ self.addEventListener("push", event => {
         if (seen.includes(eventId)) return;
         const staff = eventId.startsWith("staff:");
         const marketing = eventId.startsWith("marketing:");
-        if (!marketing && !await matchesOrderPushBinding(payload, staff)) return;
-        const destination = notificationDestination(payload.url, staff, marketing);
+        const display = marketing ? "details" : await orderPushDisplay(payload, staff);
+        if (display === "blocked") return;
+        const target = display === "generic" ? undefined : payload.url;
+        const destination = notificationDestination(target, staff, marketing);
         if (marketing && destination === "/profile#account-notifications") return;
         const custom = destination !== "/profile#account-notifications" && destination !== "/admin/staff-notifications";
-        const title = custom && typeof payload.title === "string" ? payload.title.slice(0, 80) : "Gokul Sweets";
-        const body = custom && typeof payload.body === "string" ? payload.body.slice(0, 500) : "A new account update is waiting in your notification inbox.";
+        const title = custom && typeof payload.title === "string" ? payload.title.slice(0, 80) : staff ? "Gokul kitchen alert" : "Gokul Sweets";
+        const body = custom && typeof payload.body === "string" ? payload.body.slice(0, 500)
+            : staff ? "Open Staff notifications to check the latest order activity." : "Open the app to check your latest order update.";
         const tagGroup = `gokul-${staff ? "staff" : "customer"}-${destination.split("#")[0]}`;
         // The generic staff inbox can represent unrelated events, so order only specific targets.
         const orderedStaff = staff && custom;
@@ -857,7 +864,8 @@ self.addEventListener("push", event => {
             icon: "/icon-192.png", tag, renotify: staff, requireInteraction: staff,
             data: {url: destination, staff, marketing, registrationId: payload.registrationId}
         });
-        if (!marketing && !await matchesOrderPushBinding(payload, staff)) {
+        const confirmedDisplay = marketing ? display : await orderPushDisplay(payload, staff);
+        if (confirmedDisplay === "blocked" || (display === "details" && confirmedDisplay !== "details")) {
             try {
                 const notices = await self.registration.getNotifications({tag});
                 for (const notice of notices) if (notice.tag === tag) notice.close();

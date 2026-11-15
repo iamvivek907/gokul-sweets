@@ -110,10 +110,14 @@ public class StaffSessionFilter extends OncePerRequestFilter {
                             || path.startsWith("/api/admin/payroll")
                             || path.contains("refund")
                             || path.startsWith("/api/admin/approvals"))) {
-                if (!administrator
-                        && verified.createdAt()
-                                .plusSeconds(600)
-                                .isBefore(java.time.Instant.now())) {
+                // Keep the previous administrator confirmation window separate from session expiry.
+                var confirmationWindow =
+                        administrator
+                                ? java.time.Duration.ofHours(12)
+                                : java.time.Duration.ofMinutes(10);
+                if (!verified.createdAt()
+                        .plus(confirmationWindow)
+                        .isAfter(java.time.Instant.now())) {
                     rejectWrite(response, "STAFF_REAUTH_REQUIRED");
                     return;
                 }

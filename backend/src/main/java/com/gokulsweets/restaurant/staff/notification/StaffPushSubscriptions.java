@@ -138,12 +138,28 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.environment = ? AND s.endpoint_h
                 }
                 return new Result(null);
             }
+            Long count =
+                    jdbc.queryForObject(
+                            """
+SELECT COUNT(*) FROM staff_push_subscriptions s JOIN staff_sessions v ON v.token_hash = s.session_hash
+JOIN staff_users u ON u.id = s.staff_id WHERE s.environment = ? AND s.staff_id = ? AND s.endpoint_hash <> ?
+  AND s.revoked_at IS NULL AND s.paused_at IS NULL AND v.revoked_at IS NULL AND u.active
+""",
+                            Long.class,
+                            alerts.scope(),
+                            staffId,
+                            hash);
+            if (count != null && count >= 5)
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT, "Maximum five live staff browsers.");
             if (input.registrationId() != null) {
                 // Existing-device restoration must never recreate a removed subscription.
                 var restored =
                         jdbc.query(
                                 """
-UPDATE staff_push_subscriptions s SET session_hash=?
+UPDATE staff_push_subscriptions s SET session_hash=?,
+    subscribed_at=CASE WHEN s.paused_at IS NULL THEN s.subscribed_at ELSE CURRENT_TIMESTAMP END,
+    paused_at=NULL
 FROM staff_sessions old, staff_users u
 WHERE s.id=? AND s.environment=? AND s.staff_id=? AND s.endpoint_hash=?
   AND s.public_key=? AND s.auth_secret=? AND s.revoked_at IS NULL
@@ -166,20 +182,6 @@ RETURNING s.id
                         HttpStatus.CONFLICT,
                         "This browser belongs to another staff session. Disable its old"
                                 + " registration first.");
-            Long count =
-                    jdbc.queryForObject(
-                            """
-SELECT COUNT(*) FROM staff_push_subscriptions s JOIN staff_sessions v ON v.token_hash = s.session_hash
-JOIN staff_users u ON u.id = s.staff_id WHERE s.environment = ? AND s.staff_id = ? AND s.endpoint_hash <> ?
-  AND s.revoked_at IS NULL AND v.revoked_at IS NULL AND u.active
-""",
-                            Long.class,
-                            alerts.scope(),
-                            staffId,
-                            hash);
-            if (count != null && count >= 5)
-                throw new ResponseStatusException(
-                        HttpStatus.CONFLICT, "Maximum five live staff browsers.");
             if (old != null) {
                 if (!old.inactive()
                         && old.staffId() == staffId
@@ -265,7 +267,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                                     """
 SELECT EXISTS (SELECT 1 FROM staff_push_subscriptions s JOIN staff_sessions v ON v.token_hash = s.session_hash
 JOIN staff_users u ON u.id = s.staff_id WHERE s.id = ? AND s.environment = ? AND s.staff_id = ? AND s.session_hash = ?
-  AND s.revoked_at IS NULL AND v.revoked_at IS NULL AND v.expires_at > CURRENT_TIMESTAMP
+  AND s.revoked_at IS NULL AND s.paused_at IS NULL AND v.revoked_at IS NULL AND v.expires_at > CURRENT_TIMESTAMP
   AND u.active)
 """,
                                     Boolean.class,

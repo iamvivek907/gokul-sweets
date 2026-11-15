@@ -182,6 +182,36 @@ class StaffSessionFilterTest {
         verify(sessions, never()).refreshCookie(any(), any());
     }
 
+    @Test
+    void expiredConfirmationWindowDoesNotEndPersistentAdminSession() throws Exception {
+        flags.setSecureStaffSessions(true);
+        when(staff.findDetailedById(1L)).thenReturn(Optional.of(staffWithRole("OWNER_ADMIN")));
+        when(sessions.verify("cookie"))
+                .thenReturn(
+                        new StaffSessionService.Verified(
+                                1L, "staff", "csrf", Instant.now().minusSeconds(12 * 3600 + 1)));
+        when(users.loadUserByUsername("staff"))
+                .thenReturn(
+                        User.withUsername("staff")
+                                .password("unused")
+                                .authorities("STAFF_MANAGE")
+                                .build());
+        var routine = new MockHttpServletRequest("GET", "/api/admin/orders");
+        routine.setCookies(
+                new jakarta.servlet.http.Cookie(StaffSessionService.COOKIE_NAME, "cookie"));
+        var response = new MockHttpServletResponse();
+        filter.doFilter(routine, response, chain);
+        assertEquals(200, response.getStatus());
+        verify(chain).doFilter(routine, response);
+        for (var request : staffWrites()) {
+            var denied = new MockHttpServletResponse();
+            filter.doFilter(request, denied, chain);
+            assertEquals(403, denied.getStatus());
+            assertTrue(denied.getContentAsString().contains("STAFF_REAUTH_REQUIRED"));
+        }
+        verify(sessions, never()).auditSensitiveAction(anyLong());
+    }
+
     private static StaffUser staffWithRole(String roleName) {
         var role = new Role();
         role.setName(roleName);

@@ -22,7 +22,7 @@ Unavailable scheduled items remain visible with a readable availability reason a
 
 The kitchen sound preference is saved per staff account/browser/API environment. Refresh restores the enabled choice and polling; browsers require a user gesture before sound can resume. “Resume kitchen sound” and an explanation communicate that restriction, and “Disable kitchen alarm” clears the saved choice. Existing persistent Web Push registration, permissions, branch filtering and duplicate-alarm protection are retained.
 
-Secure staff sign-ins have no routine server expiry. The browser cookie is renewed at most daily while the device is in use. Signing out ends that device’s session. Deactivation, credential changes, and account recovery revoke affected sessions. Staff details, roles, and branch access are checked against the current account. Non-admin staff still confirm sign-in for protected actions. Sign-in MFA and CSRF checks continue to apply.
+Secure staff sign-ins have no routine server expiry. The browser cookie is renewed at most daily while the device is in use. Signing out ends that device’s session. Deactivation, credential changes, and account recovery revoke affected sessions. Staff details, roles, and branch access are checked against the current account. Protected staff, payroll, refund, and approval actions require confirmation after 12 hours for admin roles or 10 minutes for other staff. Sign-in MFA and CSRF checks continue to apply.
 
 ## Regression coverage
 

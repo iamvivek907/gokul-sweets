@@ -127,8 +127,8 @@ WHERE environment = ? AND token_digest = ? AND expires_at > ? AND revoked_at IS 
         try {
             jdbc.update(
                     "UPDATE customer_push_subscriptions SET"
-                        + " revoked_at=COALESCE(revoked_at,CURRENT_TIMESTAMP) WHERE environment=?"
-                        + " AND subject_id=? AND id=?",
+                            + " paused_at=COALESCE(paused_at,CURRENT_TIMESTAMP) WHERE environment=?"
+                            + " AND subject_id=? AND id=?",
                     environment.name(),
                     subject,
                     id);

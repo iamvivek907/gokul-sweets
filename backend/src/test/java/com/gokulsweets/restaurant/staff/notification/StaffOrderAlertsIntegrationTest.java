@@ -410,7 +410,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
 
     @Test
     void signingOutPausesTheOlderRegistrationWithoutRevokingAnotherPhone() {
-        var old = subscriptions.subscribe(staff, cookie, input("old-device-" + UUID.randomUUID()));
+        var browser = input("old-device-" + UUID.randomUUID());
+        var old = subscriptions.subscribe(staff, cookie, browser);
         var otherCookie = issueFor(staff);
         var other =
                 subscriptions.subscribe(
@@ -422,6 +423,15 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
         assertThat(sessions.verify(newCookie)).isNull();
         assertThat(subscriptions.live(staff, old.id(), cookie)).isFalse();
         assertThat(subscriptions.live(staff, other.id(), otherCookie)).isTrue();
+        var nextLogin = issueFor(staff);
+        var restoration =
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(), browser.publicKey(), browser.authSecret(), old.id());
+        assertThat(subscriptions.subscribe(staff, nextLogin, restoration).id()).isEqualTo(old.id());
+        assertThat(subscriptions.live(staff, old.id(), nextLogin)).isTrue();
+        subscriptions.revoke(staff, old.id());
+        assertThatThrownBy(() -> subscriptions.subscribe(staff, nextLogin, restoration))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
     }
 
     @Test

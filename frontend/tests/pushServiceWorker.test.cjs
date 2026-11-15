@@ -136,7 +136,8 @@ test('cache failure still shows a pickup alert and wakes only customer clients',
     let pending;
     runtime.listeners.push({data: {json: () => ({eventId: '431', title: 'Ready for pickup', url: '/orders/GS-431'})}, waitUntil(value) {pending = value;}});
     await pending;
-    assert.equal(runtime.shown[0].title, 'Ready for pickup');
+    assert.equal(runtime.shown[0].title, 'Gokul Sweets');
+    assert.equal(runtime.shown[0].data.url, '/profile#account-notifications');
     assert.deepEqual(wakes, ['gokul-customer-alert']);
 });
 
@@ -197,4 +198,18 @@ test('a queued alert from the previous account stays hidden after a shared-phone
     runtime.entries.set(key, JSON.stringify({owner: 'current', registrationId: 'new-device'}));
     await send(4, 'new-device');
     assert.deepEqual(runtime.shown.map(notice => notice.data.registrationId), ['old-device', 'new-device']);
+});
+
+test('an existing staff phone gets a generic audible reminder during the binding upgrade', async () => {
+    const runtime = worker();
+    let pending;
+    runtime.listeners.push({data: {json: () => ({
+        eventId: 'staff:930', registrationId: 'previously-enrolled-device',
+        title: 'Preparation is due', body: 'Order GS-930', url: '/admin/orders/GS-930'
+    })}, waitUntil(value) {pending = value;}});
+    await pending;
+    assert.equal(runtime.shown[0].title, 'Gokul kitchen alert');
+    assert.equal(runtime.shown[0].data.url, '/admin/staff-notifications');
+    assert.equal(runtime.shown[0].silent, false);
+    assert.ok(!runtime.shown[0].body.includes('GS-930'));
 });

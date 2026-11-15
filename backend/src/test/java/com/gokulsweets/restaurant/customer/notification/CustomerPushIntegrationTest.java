@@ -211,6 +211,14 @@ VALUES ('DEV', ?, ?, 'PAYMENT_PAID', 'ORDER', 'TEST-ORDER', 'Payment received', 
                         anyString(),
                         any(UUID.class));
 
+        sessions.pausePushDevice(ConsentEnvironment.DEV, subject, registration.id());
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT paused_at IS NOT NULL AND revoked_at IS NULL FROM"
+                                        + " customer_push_subscriptions WHERE id=?",
+                                Boolean.class,
+                                registration.id()))
+                .isTrue();
         var next = sessions.issue(ConsentEnvironment.DEV, subject, Instant.now());
         var restoration =
                 new CustomerAlertPreferences.SubscriptionInput(

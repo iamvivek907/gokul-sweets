@@ -410,8 +410,8 @@ WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ? AND u.activ
             if (deviceId != null) {
                 jdbc.update(
                         "UPDATE staff_push_subscriptions SET"
-                            + " revoked_at=COALESCE(revoked_at,CURRENT_TIMESTAMP) WHERE id=? AND"
-                            + " staff_id=?",
+                                + " paused_at=COALESCE(paused_at,CURRENT_TIMESTAMP) WHERE id=? AND"
+                                + " staff_id=?",
                         deviceId,
                         staffId);
             }

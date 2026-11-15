@@ -1,5 +1,5 @@
 import {clearOrderPushBinding, readOrderPushBinding, setOrderPushBinding, switchOrderPushOwner} from "@/lib/orderPushBinding";
-import {apiClient} from "@/services/apiClient";
+import {apiClient, ApiError} from "@/services/apiClient";
 import {applicationServerKey, type AlertSettings} from "@/lib/notificationAlerts";
 export const PUSH_REGISTRATION_CHANGED = "gokul-push-registration-changed";
 export const pushDeviceKey = (scope: string) => `gokul-push-device:${scope}`;
@@ -28,23 +28,24 @@ export async function registerCustomerPush(settings: AlertSettings): Promise<"gr
 }
 
 /** Confirm an explicit device opt-in against the verified account; never grants marketing consent. */
-export async function confirmCustomerPush(settings: AlertSettings, subscription: PushSubscription, registrationId?: string, signal?: AbortSignal) {
-    const deadline = () => signal ? AbortSignal.any([signal, AbortSignal.timeout(8000)]) : AbortSignal.timeout(8000);
-    const current = await apiClient<AlertSettings>("/api/customer/identity/notification-alerts", {credentials: "include", signal: deadline()});
+async function confirmCustomerPush(settings: AlertSettings, subscription: PushSubscription) {
+    const current = await apiClient<AlertSettings>("/api/customer/identity/notification-alerts", {
+        credentials: "include", signal: AbortSignal.timeout(8000)
+    });
     if (current.scopeId !== settings.scopeId) throw new Error("Account changed");
     const keys = subscription.toJSON().keys;
-    const result = await apiClient<{id: string}>("/api/customer/identity/push-subscriptions", {method: "POST", credentials: "include",
-        signal: deadline(), body: JSON.stringify({registrationId, expectedSubject: settings.scopeId, endpoint: subscription.endpoint, publicKey: keys?.p256dh, authSecret: keys?.auth})});
-    if (registrationId) {
-        await setOrderPushBinding("customer", settings.scopeId, registrationId, signal);
-        return;
-    }
+    const result = await apiClient<{id: string}>("/api/customer/identity/push-subscriptions", {
+        method: "POST", credentials: "include", signal: AbortSignal.timeout(8000),
+        body: JSON.stringify({expectedSubject: settings.scopeId, endpoint: subscription.endpoint,
+            publicKey: keys?.p256dh, authSecret: keys?.auth})
+    });
     try {
         localStorage.setItem(pushDeviceKey(settings.scopeId), result.id);
-        await setOrderPushBinding("customer", settings.scopeId, result.id, signal);
-    }
-    catch {
-        await apiClient<void>(`/api/customer/identity/push-subscriptions/${result.id}`, {method: "DELETE", credentials: "include"});
+        await setOrderPushBinding("customer", settings.scopeId, result.id);
+    } catch {
+        await apiClient<void>(`/api/customer/identity/push-subscriptions/${result.id}`, {
+            method: "DELETE", credentials: "include", signal: AbortSignal.timeout(8000)
+        });
         await subscription.unsubscribe();
         throw new Error("Push registration cannot be remembered");
     }
@@ -76,8 +77,26 @@ export async function pausePreviousCustomerAlerts(scopeId: string, signal: Abort
     try {deviceId = localStorage.getItem(pushDeviceKey(scopeId));} catch { /* No remembered device. */ }
     if (!deviceId) return;
     const status = await apiClient<{enabled: boolean; fingerprint: string | null}>(`/api/customer/identity/push-subscriptions/${encodeURIComponent(deviceId)}`, {credentials: "include", signal});
-    if (status.enabled && status.fingerprint === await pushSubscriptionFingerprint(subscription)) {
+    if (status.enabled) {
+        if (status.fingerprint === await pushSubscriptionFingerprint(subscription)) {
+            await setOrderPushBinding("customer", scopeId, deviceId, signal);
+        }
+        return;
+    }
+    // Restore prior consent independently of the optional permission prompt.
+    try {
+        if (localStorage.getItem(pushDeviceKey(scopeId)) !== deviceId) return;
+        const keys = subscription.toJSON().keys;
+        await apiClient("/api/customer/identity/push-subscriptions", {
+            method: "POST", credentials: "include", signal,
+            body: JSON.stringify({expectedSubject: scopeId, registrationId: deviceId,
+                endpoint: subscription.endpoint, publicKey: keys?.p256dh, authSecret: keys?.auth})
+        });
         await setOrderPushBinding("customer", scopeId, deviceId, signal);
+        window.dispatchEvent(new Event(PUSH_REGISTRATION_CHANGED));
+    } catch (reason) {
+        // Explicitly disabled or retired devices require a new opt-in.
+        if (!(reason instanceof ApiError && [404, 409].includes(reason.status))) throw reason;
     }
 }
 

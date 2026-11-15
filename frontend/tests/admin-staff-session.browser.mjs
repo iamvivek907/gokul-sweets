@@ -108,8 +108,15 @@ try {
     assert.equal(await staffInput("Full Name").inputValue(), "Test Manager");
 
     await page.getByRole("button", {name: /Test Manager/}).click();
-    await staffInput("Phone").fill("9000000000");
     managerChanged = true;
+    await page.clock.fastForward(31_000);
+    await page.waitForFunction(() => {
+        const status = [...document.querySelectorAll("label")].find(label => label.textContent.trim() === "Account Status");
+        return status?.parentElement?.querySelector("select")?.value === "INACTIVE";
+    });
+    assert.equal(await page.getByRole("alert").filter({hasText: "This staff record changed"}).count(), 0);
+    await staffInput("Phone").fill("9000000000");
+    managerChanged = false;
     await page.clock.fastForward(31_000);
     await page.getByRole("alert").filter({hasText: "This staff record changed"}).waitFor();
     assert.equal(await staffInput("Phone").inputValue(), "9000000000");

@@ -71,7 +71,7 @@ INSERT INTO staff_alert_deliveries(event_id, staff_id, channel, subscription_id)
 SELECT e.id, u.id, 'PUSH', s.id FROM staff_order_alerts e
 JOIN staff_push_subscriptions s ON s.environment = e.environment
 JOIN staff_users u ON u.id = s.staff_id JOIN staff_sessions v ON v.token_hash = s.session_hash
-WHERE e.environment = ? AND s.revoked_at IS NULL AND v.revoked_at IS NULL
+WHERE e.environment = ? AND s.revoked_at IS NULL AND s.paused_at IS NULL AND v.revoked_at IS NULL
 
   AND e.created_at >= s.subscribed_at AND e.created_at > CURRENT_TIMESTAMP - INTERVAL '5 minutes'
   AND (e.kind IN ('PREPARATION_DUE','PREPARATION_OVERDUE','READY_OVERDUE')
@@ -126,8 +126,8 @@ WHERE e.environment = ? AND e.kind IN ('PREPARATION_OVERDUE','READY_OVERDUE')
                                     """
 SELECT EXISTS (SELECT 1 FROM staff_push_subscriptions s JOIN staff_sessions v ON v.token_hash = s.session_hash
 JOIN staff_users u ON u.id = s.staff_id WHERE s.id = ? AND s.staff_id = ? AND s.environment = ?
-  AND s.revoked_at IS NULL AND v.revoked_at IS NULL
-  AND u.active
+  AND s.revoked_at IS NULL AND s.paused_at IS NULL AND v.revoked_at IS NULL
+  AND u.active AND s.subscribed_at <= ?
   AND (? IN ('PREPARATION_DUE','PREPARATION_OVERDUE','READY_OVERDUE')
     OR NOT EXISTS (SELECT 1 FROM staff_order_alert_reads r WHERE r.event_id = ? AND r.staff_id = u.id)))
 """,
@@ -135,6 +135,7 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.id = ? AND s.staff_id = ? AND s.
                                     task.subscriptionId(),
                                     task.staffId(),
                                     alerts.scope(),
+                                    java.sql.Timestamp.from(task.event().createdAt()),
                                     task.event().kind(),
                                     task.event().id());
                     if (!push.configured()

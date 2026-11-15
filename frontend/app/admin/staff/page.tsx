@@ -4,6 +4,7 @@ import {T} from "@/lib/language";
 
 import {
     useEffect,
+    useEffectEvent,
     useMemo,
     useRef,
     useState
@@ -476,6 +477,18 @@ export default function AdminStaffPage() {
         );
 
 
+    const updateCleanEditor = useEffectEvent((records: AdminStaff[]) => {
+        if (createMode || !editingSnapshot || newPassword || confirmNewPassword) return;
+        const current = records.find(item => item.id === selectedStaffId);
+        if (!current || sameStaffDetails(editingSnapshot, current)) return;
+        if (form.fullName !== editingSnapshot.fullName || form.phone !== (editingSnapshot.phone ?? "")
+            || form.roleName !== editingSnapshot.roleName || form.active !== editingSnapshot.active
+            || form.branchIds.length !== editingSnapshot.branchIds.length
+            || form.branchIds.some(id => !editingSnapshot.branchIds.includes(id))) return;
+        setEditingSnapshot(current);
+        setForm(toFormState(current));
+    });
+
     useEffect(
         () => {
 
@@ -512,7 +525,7 @@ export default function AdminStaffPage() {
                         setEditingSnapshot(firstStaff);
                         setForm(firstStaff ? toFormState(firstStaff) : EMPTY_FORM);
                         loadedStaff.current = true;
-                    }
+                    } else updateCleanEditor(staffResult);
                     setLoading(false);
                 }).catch(exception => {
                     if (!controller.signal.aborted && initialLoad) {

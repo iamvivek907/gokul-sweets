@@ -7,7 +7,7 @@ import {usePathname} from "next/navigation";
 import {usePwaInstall} from "@/hooks/usePwaInstall";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {subscribeCustomerIdentityChanges} from "@/lib/customerIdentityEvents";
-import {PUSH_REGISTRATION_CHANGED, confirmCustomerPush, pushDeviceKey, pushSubscriptionFingerprint, registerCustomerPush} from "@/lib/customerPushRegistration";
+import {PUSH_REGISTRATION_CHANGED, pushDeviceKey, pushSubscriptionFingerprint, registerCustomerPush} from "@/lib/customerPushRegistration";
 import {type AlertSettings} from "@/lib/notificationAlerts";
 import {apiClient} from "@/services/apiClient";
 
@@ -61,11 +61,6 @@ export default function NotificationOptIn() {
                     try {
                         const status = await apiClient<{enabled: boolean; fingerprint: string | null}>(`/api/customer/identity/push-subscriptions/${encodeURIComponent(remembered)}`, {credentials: "include", signal});
                         if (status.enabled && status.fingerprint === await pushSubscriptionFingerprint(subscription)) {if (active) setVisible(false); return;}
-                        if (active && !status.enabled && localStorage.getItem(pushDeviceKey(value.scopeId)) === remembered) {
-                            await confirmCustomerPush(value, subscription, remembered, signal);
-                            if (active) setVisible(false);
-                            return;
-                        }
                     } catch { /* Show Retry rather than claim a server registration succeeded. */ }
                 }
                 if (active) {setSettings(value); setVisible(true);}
