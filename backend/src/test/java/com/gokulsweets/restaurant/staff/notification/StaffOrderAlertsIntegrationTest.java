@@ -596,7 +596,7 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
     }
 
     @Test
-    void livePreparationAlertSendsBeforeAnOlderCatchUp() throws Exception {
+    void reservesOneCatchUpSlotAfterLivePreparationAlertsFillTheBatch() throws Exception {
         var browser = input("priority-phone-" + UUID.randomUUID());
         var device = subscriptions.subscribe(staff, cookie, browser);
         sessions.signOut(staff, device.id(), cookie);
@@ -613,17 +613,24 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
         now(17, 0);
         alerts.generateReminders();
         long due = latest();
+        jdbc.update(
+                """
+INSERT INTO staff_order_alerts(environment, event_key, order_id, branch_id, kind, required_permission, title, message, scheduled_at)
+SELECT e.environment, e.event_key || ':test:' || i, e.order_id, e.branch_id, e.kind, e.required_permission, e.title, e.message, e.scheduled_at
+FROM staff_order_alerts e CROSS JOIN generate_series(1, 9) AS slot(i) WHERE e.id=?
+""",
+                due);
 
         dispatcher.dispatchBatch();
 
         assertThat(due).isNotEqualTo(paid);
         var order = inOrder(push);
-        order.verify(push)
+        order.verify(push, times(9))
                 .sendStaff(
                         anyString(),
                         anyString(),
                         anyString(),
-                        eq(due),
+                        longThat(id -> id != paid),
                         anyString(),
                         anyString(),
                         anyString(),
@@ -638,6 +645,61 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                         anyString(),
                         anyString(),
                         eq(device.id()));
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM staff_alert_deliveries WHERE"
+                                    + " subscription_id=? AND state='QUEUED' AND NOT catch_up",
+                                Long.class,
+                                device.id()))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void skippingAPausedPhonePreservesAttemptsAndLastFailure() throws Exception {
+        var browser = input("paused-retry-" + UUID.randomUUID());
+        var device = subscriptions.subscribe(staff, cookie, browser);
+        alerts.paymentConfirmed(payment);
+        long event = latest();
+        jdbc.update(
+                """
+INSERT INTO staff_alert_deliveries(event_id, staff_id, channel, subscription_id, attempts, last_http_status)
+VALUES (?, ?, 'PUSH', ?, 2, 503)
+""",
+                event,
+                staff,
+                device.id());
+        sessions.signOut(staff, device.id(), cookie);
+
+        dispatcher.dispatchBatch();
+        assertThat(
+                        jdbc.queryForMap(
+                                "SELECT state, attempts, last_http_status FROM"
+                                    + " staff_alert_deliveries WHERE event_id=? AND"
+                                    + " subscription_id=?",
+                                event,
+                                device.id()))
+                .containsEntry("state", "SKIPPED")
+                .containsEntry("attempts", 2)
+                .containsEntry("last_http_status", 503);
+        subscriptions.subscribe(
+                staff,
+                issueFor(staff),
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(),
+                        browser.publicKey(),
+                        browser.authSecret(),
+                        device.id()));
+
+        assertThat(
+                        jdbc.queryForMap(
+                                "SELECT state, attempts, last_http_status FROM"
+                                    + " staff_alert_deliveries WHERE event_id=? AND"
+                                    + " subscription_id=?",
+                                event,
+                                device.id()))
+                .containsEntry("state", "QUEUED")
+                .containsEntry("attempts", 2)
+                .containsEntry("last_http_status", 503);
     }
 
     @org.junit.jupiter.params.ParameterizedTest

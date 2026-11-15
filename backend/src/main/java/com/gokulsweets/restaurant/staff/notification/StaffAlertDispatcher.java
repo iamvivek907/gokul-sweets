@@ -18,6 +18,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class StaffAlertDispatcher {
 
+    private static final int BATCH_SIZE = 10;
+
     @org.springframework.beans.factory.annotation.Value("${gokul.jobs.worker-enabled:false}")
     private boolean dedicatedImportWorker;
 
@@ -111,8 +113,16 @@ WHERE e.environment = ? AND e.kind IN ('PREPARATION_OVERDUE','READY_OVERDUE')
                         }
                     });
             // Each HTTP request is bounded to ten seconds; each claimed task has its own lease.
-            for (int i = 0; i < 10; i++) {
-                Task task = transactions.execute(status -> claim());
+            for (int i = 0; i < BATCH_SIZE; i++) {
+                boolean catchUpSlot = i == BATCH_SIZE - 1;
+                Task task =
+                        transactions.execute(
+                                status -> {
+                                    // Reserve the last slot for catch-up and lend it to live work
+                                    // when there is no due catch-up.
+                                    Task catchUp = catchUpSlot ? claim(true) : null;
+                                    return catchUp != null ? catchUp : claim(false);
+                                });
                 if (task == null) return;
                 if (!alerts.enabled()
                         || !alerts.eligible(task.event().id(), task.staffId())
@@ -241,11 +251,12 @@ WHERE s.id=? AND s.staff_id=? AND s.environment=?
      *
      * <p>Writes {@code staff_alert_deliveries}.
      *
+     * @param catchUpOnly whether to claim only a catch-up delivery
      * @return the {@code Task} result
      */
-    private Task claim() {
+    private Task claim(boolean catchUpOnly) {
         final long __gokulMethodStartedNanos =
-                MethodTiming.start(StaffAlertDispatcher.class, "claim()");
+                MethodTiming.start(StaffAlertDispatcher.class, "claim(boolean)");
         try {
             var tasks =
                     jdbc.query(
@@ -255,6 +266,7 @@ SELECT e.*, COALESCE(o.order_number,'Request '||LEFT(e.enquiry_id::text,8)) orde
 JOIN staff_order_alerts e ON e.id = d.event_id LEFT JOIN orders o ON o.id = e.order_id
 LEFT JOIN staff_push_subscriptions s ON s.id = d.subscription_id
 WHERE e.environment = ? AND d.state = 'QUEUED' AND d.next_attempt_at <= CURRENT_TIMESTAMP
+  AND (NOT ? OR d.catch_up)
 ORDER BY d.catch_up, d.id LIMIT 1 FOR UPDATE OF d SKIP LOCKED
 """,
                             (rs, row) ->
@@ -269,7 +281,8 @@ ORDER BY d.catch_up, d.id LIMIT 1 FOR UPDATE OF d SKIP LOCKED
                                             rs.getString("endpoint"),
                                             rs.getString("public_key"),
                                             rs.getString("auth_secret")),
-                            alerts.scope());
+                            alerts.scope(),
+                            catchUpOnly);
             if (tasks.isEmpty()) return null;
             var task = tasks.getFirst();
             jdbc.update(
@@ -281,7 +294,8 @@ ORDER BY d.catch_up, d.id LIMIT 1 FOR UPDATE OF d SKIP LOCKED
                     task.id());
             return task;
         } finally {
-            MethodTiming.finish(__gokulMethodStartedNanos, StaffAlertDispatcher.class, "claim()");
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos, StaffAlertDispatcher.class, "claim(boolean)");
         }
     }
 
@@ -300,10 +314,15 @@ ORDER BY d.catch_up, d.id LIMIT 1 FOR UPDATE OF d SKIP LOCKED
         try {
             jdbc.update(
                     """
-UPDATE staff_alert_deliveries SET state = ?, last_http_status = ?, accepted_at = CASE WHEN ? = 'ACCEPTED' THEN CURRENT_TIMESTAMP ELSE NULL END,
+UPDATE staff_alert_deliveries SET state = ?,
+  attempts = CASE WHEN ? THEN GREATEST(0, attempts - 1) ELSE attempts END,
+  last_http_status = CASE WHEN ? THEN last_http_status ELSE ? END,
+  accepted_at = CASE WHEN ? = 'ACCEPTED' THEN CURRENT_TIMESTAMP ELSE NULL END,
   lease_token = NULL, lease_until = NULL WHERE id = ? AND state = 'SENDING' AND lease_token = ?
 """,
                     state,
+                    "SKIPPED".equals(state),
+                    "SKIPPED".equals(state),
                     code,
                     state,
                     task.id(),
