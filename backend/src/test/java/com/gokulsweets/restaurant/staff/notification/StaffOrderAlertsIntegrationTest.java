@@ -648,7 +648,7 @@ FROM staff_order_alerts e CROSS JOIN generate_series(1, 9) AS slot(i) WHERE e.id
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM staff_alert_deliveries WHERE"
-                                    + " subscription_id=? AND state='QUEUED' AND NOT catch_up",
+                                        + " subscription_id=? AND state='QUEUED' AND NOT catch_up",
                                 Long.class,
                                 device.id()))
                 .isEqualTo(1);
@@ -674,8 +674,8 @@ VALUES (?, ?, 'PUSH', ?, 2, 503)
         assertThat(
                         jdbc.queryForMap(
                                 "SELECT state, attempts, last_http_status FROM"
-                                    + " staff_alert_deliveries WHERE event_id=? AND"
-                                    + " subscription_id=?",
+                                        + " staff_alert_deliveries WHERE event_id=? AND"
+                                        + " subscription_id=?",
                                 event,
                                 device.id()))
                 .containsEntry("state", "SKIPPED")
@@ -693,8 +693,8 @@ VALUES (?, ?, 'PUSH', ?, 2, 503)
         assertThat(
                         jdbc.queryForMap(
                                 "SELECT state, attempts, last_http_status FROM"
-                                    + " staff_alert_deliveries WHERE event_id=? AND"
-                                    + " subscription_id=?",
+                                        + " staff_alert_deliveries WHERE event_id=? AND"
+                                        + " subscription_id=?",
                                 event,
                                 device.id()))
                 .containsEntry("state", "QUEUED")
