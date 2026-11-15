@@ -9,7 +9,7 @@ function worker(clients = [], cacheFailure = false) {
         registration: {
             async showNotification(title, options) {
                 shown.push({title, ...options});
-                active.set(options.tag, {tag: options.tag, close() {active.delete(options.tag);}});
+                active.set(options.tag, {tag: options.tag, data: options.data, close() {active.delete(options.tag);}});
             },
             async getNotifications() {return [...active.values()];}
         },
@@ -252,4 +252,27 @@ test('staff push deduplication and ordering follow the registration on a shared 
     await send('staff:964', 'new-device', 'GS-902');
     assert.deepEqual(runtime.shown.map(notice => notice.data.registrationId),
         ['old-device', 'old-device', 'new-device', 'new-device']);
+});
+
+test('worker rollout replaces older same-registration alerts and keeps other registrations separate', async () => {
+    const runtime = worker();
+    const key = 'https://dev.gokulsweets.in/.__gokul-order-push/staff';
+    runtime.entries.set(key, JSON.stringify({owner: 'staff', registrationId: 'current-device'}));
+    const legacy = (id, registrationId) => {
+        const tag = `gokul-staff-/admin/orders/GS-901:staff:${id}`;
+        runtime.active.set(tag, {tag, data: {registrationId}, close() {runtime.active.delete(tag);}});
+        return tag;
+    };
+    const previous = legacy(997, 'current-device');
+    const other = legacy(999, 'other-device');
+    const send = id => new Promise(resolve => runtime.listeners.push({
+        data: {json: () => ({eventId: `staff:${id}`, registrationId: 'current-device', title: 'Prepare order', url: '/admin/orders/GS-901'})},
+        waitUntil: resolve
+    }));
+    await send(996);
+    assert.equal(runtime.shown.length, 0);
+    await send(998);
+    assert.equal(runtime.active.has(previous), false);
+    assert.equal(runtime.active.has(other), true);
+    assert.equal(runtime.active.has(runtime.shown[0].tag), true);
 });

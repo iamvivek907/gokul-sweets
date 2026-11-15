@@ -1,6 +1,6 @@
 import {ADMIN_API_BASE_URL} from "@/lib/constants";
 import {applicationServerKey} from "@/lib/notificationAlerts";
-import {setOrderPushBinding} from "@/lib/orderPushBinding";
+import {bindStaffOrderPush, readOrderPushBinding, switchOrderPushOwner} from "@/lib/orderPushBinding";
 import {adminFetch} from "@/services/adminApi";
 
 export const STAFF_ALERT_DEVICE_RESTORED = "gokul-staff-alert-device-restored";
@@ -45,7 +45,9 @@ export async function staffAlertsRequest<T>(path = "", init?: RequestInit, staff
 export async function syncStaffAlertDevice(subscription: PushSubscription, staffId: number, signal: AbortSignal, registrationId?: string) {
     // A restore can release queued pushes before its response reaches the browser.
     // Allow a generic alert for this registration while the server confirms the restore.
-    if (registrationId) await setOrderPushBinding("staff", String(staffId), registrationId, signal, true);
+    if (registrationId && !await bindStaffOrderPush(String(staffId), registrationId, signal, true)) {
+        throw new Error("The active staff account changed. Reopen this page and try again.");
+    }
     const keys = subscription.toJSON().keys;
     return staffAlertsRequest<{id: string | null}>("/push-subscriptions", {
         method: "POST", signal, body: JSON.stringify({
@@ -71,6 +73,7 @@ export async function enableStaffDeviceAlerts(settings: StaffAlertSettings, scop
     });
     try {
         signal.throwIfAborted();
+        const previousOwner = (await readOrderPushBinding("staff"))?.owner ?? null;
         const registration = await Promise.race([navigator.serviceWorker.register("/sw.js"), deadline]);
         if (!registration.active) await Promise.race([navigator.serviceWorker.ready, deadline]);
         let subscription = await Promise.race([registration.pushManager.getSubscription(), deadline]);
@@ -88,7 +91,11 @@ export async function enableStaffDeviceAlerts(settings: StaffAlertSettings, scop
             await staffAlertsRequest(`/push-subscriptions/${result.id}`, {method: "DELETE", signal: AbortSignal.timeout(8000)}, settings.staffId);
             throw new Error("This device could not save its alert registration. Try again from Staff notifications.");
         }
-        await setOrderPushBinding("staff", String(settings.staffId), result.id, signal);
+        const owner = String(settings.staffId);
+        await switchOrderPushOwner("staff", owner, signal, true, previousOwner).catch(() => {});
+        if (!await bindStaffOrderPush(owner, result.id, signal)) {
+            throw new Error("The active staff account changed. Reopen this page and try again.");
+        }
         dismissStaffAlertSetup(settings.staffId);
         window.dispatchEvent(new Event(STAFF_ALERT_DEVICE_RESTORED));
         return permission;

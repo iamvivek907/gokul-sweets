@@ -848,20 +848,33 @@ self.addEventListener("push", event => {
         const body = custom && typeof payload.body === "string" ? payload.body.slice(0, 500)
             : staff ? "Open Staff notifications to check the latest order activity." : "Open the app to check your latest order update.";
         const scope = registration ? `:${encodeURIComponent(registration)}` : "";
-        const tagGroup = `gokul-${staff ? "staff" : "customer"}-${destination.split("#")[0]}${scope}`;
+        const legacyGroup = `gokul-${staff ? "staff" : "customer"}-${destination.split("#")[0]}`;
+        const tagGroup = `${legacyGroup}${scope}`;
         // The generic staff inbox can represent unrelated events, so order only specific targets.
         const orderedStaff = staff && custom;
         const tag = marketing ? `gokul-${eventId}` : staff ? `${tagGroup}:${eventId}` : tagGroup;
         const newerOrSame = other => typeof other === "string" && /^staff:[0-9]{1,20}$/.test(other)
             && BigInt(other.slice(6)) >= BigInt(eventId.slice(6));
         if (orderedStaff && newerOrSame(staffLatest.find(entry => entry?.[0] === tagGroup)?.[1])) return;
-        let previousStaff = [];
+        let replacedNotices = [];
         if (orderedStaff) {
             try {
-                previousStaff = (await self.registration.getNotifications())
-                    .filter(notice => notice.tag === tagGroup || notice.tag.startsWith(`${tagGroup}:staff:`));
-                if (previousStaff.some(notice => newerOrSame(notice.tag.slice(tagGroup.length + 1)))) return;
+                for (const notice of await self.registration.getNotifications()) {
+                    const group = notice.tag === tagGroup || notice.tag.startsWith(`${tagGroup}:staff:`)
+                        ? tagGroup
+                        : registration && notice.data?.registrationId === registration
+                            && (notice.tag === legacyGroup || notice.tag.startsWith(`${legacyGroup}:staff:`))
+                            ? legacyGroup : null;
+                    if (!group) continue;
+                    if (newerOrSame(notice.tag.slice(group.length + 1))) return;
+                    replacedNotices.push(notice);
+                }
             } catch { /* Durable ordering still works when the notification list is unavailable. */ }
+        } else if (!staff && custom && registration) {
+            try {
+                replacedNotices = (await self.registration.getNotifications({tag: legacyGroup}))
+                    .filter(notice => notice.tag === legacyGroup && notice.data?.registrationId === registration);
+            } catch { /* A current alert can still display. */ }
         }
         await self.registration.showNotification(title, {
             body, silent: false, ...(staff ? {vibrate: [300, 120, 300, 120, 500]} : {}), badge: "/notification-badge.svg",
@@ -878,9 +891,9 @@ self.addEventListener("push", event => {
         }
         if (orderedStaff) {
             staffLatest = [...staffLatest.filter(entry => entry?.[0] !== tagGroup), [tagGroup, eventId]].slice(-256);
-            for (const notice of previousStaff) {
-                try {notice.close();} catch { /* The newer notification is already visible. */ }
-            }
+        }
+        for (const notice of replacedNotices) {
+            try {notice.close();} catch { /* The newer notification is already visible. */ }
         }
         try {
             if (cache) await cache.put(key, new Response(JSON.stringify({seen: [...seen, seenId].slice(-256), staffLatest}),
