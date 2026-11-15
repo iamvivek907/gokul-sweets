@@ -34,10 +34,22 @@ public class StaffPushSubscriptions {
      * @param publicKey the public key
      * @param authSecret the auth secret
      * @param registrationId the existing device id when restoring an opt-in
+     * @param expectedStaffId the account that started this request
+     * @param pausePrevious whether to deactivate another account on this device without opting in
      */
-    public record Input(String endpoint, String publicKey, String authSecret, UUID registrationId) {
+    public record Input(
+            String endpoint,
+            String publicKey,
+            String authSecret,
+            UUID registrationId,
+            Long expectedStaffId,
+            boolean pausePrevious) {
         public Input(String endpoint, String publicKey, String authSecret) {
             this(endpoint, publicKey, authSecret, null);
+        }
+
+        public Input(String endpoint, String publicKey, String authSecret, UUID registrationId) {
+            this(endpoint, publicKey, authSecret, registrationId, null, false);
         }
     }
 
@@ -81,6 +93,9 @@ public class StaffPushSubscriptions {
                     || !WebPushTransport.validEndpoint(input.endpoint())
                     || !WebPushTransport.validRecipientKeys(input.publicKey(), input.authSecret()))
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+            if (input.expectedStaffId() != null && input.expectedStaffId() != staffId)
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT, "The active account changed.");
             var verified = sessions.verify(cookie);
             if (verified == null || verified.staffId() != staffId)
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
@@ -108,6 +123,21 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.environment = ? AND s.endpoint_h
                                             rs.getBoolean(6)),
                             alerts.scope(),
                             hash);
+            var old = existing.isEmpty() ? null : existing.getFirst();
+            boolean differentOwner = old != null && !(old.staffId() == staffId);
+            boolean sameDevice =
+                    old != null
+                            && old.publicKey().equals(input.publicKey())
+                            && old.auth().equals(input.authSecret());
+            if (input.pausePrevious()) {
+                if (differentOwner && sameDevice && !old.inactive()) {
+                    jdbc.update(
+                            "UPDATE staff_push_subscriptions SET revoked_at=CURRENT_TIMESTAMP WHERE"
+                                    + " id=?",
+                            old.id());
+                }
+                return new Result(null);
+            }
             if (input.registrationId() != null) {
                 // Existing-device restoration must never recreate a removed subscription.
                 var restored =
@@ -132,9 +162,7 @@ RETURNING s.id
                 if (restored.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
                 return new Result(restored.getFirst());
             }
-            if (!existing.isEmpty()
-                    && !existing.getFirst().inactive()
-                    && existing.getFirst().staffId() != staffId)
+            if (differentOwner && !old.inactive() && !sameDevice)
                 throw new ResponseStatusException(
                         HttpStatus.CONFLICT,
                         "This browser belongs to another staff session. Disable its old"
@@ -153,8 +181,7 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.environment = ? AND s.staff_id =
             if (count != null && count >= 5)
                 throw new ResponseStatusException(
                         HttpStatus.CONFLICT, "Maximum five live staff browsers.");
-            if (!existing.isEmpty()) {
-                var old = existing.getFirst();
+            if (old != null) {
                 if (!old.inactive()
                         && old.staffId() == staffId
                         && old.session().equals(session)

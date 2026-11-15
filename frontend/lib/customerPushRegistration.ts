@@ -33,7 +33,7 @@ export async function confirmCustomerPush(settings: AlertSettings, subscription:
     if (current.scopeId !== settings.scopeId) throw new Error("Account changed");
     const keys = subscription.toJSON().keys;
     const result = await apiClient<{id: string}>("/api/customer/identity/push-subscriptions", {method: "POST", credentials: "include",
-        signal: deadline(), body: JSON.stringify({registrationId, endpoint: subscription.endpoint, publicKey: keys?.p256dh, authSecret: keys?.auth})});
+        signal: deadline(), body: JSON.stringify({registrationId, expectedSubject: settings.scopeId, endpoint: subscription.endpoint, publicKey: keys?.p256dh, authSecret: keys?.auth})});
     if (registrationId) {
         // Restoration never changes local opt-in state or revives a disabled device.
         return;
@@ -52,4 +52,19 @@ export async function pushSubscriptionFingerprint(subscription: PushSubscription
     if (!keys?.p256dh || !keys.auth) throw new Error("Push subscription keys unavailable");
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${subscription.endpoint}\n${keys.p256dh}\n${keys.auth}`));
     return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+
+/** Pause a previous account only when this browser still holds its push subscription. */
+export async function pausePreviousCustomerAlerts(scopeId: string, signal: AbortSignal) {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    const registration = await navigator.serviceWorker?.getRegistration();
+    const subscription = await registration?.pushManager.getSubscription();
+    signal.throwIfAborted();
+    if (!subscription) return;
+    const keys = subscription.toJSON().keys;
+    await apiClient("/api/customer/identity/push-subscriptions", {
+        method: "POST", credentials: "include", signal,
+        body: JSON.stringify({expectedSubject: scopeId, pausePrevious: true, endpoint: subscription.endpoint, publicKey: keys?.p256dh, authSecret: keys?.auth})
+    });
 }

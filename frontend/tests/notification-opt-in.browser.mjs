@@ -51,6 +51,7 @@ await context.route("**/api/**", async route => {
     else if (path === "/api/customer/identity/consents/MARKETING") {consentWrites++; marketing = route.request().postDataJSON().granted; json = {granted: marketing, policyVersion: "test", recordedAt: null};}
     else if (path === "/api/customer/identity/privacy-requests") json = [];
     else if (path === "/api/customer/identity/push-subscriptions") {
+        if (route.request().postDataJSON().pausePrevious) return route.fulfill({json: {id: null}});
         subscriptions++;
         if (failSubscription) return route.fulfill({status: 503, json: {message: "Retry"}});
         const replacement = route.request().postDataJSON().registrationId;
@@ -137,7 +138,7 @@ try {
     assert.equal(subscriptions, 2, "Rotation requires an explicit registration action");
     rotated = false;
     registrationActive = false;
-    const restored = page.waitForResponse(response => response.url().endsWith("/push-subscriptions") && response.request().method() === "POST");
+    const restored = page.waitForResponse(response => response.url().endsWith("/push-subscriptions") && response.request().method() === "POST" && !response.request().postDataJSON().pausePrevious);
     await page.reload();
     await restored;
     assert.equal(await card.count(), 0, "An existing device restores its registration after reauthentication");

@@ -41,6 +41,7 @@ try {
    };
   });
   const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+  await page.clock.install();
   await page.goto(`${base}/admin/order-desk`);
   await page.getByRole('button',{name:'Enable kitchen alarm',exact:true}).click();
   await page.waitForFunction(()=>window.__chimes>=3);
@@ -83,7 +84,7 @@ try {
   const transient=await page.evaluate(()=>window.__chimes);
   await page.waitForFunction(previous=>window.__chimes>previous,transient);
   // Simulate long inactivity/network loss without waiting a real minute.
-  await page.clock.install();await page.clock.fastForward(20*60*1000);
+  await page.clock.fastForward(20*60*1000);
   const stale=await page.evaluate(()=>window.__chimes);
   await page.clock.runFor(4000);
   assert.ok(await page.evaluate(()=>window.__warnings)>0,'stale order data produces a separate connection warning');

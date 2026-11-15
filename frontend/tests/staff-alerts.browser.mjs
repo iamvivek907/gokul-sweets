@@ -4,7 +4,7 @@ const require = createRequire(import.meta.url);
 const {chromium} = require(process.env.PLAYWRIGHT_MODULE ?? "playwright");
 const browser = await chromium.launch({headless: true});
 const context = await browser.newContext({viewport: {width: 390, height: 844}, timezoneId: "America/Los_Angeles"});
-let testingEmail = false;
+let testingEmail = false, restoreFailures = 0, restored = 0;
 let enabled = true, registered = false, read = false, denied = true, failDisable = true, failRead = true;
 let orderStatus = "CONFIRMED", firstPreparation = true, mutations = 0;
 const registrationId = "d1779266-3814-48cf-8f6d-8c23b832c1c3";
@@ -41,7 +41,19 @@ await context.route("**/api/**", async route => {
         kind: "PREPARATION_OVERDUE", title: "Preparation is overdue", message: "Order STAFF-ORDER · Main branch. Booked pickup 01 Oct 2026, 6:00 pm IST has passed. Take action.",
         createdAt: "2026-10-01T12:30:00Z"}, readAt: read ? "2026-10-01T12:31:00Z" : null, actionRequired: orderStatus === "CONFIRMED", emailState: null, pushState: null}], unreadCount: read ? 0 : 1, nextBefore: null};
     else if (path === "/api/admin/notifications/push-subscriptions") {
-        assert.equal(request.headers()["x-staff-csrf"], csrf); registered = true; json = {id: registrationId};
+        assert.equal(request.headers()["x-staff-csrf"], csrf);
+        const payload = request.postDataJSON();
+        assert.equal(payload.expectedStaffId, 12);
+        if (payload.pausePrevious) return route.fulfill({json: {id: null}});
+        if (payload.registrationId) {
+            assert.equal(payload.registrationId, registrationId);
+            if (restoreFailures > 0) {
+                restoreFailures--;
+                return route.fulfill({status: 503, json: {}});
+            }
+            restored++;
+        }
+        registered = true; json = {id: registrationId};
     } else if (path === `/api/admin/notifications/push-subscriptions/${registrationId}`) {
         assert.equal(request.headers()["x-staff-csrf"], csrf);
         if (failDisable) {failDisable = false; return route.abort("internetdisconnected");}
@@ -139,6 +151,16 @@ try {
     await page.reload();
     await page.getByRole("link", {name: /Staff alerts,/}).waitFor();
     assert.equal(await setup.count(), 0, "an enrolled phone does not get another setup offer");
+    assert.equal(await page.evaluate(() => window._permissionRequests), 0);
+    registered = false;
+    restoreFailures = 1;
+    await page.clock.install();
+    await page.reload();
+    const reconnect = page.getByRole("region", {name: "Reconnect phone alerts"});
+    await reconnect.waitFor();
+    await page.clock.fastForward(31_000);
+    await reconnect.waitFor({state: "hidden"});
+    assert.equal(restored, 1, "a transient failure is retried without another permission request");
     assert.equal(await page.evaluate(() => window._permissionRequests), 0);
     console.log("PASS: staff permission gesture, denial, registration, honest offline revoke/read, CSRF, modern mobile layout, exact order/actions, IST estimate and flag OFF.");
 } catch (error) {console.error("URL", page.url(), "BODY", (await page.locator("body").innerText()).slice(0,2500)); throw error;} finally {await browser.close();}

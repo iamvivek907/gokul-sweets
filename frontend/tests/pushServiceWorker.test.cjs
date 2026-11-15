@@ -4,14 +4,20 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 function worker(clients = [], cacheFailure = false) {
-    const listeners = {}, shown = [], opened = [], entries = new Map();
+    const listeners = {}, shown = [], opened = [], entries = new Map(), active = new Map();
     const self = {location: {origin: 'https://dev.gokulsweets.in'}, addEventListener(name, listener) {listeners[name] = listener;},
-        registration: {async showNotification(title, options) {shown.push({title, ...options});}},
+        registration: {
+            async showNotification(title, options) {
+                shown.push({title, ...options});
+                active.set(options.tag, {tag: options.tag, close() {active.delete(options.tag);}});
+            },
+            async getNotifications() {return [...active.values()];}
+        },
         clients: {async matchAll() {if(clients instanceof Error)throw clients;return clients;}, async openWindow(url) {opened.push(url);}}};
     const caches = {async open() {if (cacheFailure) throw new Error("Cache unavailable"); return {async match(key) {const value = entries.get(key.url); return value ? new Response(value) : undefined;},
         async put(key, response) {entries.set(key.url, await response.text());}};}};
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../public/sw.js'), 'utf8'), {self, caches, URL, Request, Response, Promise, Array, String});
-    return {listeners, shown, opened};
+    return {listeners, shown, opened, active};
 }
 test('replayed/concurrent push uses one generic notification and exact safe inbox destination', async () => {
     const runtime = worker();
@@ -143,4 +149,30 @@ test('separate staff reminders for the same order have distinct device tags, and
     }
     assert.equal(runtime.shown.length, 2);
     assert.notEqual(runtime.shown[0].tag, runtime.shown[1].tag);
+});
+
+
+test('a late new-order alert cannot replace a newer preparation reminder', async () => {
+    for (const cacheFailure of [false, true]) {
+        const runtime = worker([], cacheFailure);
+        const send = async (id, title, order = 'GS-001') => {
+            let pending;
+            runtime.listeners.push({
+                data: {json: () => ({eventId: `staff:${id}`, title, url: `/admin/orders/${order}`})},
+                waitUntil(value) {pending = value;}
+            });
+            await pending;
+        };
+        await send('10000000000000000000', 'Preparation is due');
+        await send('9999999999999999999', 'New paid order');
+        assert.deepEqual(runtime.shown.map(notice => notice.title), ['Preparation is due']);
+        const notice = runtime.active.values().next().value;
+        if (!cacheFailure) notice.close();
+        if (!cacheFailure) await send('9999999999999999998', 'Another delayed reminder');
+        assert.equal(runtime.shown.length, 1);
+        await send('9999999999999999998', 'Another order', 'GS-002');
+        assert.equal(runtime.shown.length, 2);
+        await send('10000000000000000001', 'Preparation is overdue');
+        assert.equal([...runtime.active.keys()].filter(tag => tag.includes('GS-001')).length, 1);
+    }
 });

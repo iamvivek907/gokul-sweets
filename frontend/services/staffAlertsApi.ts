@@ -27,14 +27,29 @@ export type StaffAlertSettings = {enabled: boolean; environment: string; staffId
 export type StaffAlert = {event: {id: number;enquiryId?:string|null;targetUrl?:string; orderNumber: string;customerOrderNumber?:number|null; branchId: number; kind: string; title: string; message: string; createdAt: string};
     readAt: string | null; actionRequired: boolean; pushState: string | null; emailState: string | null};
 export type StaffInbox = {messages: StaffAlert[]; unreadCount: number; nextBefore: number | null; readThrough?: number};
-export async function staffAlertsRequest<T>(path = "", init?: RequestInit): Promise<T> {
+export class StaffAlertRequestError extends Error {
+    constructor(readonly status: number) {
+        super(status === 401 ? "Sign in again to use staff alerts." : "Could not confirm this change. Check your connection and try again.");
+    }
+}
+export async function staffAlertsRequest<T>(path = "", init?: RequestInit, staffId?: number): Promise<T> {
     const headers = new Headers(init?.headers);
     if (init?.body) headers.set("Content-Type", "application/json");
-    const response = await adminFetch(`/api/admin/notifications${path}`, "staff-session", {...init, headers});
-    if (!response.ok) throw new Error(response.status === 401 ? "Sign in again to use staff alerts." : "Could not confirm this change. Check your connection and try again.");
+    const response = await adminFetch(`/api/admin/notifications${path}`, staffId === undefined ? "staff-session" : `staff-session:${staffId}`, {...init, headers});
+    if (!response.ok) throw new StaffAlertRequestError(response.status);
     return response.status === 204 ? undefined as T : response.json() as Promise<T>;
 }
 
+
+export function syncStaffAlertDevice(subscription: PushSubscription, staffId: number, signal: AbortSignal, registrationId?: string) {
+    const keys = subscription.toJSON().keys;
+    return staffAlertsRequest<{id: string | null}>("/push-subscriptions", {
+        method: "POST", signal, body: JSON.stringify({
+            endpoint: subscription.endpoint, publicKey: keys?.p256dh, authSecret: keys?.auth,
+            expectedStaffId: staffId, registrationId, pausePrevious: !registrationId
+        })
+    }, staffId);
+}
 
 /** Start this call from the staff member's tap, before any asynchronous work. */
 export async function enableStaffDeviceAlerts(settings: StaffAlertSettings, scope?: AbortSignal): Promise<NotificationPermission> {
@@ -62,11 +77,11 @@ export async function enableStaffDeviceAlerts(settings: StaffAlertSettings, scop
         signal.throwIfAborted();
         const keys = subscription.toJSON().keys;
         const result = await staffAlertsRequest<{id: string}>("/push-subscriptions", {
-            method: "POST", signal, body: JSON.stringify({endpoint: subscription.endpoint, publicKey: keys?.p256dh, authSecret: keys?.auth})
-        });
+            method: "POST", signal, body: JSON.stringify({expectedStaffId: settings.staffId, endpoint: subscription.endpoint, publicKey: keys?.p256dh, authSecret: keys?.auth})
+        }, settings.staffId);
         try {localStorage.setItem(staffAlertDeviceKey(settings.staffId), result.id);}
         catch {
-            await staffAlertsRequest(`/push-subscriptions/${result.id}`, {method: "DELETE", signal: AbortSignal.timeout(8000)});
+            await staffAlertsRequest(`/push-subscriptions/${result.id}`, {method: "DELETE", signal: AbortSignal.timeout(8000)}, settings.staffId);
             throw new Error("This device could not save its alert registration. Try again from Staff notifications.");
         }
         dismissStaffAlertSetup(settings.staffId);

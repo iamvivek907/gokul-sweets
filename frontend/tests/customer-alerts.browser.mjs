@@ -43,7 +43,8 @@ await context.route("**/api/**", async route => {
     else if (path === "/api/customer/identity/notification-alerts") {
         if (route.request().method() === "PUT") settings = {...settings, ...route.request().postDataJSON()};
         json = settings;
-    } else if (path === "/api/customer/identity/push-subscriptions") {subscriptions++; json = {id: "browser-registration"};}
+    } else if (path === "/api/customer/identity/push-subscriptions") {if (route.request().postDataJSON().pausePrevious) return route.fulfill({json: {id: null}});
+        subscriptions++; json = {id: "browser-registration"};}
     else if (path === "/api/customer/identity/push-subscriptions/browser-registration") {revoked = true; return route.fulfill({status: 204});}
     return route.fulfill({json});
 });

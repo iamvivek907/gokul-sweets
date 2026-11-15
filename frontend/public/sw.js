@@ -804,11 +804,16 @@ self.addEventListener("push", event => {
         const key = new Request(new URL("/__push_seen", self.location.origin));
         let cache;
         let seen = [];
+        let staffLatest = [];
         try {
             cache = await caches.open(PUSH_DEDUPE_CACHE);
             const previous = await cache.match(key);
             const stored = previous ? await previous.json() : [];
             if (Array.isArray(stored)) seen = stored;
+            else {
+                if (Array.isArray(stored?.seen)) seen = stored.seen;
+                if (Array.isArray(stored?.staffLatest)) staffLatest = stored.staffLatest;
+            }
         } catch { /* Cache errors must never prevent notification delivery. */ }
         if (seen.includes(eventId)) return;
         const staff = eventId.startsWith("staff:");
@@ -819,26 +824,35 @@ self.addEventListener("push", event => {
         const title = custom && typeof payload.title === "string" ? payload.title.slice(0, 80) : "Gokul Sweets";
         const body = custom && typeof payload.body === "string" ? payload.body.slice(0, 500) : "A new account update is waiting in your notification inbox.";
         const tagGroup = `gokul-${staff ? "staff" : "customer"}-${destination.split("#")[0]}`;
-        // Fresh staff reminders get distinct tags so they can sound on platforms that
-        // suppress alerts when an existing notification is replaced.
+        // The generic staff inbox can represent unrelated events, so order only specific targets.
+        const orderedStaff = staff && custom;
         const tag = marketing ? `gokul-${eventId}` : staff ? `${tagGroup}:${eventId}` : tagGroup;
+        const newerOrSame = other => typeof other === "string" && /^staff:[0-9]{1,20}$/.test(other)
+            && BigInt(other.slice(6)) >= BigInt(eventId.slice(6));
+        if (orderedStaff && newerOrSame(staffLatest.find(entry => entry?.[0] === tagGroup)?.[1])) return;
+        let previousStaff = [];
+        if (orderedStaff) {
+            try {
+                previousStaff = (await self.registration.getNotifications())
+                    .filter(notice => notice.tag === tagGroup || notice.tag.startsWith(`${tagGroup}:staff:`));
+                if (previousStaff.some(notice => newerOrSame(notice.tag.slice(tagGroup.length + 1)))) return;
+            } catch { /* Durable ordering still works when the notification list is unavailable. */ }
+        }
         await self.registration.showNotification(title, {
             body, silent: false, ...(staff ? {vibrate: [300, 120, 300, 120, 500]} : {}), badge: "/notification-badge.svg",
             icon: "/icon-192.png", tag, renotify: staff, requireInteraction: staff,
             data: {url: destination, staff, marketing}
         });
+        if (orderedStaff) {
+            staffLatest = [...staffLatest.filter(entry => entry?.[0] !== tagGroup), [tagGroup, eventId]].slice(-256);
+            for (const notice of previousStaff) {
+                try {notice.close();} catch { /* The newer notification is already visible. */ }
+            }
+        }
         try {
-            if (cache) await cache.put(key, new Response(JSON.stringify([...seen, eventId].slice(-256)),
+            if (cache) await cache.put(key, new Response(JSON.stringify({seen: [...seen, eventId].slice(-256), staffLatest}),
                 {headers: {"Content-Type": "application/json"}}));
         } catch { /* The banner already displayed; its tag still replaces duplicates. */ }
-        if (staff) {
-            try {
-                const notices = await self.registration.getNotifications();
-                for (const notice of notices) {
-                    if (notice.tag === tagGroup || (notice.tag.startsWith(`${tagGroup}:staff:`) && notice.tag !== tag)) notice.close();
-                }
-            } catch { /* The new reminder has already displayed. */ }
-        }
         if (!marketing) {
             try {
                 const windows = await self.clients.matchAll({type: "window", includeUncontrolled: true});

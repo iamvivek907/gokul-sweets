@@ -110,18 +110,7 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                                 + " (?, 'PHONEPE', 100, 'PAID') RETURNING id",
                         Long.class,
                         order);
-        StaffUser user = new StaffUser();
-        user.setId(staff);
-        var staffRole = new com.gokulsweets.restaurant.staff.Role();
-        staffRole.setName(
-                jdbc.queryForObject("SELECT name FROM roles WHERE id = ?", String.class, role));
-        user.setRole(staffRole);
-        user.setUpdatedAt(
-                jdbc.queryForObject(
-                        "SELECT updated_at FROM staff_users WHERE id = ?",
-                        LocalDateTime.class,
-                        staff));
-        cookie = sessions.issue(user).token();
+        cookie = issueFor(staff);
         when(push.configured()).thenReturn(true);
         when(email.configured()).thenReturn(true);
         when(email.recipient(staff)).thenReturn("staff-test@example.invalid");
@@ -140,6 +129,21 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                                                 generator.generateKeyPair().getPublic())
                                         .getQ()
                                         .getEncoded(false));
+    }
+
+    private String issueFor(long staffId) {
+        StaffUser user = new StaffUser();
+        user.setId(staffId);
+        var staffRole = new com.gokulsweets.restaurant.staff.Role();
+        staffRole.setName(
+                jdbc.queryForObject("SELECT name FROM roles WHERE id = ?", String.class, role));
+        user.setRole(staffRole);
+        user.setUpdatedAt(
+                jdbc.queryForObject(
+                        "SELECT updated_at FROM staff_users WHERE id = ?",
+                        LocalDateTime.class,
+                        staff));
+        return sessions.issue(user).token();
     }
 
     private long staff(long branch) {
@@ -349,6 +353,55 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                         anyString());
         assertThat(alerts.page(staff, null).messages())
                 .allMatch(message -> !message.actionRequired());
+    }
+
+    @Test
+    void sharedPhonePausesPreviousStaffAndRequiresNewOptIn() {
+        var browser = input("shared-" + UUID.randomUUID());
+        var first = subscriptions.subscribe(staff, cookie, browser);
+        var nextCookie = issueFor(otherStaff);
+        jdbc.update(
+                "UPDATE staff_sessions SET expires_at=CURRENT_TIMESTAMP - INTERVAL '1 minute'"
+                        + " WHERE token_hash=?",
+                StaffSessionService.hash(cookie));
+        var pause =
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(),
+                        browser.publicKey(),
+                        browser.authSecret(),
+                        null,
+                        otherStaff,
+                        true);
+        assertThatThrownBy(
+                        () ->
+                                subscriptions.subscribe(
+                                        otherStaff,
+                                        nextCookie,
+                                        new StaffPushSubscriptions.Input(
+                                                browser.endpoint(),
+                                                browser.publicKey(),
+                                                browser.authSecret(),
+                                                null,
+                                                staff,
+                                                true)))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThat(subscriptions.subscribe(otherStaff, nextCookie, pause).id()).isNull();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT revoked_at IS NOT NULL FROM staff_push_subscriptions WHERE"
+                                        + " id=?",
+                                Boolean.class,
+                                first.id()))
+                .isTrue();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM staff_push_subscriptions WHERE staff_id=?",
+                                Long.class,
+                                otherStaff))
+                .isZero();
+        var second = subscriptions.subscribe(otherStaff, nextCookie, browser);
+        assertThat(second.id()).isNotEqualTo(first.id());
+        assertThat(subscriptions.live(otherStaff, second.id(), nextCookie)).isTrue();
     }
 
     @Test

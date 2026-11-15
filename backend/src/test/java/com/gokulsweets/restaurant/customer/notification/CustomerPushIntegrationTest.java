@@ -147,6 +147,47 @@ VALUES ('DEV', ?, ?, 'PAYMENT_PAID', 'ORDER', 'TEST-ORDER', 'Payment received', 
     }
 
     @Test
+    void sharedPhonePausesOldCustomerWithoutRegisteringNewCustomer() {
+        var browser = input(UUID.randomUUID().toString());
+        var first = preferences.subscribe("DEV", subject, token, browser);
+        var next = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO verified_customer_subjects(id,environment,verified_phone)"
+                        + " VALUES (?,'DEV','+919876543211')",
+                next);
+        var nextToken = sessions.issue(ConsentEnvironment.DEV, next, Instant.now()).token();
+        var wrongKey =
+                new CustomerAlertPreferences.SubscriptionInput(
+                        browser.endpoint(),
+                        browser.publicKey(),
+                        "BAAAAAAAAAAAAAAAAAAAAA",
+                        null,
+                        next,
+                        true);
+        preferences.subscribe("DEV", next, nextToken, wrongKey);
+        assertThat(preferences.registered("DEV", subject, token, first.id())).isTrue();
+        var pause =
+                new CustomerAlertPreferences.SubscriptionInput(
+                        browser.endpoint(),
+                        browser.publicKey(),
+                        browser.authSecret(),
+                        null,
+                        next,
+                        true);
+        assertThat(preferences.subscribe("DEV", next, nextToken, pause).id()).isNull();
+        assertThat(preferences.registered("DEV", subject, token, first.id())).isFalse();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM customer_push_subscriptions WHERE"
+                                        + " subject_id=?",
+                                Long.class,
+                                next))
+                .isZero();
+        var second = preferences.subscribe("DEV", next, nextToken, browser);
+        assertThat(preferences.registered("DEV", next, nextToken, second.id())).isTrue();
+    }
+
+    @Test
     void deviceSurvivesExpiryAndRestoresOnlyWhileOptedIn() throws Exception {
         preferences.save(
                 "DEV", subject, new CustomerAlertPreferences.Input(false, false, 1320, 480));

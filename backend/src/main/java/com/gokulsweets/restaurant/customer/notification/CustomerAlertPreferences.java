@@ -74,11 +74,23 @@ public class CustomerAlertPreferences {
      * @param publicKey the public key
      * @param authSecret the auth secret
      * @param registrationId the existing device id when restoring an opt-in
+     * @param expectedSubject the account that started this request
+     * @param pausePrevious whether to deactivate another account on this device without opting in
      */
     public record SubscriptionInput(
-            String endpoint, String publicKey, String authSecret, UUID registrationId) {
+            String endpoint,
+            String publicKey,
+            String authSecret,
+            UUID registrationId,
+            UUID expectedSubject,
+            boolean pausePrevious) {
         public SubscriptionInput(String endpoint, String publicKey, String authSecret) {
             this(endpoint, publicKey, authSecret, null);
+        }
+
+        public SubscriptionInput(
+                String endpoint, String publicKey, String authSecret, UUID registrationId) {
+            this(endpoint, publicKey, authSecret, registrationId, null, false);
         }
     }
 
@@ -253,6 +265,9 @@ ON CONFLICT (environment, subject_id) DO UPDATE SET sound_enabled = EXCLUDED.sou
                     || !WebPushTransport.validRecipientKeys(input.publicKey(), input.authSecret()))
                 throw new ResponseStatusException(
                         HttpStatus.BAD_REQUEST, "Invalid browser subscription.");
+            if (input.expectedSubject() != null && !input.expectedSubject().equals(subject))
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT, "The active account changed.");
             lockSubject(environment, subject);
             Long session =
                     jdbc.query(
@@ -283,6 +298,21 @@ WHERE s.environment = ? AND s.endpoint_hash = ? FOR UPDATE OF s
                                             rs.getString(6)),
                             environment,
                             endpointHash);
+            var old = existing.isEmpty() ? null : existing.getFirst();
+            boolean differentOwner = old != null && !(old.subject().equals(subject));
+            boolean sameDevice =
+                    old != null
+                            && old.publicKey().equals(input.publicKey())
+                            && old.auth().equals(input.authSecret());
+            if (input.pausePrevious()) {
+                if (differentOwner && sameDevice && !old.inactive()) {
+                    jdbc.update(
+                            "UPDATE customer_push_subscriptions SET revoked_at=CURRENT_TIMESTAMP"
+                                    + " WHERE id=?",
+                            old.id());
+                }
+                return new SubscriptionResult(null);
+            }
             if (input.registrationId() != null) {
                 // Require the original opt-in and browser subscription proof.
                 var restored =
@@ -304,9 +334,7 @@ RETURNING id
                 if (restored.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
                 return new SubscriptionResult(restored.getFirst());
             }
-            if (!existing.isEmpty()
-                    && !existing.getFirst().subject().equals(subject)
-                    && !existing.getFirst().inactive())
+            if (differentOwner && !old.inactive() && !sameDevice)
                 throw new ResponseStatusException(
                         HttpStatus.CONFLICT,
                         "This browser is registered to another account. Disable its old"
@@ -331,8 +359,8 @@ RETURNING id
                     && existing.getFirst().publicKey().equals(input.publicKey())
                     && existing.getFirst().auth().equals(input.authSecret()))
                 return new SubscriptionResult(existing.getFirst().id());
-            if (!existing.isEmpty()) {
-                var id = existing.getFirst().id();
+            if (old != null) {
+                var id = old.id();
                 // Rotate identity by creating a new subscription ID; old deliveries cannot target a
                 // new owner.
                 jdbc.update(
