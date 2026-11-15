@@ -4,6 +4,7 @@ import Link from "next/link";
 import {useEffect, useRef, useState} from "react";
 import {usePathname} from "next/navigation";
 import {bindStaffOrderPush, readOrderPushBinding, switchOrderPushOwner} from "@/lib/orderPushBinding";
+import {fetchAdminProfile} from "@/services/adminApi";
 import {usePwaInstall} from "@/hooks/usePwaInstall";
 import {T} from "@/lib/language";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
@@ -25,7 +26,8 @@ export default function StaffNotificationBell() {
     useEffect(() => {
         if (!profile) return;
         const canViewOrders = hasPermission("ORDER_VIEW");
-        let active = true, busy = false, handoffChecked = false, retryAt = 0, failures = 0;
+        let active = true, busy = false, localHandoffChecked = false, serverHandoffChecked = false;
+        let retryAt = 0, failures = 0;
         const controller = new AbortController();
         requestScope.current = controller;
         const refresh = async () => {
@@ -35,20 +37,24 @@ export default function StaffNotificationBell() {
                 const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]);
                 const staffId = profile.staffId;
                 const owner = String(staffId);
-                const previousOwner = !handoffChecked ? (await readOrderPushBinding("staff"))?.owner ?? null : null;
+                const previousOwner = !localHandoffChecked ? (await readOrderPushBinding("staff"))?.owner ?? null : null;
                 const stored = readStaffAlertDevice(staffId);
                 const permitted = supportsStaffPush() && Notification.permission === "granted";
                 const device = permitted ? stored : null;
                 if (!canViewOrders) {
-                    if (!handoffChecked && permitted && Date.now() >= retryAt) {
+                    if ((!serverHandoffChecked || !localHandoffChecked) && permitted && Date.now() >= retryAt) {
                         try {
-                            const worker = await navigator.serviceWorker.getRegistration();
-                            const subscription = await worker?.pushManager.getSubscription();
-                            if (subscription) {
+                            if (!serverHandoffChecked) {
+                                const worker = await navigator.serviceWorker.getRegistration();
+                                const subscription = await worker?.pushManager.getSubscription();
+                                if (!subscription) return;
                                 await syncStaffAlertDevice(subscription, staffId, signal);
-                                await switchOrderPushOwner("staff", owner, signal, false, previousOwner).catch(() => {});
+                                serverHandoffChecked = true;
+                            } else if ((await fetchAdminProfile(signal))?.staffId !== staffId) {
+                                return;
                             }
-                            handoffChecked = true;
+                            localHandoffChecked = await switchOrderPushOwner("staff", owner, signal, false, previousOwner);
+                            failures = 0;
                         } catch {
                             retryAt = Date.now() + Math.min(120_000, 15_000 * 2 ** Math.min(failures++, 3));
                         }
@@ -57,26 +63,29 @@ export default function StaffNotificationBell() {
                 }
                 const settings = await staffAlertsRequest<StaffAlertSettings>(`/settings${device ? `?deviceId=${encodeURIComponent(device)}` : ""}`, {signal});
                 if (!active || settings.staffId !== staffId) return;
-                if (!handoffChecked) await switchOrderPushOwner("staff", owner, signal, true, previousOwner).catch(() => {});
+                if (!localHandoffChecked) {
+                    localHandoffChecked = await switchOrderPushOwner("staff", owner, signal, true, previousOwner).catch(() => false);
+                }
                 if (!settings.enabled) {setCount(null); setSetup(null); setNeedsRepair(false); return;}
 
                 let deviceActive = settings.deviceActive;
-                if (settings.pushConfigured && permitted && (!handoffChecked || (device && !deviceActive)) && Date.now() >= retryAt) {
+                let restored = false;
+                if (settings.pushConfigured && permitted && (!serverHandoffChecked || (device && !deviceActive)) && Date.now() >= retryAt) {
                     try {
                         const registration = await navigator.serviceWorker.getRegistration();
                         const push = await registration?.pushManager.getSubscription();
                         signal.throwIfAborted();
                         if (push && readStaffAlertDevice(staffId) === stored) {
                             // Pause an earlier owner's verified endpoint before reusing this browser.
-                            if (!handoffChecked) await syncStaffAlertDevice(push, staffId, signal);
-                            handoffChecked = true;
+                            if (!serverHandoffChecked) await syncStaffAlertDevice(push, staffId, signal);
+                            serverHandoffChecked = true;
                             if (device && !deviceActive) {
                                 await syncStaffAlertDevice(push, staffId, signal, device);
                                 deviceActive = true;
-                                if (active) window.dispatchEvent(new Event(STAFF_ALERT_DEVICE_RESTORED));
+                                restored = true;
                             }
                         } else if (!device) {
-                            handoffChecked = true;
+                            serverHandoffChecked = true;
                         } else {
                             retryAt = Date.now() + 60_000;
                         }
@@ -86,7 +95,11 @@ export default function StaffNotificationBell() {
                         retryAt = permanentlyInactive ? Infinity : Date.now() + Math.min(120_000, 15_000 * 2 ** Math.min(failures++, 3));
                     }
                 }
-                if (deviceActive && device) await bindStaffOrderPush(owner, device, signal);
+                if (deviceActive && device) {
+                    deviceActive = await bindStaffOrderPush(owner, device, signal);
+                    if (!deviceActive) localHandoffChecked = false;
+                    if (deviceActive && restored && active) window.dispatchEvent(new Event(STAFF_ALERT_DEVICE_RESTORED));
+                }
                 if (active && isStandalone && supportsStaffPush()) {
                     let seen = false;
                     try {seen = localStorage.getItem(staffAlertPromptKey(staffId)) === "1";} catch { /* Allow the optional offer. */ }

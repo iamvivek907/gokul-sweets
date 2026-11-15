@@ -57,8 +57,9 @@ public class StaffPushSubscriptions {
      * Immutable result data contract.
      *
      * @param id the id
+     * @param created whether this request created the registration
      */
-    public record Result(UUID id) {}
+    public record Result(UUID id, boolean created) {}
 
     /**
      * Subscribes to staff push subscriptions data and returns the {@code Result} result.
@@ -137,7 +138,7 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.environment = ? AND s.endpoint_h
                                     + " id=?",
                             old.id());
                 }
-                return new Result(null);
+                return new Result(null, false);
             }
             Long count =
                     jdbc.queryForObject(
@@ -189,7 +190,7 @@ RETURNING s.id
                                 input.authSecret());
                 if (restored.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
                 if (old != null && old.paused()) queuePendingOrders(staffId, restored.getFirst());
-                return new Result(restored.getFirst());
+                return new Result(restored.getFirst(), false);
             }
             if (differentOwner && !old.inactive() && !sameDevice)
                 throw new ResponseStatusException(
@@ -201,7 +202,8 @@ RETURNING s.id
                         && old.staffId() == staffId
                         && old.session().equals(session)
                         && old.publicKey().equals(input.publicKey())
-                        && old.auth().equals(input.authSecret())) return new Result(old.id());
+                        && old.auth().equals(input.authSecret()))
+                    return new Result(old.id(), false);
                 jdbc.update(
                         "UPDATE staff_push_subscriptions SET revoked_at = CURRENT_TIMESTAMP,"
                                 + " endpoint_hash = ? WHERE id = ?",
@@ -222,7 +224,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     hash,
                     input.publicKey(),
                     input.authSecret());
-            return new Result(id);
+            return new Result(id, true);
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,

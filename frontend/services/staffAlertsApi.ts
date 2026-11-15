@@ -1,6 +1,6 @@
 import {ADMIN_API_BASE_URL} from "@/lib/constants";
 import {applicationServerKey} from "@/lib/notificationAlerts";
-import {bindStaffOrderPush, readOrderPushBinding, switchOrderPushOwner} from "@/lib/orderPushBinding";
+import {bindStaffOrderPush, clearFailedStaffOrderPushBinding, readOrderPushBinding, switchOrderPushOwner} from "@/lib/orderPushBinding";
 import {adminFetch} from "@/services/adminApi";
 
 export const STAFF_ALERT_DEVICE_RESTORED = "gokul-staff-alert-device-restored";
@@ -65,7 +65,12 @@ export async function enableStaffDeviceAlerts(settings: StaffAlertSettings, scop
     if (permission !== "granted") return permission;
     const timeout = AbortSignal.timeout(12000);
     const signal = scope ? AbortSignal.any([scope, timeout]) : timeout;
+    const owner = String(settings.staffId);
+    const previousDevice = readStaffAlertDevice(settings.staffId);
     let created: PushSubscription | null = null;
+    let registrationId: string | null = null;
+    let newRegistration = false;
+    let savedDevice = false;
     let expire: () => void = () => {};
     const deadline = new Promise<never>((_, reject) => {
         expire = () => reject(signal.reason);
@@ -83,24 +88,40 @@ export async function enableStaffDeviceAlerts(settings: StaffAlertSettings, scop
         }
         signal.throwIfAborted();
         const keys = subscription.toJSON().keys;
-        const result = await staffAlertsRequest<{id: string}>("/push-subscriptions", {
+        const result = await staffAlertsRequest<{id: string; created?: boolean}>("/push-subscriptions", {
             method: "POST", signal, body: JSON.stringify({expectedStaffId: settings.staffId, endpoint: subscription.endpoint, publicKey: keys?.p256dh, authSecret: keys?.auth})
         }, settings.staffId);
-        try {localStorage.setItem(staffAlertDeviceKey(settings.staffId), result.id);}
-        catch {
-            await staffAlertsRequest(`/push-subscriptions/${result.id}`, {method: "DELETE", signal: AbortSignal.timeout(8000)}, settings.staffId);
-            throw new Error("This device could not save its alert registration. Try again from Staff notifications.");
-        }
-        const owner = String(settings.staffId);
+        registrationId = result.id;
+        newRegistration = result.created ?? result.id !== previousDevice;
         await switchOrderPushOwner("staff", owner, signal, true, previousOwner).catch(() => {});
         if (!await bindStaffOrderPush(owner, result.id, signal)) {
             throw new Error("The active staff account changed. Reopen this page and try again.");
+        }
+        signal.throwIfAborted();
+        try {
+            localStorage.setItem(staffAlertDeviceKey(settings.staffId), result.id);
+            savedDevice = true;
+        } catch {
+            throw new Error("This device could not save its alert registration. Try again from Staff notifications.");
         }
         dismissStaffAlertSetup(settings.staffId);
         window.dispatchEvent(new Event(STAFF_ALERT_DEVICE_RESTORED));
         return permission;
     } catch (error) {
-        if (created) await created.unsubscribe().catch(() => false);
+        if (registrationId && newRegistration && (savedDevice || readStaffAlertDevice(settings.staffId) !== registrationId)) {
+            if (savedDevice && readStaffAlertDevice(settings.staffId) === registrationId) {
+                try {localStorage.removeItem(staffAlertDeviceKey(settings.staffId));} catch { /* Server cleanup still runs. */ }
+            }
+            await Promise.allSettled([
+                clearFailedStaffOrderPushBinding(owner, registrationId),
+                staffAlertsRequest(`/push-subscriptions/${encodeURIComponent(registrationId)}`, {
+                    method: "DELETE", signal: AbortSignal.timeout(8000)
+                }, settings.staffId),
+                created?.unsubscribe()
+            ]);
+        } else if (created && !registrationId) {
+            await created.unsubscribe().catch(() => false);
+        }
         throw error;
     } finally {signal.removeEventListener("abort", expire);}
 }

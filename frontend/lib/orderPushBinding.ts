@@ -72,12 +72,22 @@ async function closeOrderNotifications(audience: Audience) {
 
 /** Changes the device owner before restoring notifications for a different account. */
 export async function switchOrderPushOwner(audience: Audience, owner: string, signal: AbortSignal, keepCurrent = true, expectedOwner?: string | null) {
-    if (typeof caches === "undefined") return;
+    if (typeof caches === "undefined") return false;
+    let switched = true;
     await updateBinding(audience, previous => {
         if (previous?.owner === owner && (keepCurrent || !previous.registrationId)) return null;
-        if (expectedOwner !== undefined && (previous?.owner ?? null) !== expectedOwner) return null;
+        if (expectedOwner !== undefined && (previous?.owner ?? null) !== expectedOwner) {
+            switched = false;
+            return null;
+        }
         return {owner, registrationId: null};
     }, signal, () => closeOrderNotifications(audience).catch(() => {}));
+    return switched;
+}
+
+export async function clearFailedStaffOrderPushBinding(owner: string, registrationId: string) {
+    await updateBinding("staff", previous =>
+        previous?.owner === owner && previous.registrationId === registrationId ? {owner, registrationId: null} : null);
 }
 
 /** Stop displaying this account’s queued notifications after confirmed logout. */

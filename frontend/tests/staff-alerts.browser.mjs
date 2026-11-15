@@ -5,6 +5,7 @@ const {chromium} = require(process.env.PLAYWRIGHT_MODULE ?? "playwright");
 const browser = await chromium.launch({headless: true});
 const context = await browser.newContext({viewport: {width: 390, height: 844}, timezoneId: "America/Los_Angeles"});
 let testingEmail = false, restoreFailures = 0, restored = 0;
+let pauseCalls = 0;
 let bindingBeforeRestore;
 let enabled = true, registered = false, read = false, denied = true, failDisable = true, failRead = true;
 let orderStatus = "CONFIRMED", firstPreparation = true, mutations = 0;
@@ -45,7 +46,10 @@ await context.route("**/api/**", async route => {
         assert.equal(request.headers()["x-staff-csrf"], csrf);
         const payload = request.postDataJSON();
         assert.equal(payload.expectedStaffId, 12);
-        if (payload.pausePrevious) return route.fulfill({json: {id: null}});
+        if (payload.pausePrevious) {
+            pauseCalls++;
+            return route.fulfill({json: {id: null}});
+        }
         if (payload.registrationId) {
             assert.equal(payload.registrationId, registrationId);
             bindingBeforeRestore = await page.evaluate(async () => {
@@ -173,5 +177,31 @@ try {
     assert.deepEqual(bindingBeforeRestore, {owner: "12", registrationId, pending: true},
         "the phone can show a generic catch-up alert before the restore response");
     assert.equal(await page.evaluate(() => window._permissionRequests), 0);
+
+    registered = false;
+    const previousPauseCalls = pauseCalls;
+    await page.evaluate(async () => {
+        const cache = await caches.open("gokul-order-push-binding-v1");
+        await cache.put("/.__gokul-order-push/staff", new Response(JSON.stringify({owner: "13", registrationId: "previous-account"})));
+        localStorage.setItem("test-fail-staff-cache-once", "yes");
+    });
+    await page.addInitScript(() => {
+        const original = Cache.prototype.put;
+        Cache.prototype.put = function (key, value) {
+            if (String(key) === "/.__gokul-order-push/staff" && localStorage.getItem("test-fail-staff-cache-once")) {
+                localStorage.removeItem("test-fail-staff-cache-once");
+                return Promise.reject(new Error("Temporary cache failure"));
+            }
+            return original.call(this, key, value);
+        };
+    });
+    await page.reload();
+    await reconnect.waitFor();
+    assert.equal(restored, 1, "the first poll cannot stage against the old local owner");
+    assert.equal(pauseCalls, previousPauseCalls + 1, "the server handoff succeeded on the first poll");
+    await page.clock.fastForward(31_000);
+    await reconnect.waitFor({state: "hidden"});
+    assert.equal(restored, 2, "a later poll retries the local handoff after storage recovers");
+    assert.equal(pauseCalls, previousPauseCalls + 1, "the server handoff is not repeated");
     console.log("PASS: staff permission gesture, denial, registration, honest offline revoke/read, CSRF, modern mobile layout, exact order/actions, IST estimate and flag OFF.");
 } catch (error) {console.error("URL", page.url(), "BODY", (await page.locator("body").innerText()).slice(0,2500)); throw error;} finally {await browser.close();}
