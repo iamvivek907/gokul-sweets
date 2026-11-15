@@ -45,12 +45,14 @@ export default function MenuDiscoverySheet({title,children,onClose,onDismissStar
    const resolveTarget=()=>restoreFocus&&returnFocusId?document.getElementById(returnFocusId):previous?.isConnected?previous:returnFocusId?document.getElementById(returnFocusId):null;
    const target=resolveTarget();
    target?.focus({preventScroll:true});
-   if(preservePageScroll||document.activeElement===target)return;
-   // If the header is temporarily inert, retry only while focus is still unclaimed.
+   const focusAfterClose=document.activeElement;
+   if(preservePageScroll)return;
+   // A temporarily inert or removed trigger may need another frame. Preserve newer focus.
    let attempts=0;
    const restore=()=>{
     const current=resolveTarget(), focused=document.activeElement;
-    if(!current?.isConnected||focused===current||focused&&focused!==body&&focused!==root)return;
+    if(!current?.isConnected||focused===current||(current===target&&focusAfterClose===target))return;
+    if(focused&&focused!==focusAfterClose&&focused!==body&&focused!==root)return;
     current.focus({preventScroll:true});
     if(document.activeElement!==current&&attempts++<20)requestAnimationFrame(restore);
    };
