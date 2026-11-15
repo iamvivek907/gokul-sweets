@@ -72,7 +72,7 @@ SELECT e.id, u.id, 'PUSH', s.id FROM staff_order_alerts e
 JOIN staff_push_subscriptions s ON s.environment = e.environment
 JOIN staff_users u ON u.id = s.staff_id JOIN staff_sessions v ON v.token_hash = s.session_hash
 WHERE e.environment = ? AND s.revoked_at IS NULL AND s.paused_at IS NULL AND v.revoked_at IS NULL
-
+  AND v.expires_at > CURRENT_TIMESTAMP
   AND e.created_at >= s.subscribed_at AND e.created_at > CURRENT_TIMESTAMP - INTERVAL '5 minutes'
   AND (e.kind IN ('PREPARATION_DUE','PREPARATION_OVERDUE','READY_OVERDUE')
     OR NOT EXISTS (SELECT 1 FROM staff_order_alert_reads r WHERE r.event_id = e.id AND r.staff_id = u.id))
@@ -121,31 +121,7 @@ WHERE e.environment = ? AND e.kind IN ('PREPARATION_OVERDUE','READY_OVERDUE')
                     continue;
                 }
                 if (task.channel().equals("PUSH")) {
-                    Boolean live =
-                            jdbc.queryForObject(
-                                    """
-SELECT EXISTS (SELECT 1 FROM staff_push_subscriptions s JOIN staff_sessions v ON v.token_hash = s.session_hash
-JOIN staff_users u ON u.id = s.staff_id WHERE s.id = ? AND s.staff_id = ? AND s.environment = ?
-  AND s.revoked_at IS NULL AND s.paused_at IS NULL AND v.revoked_at IS NULL
-  AND u.active AND s.subscribed_at <= ?
-  AND (? IN ('PREPARATION_DUE','PREPARATION_OVERDUE','READY_OVERDUE')
-    OR NOT EXISTS (SELECT 1 FROM staff_order_alert_reads r WHERE r.event_id = ? AND r.staff_id = u.id)))
-""",
-                                    Boolean.class,
-                                    task.subscriptionId(),
-                                    task.staffId(),
-                                    alerts.scope(),
-                                    java.sql.Timestamp.from(task.event().createdAt()),
-                                    task.event().kind(),
-                                    task.event().id());
-                    if (!push.configured()
-                            || !Boolean.TRUE.equals(live)
-                            || task.event()
-                                    .createdAt()
-                                    .isBefore(java.time.Instant.now().minusSeconds(300))) {
-                        finish(task, "SKIPPED", null);
-                        continue;
-                    }
+                    if (!canSendPush(task)) continue;
                 } else if (email.recipient(task.staffId()) == null
                         || task.event().scheduledAt() == null
                         || alerts.now()
@@ -199,6 +175,58 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.id = ? AND s.staff_id = ? AND s.
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos, StaffAlertDispatcher.class, "dispatchBatch()");
+        }
+    }
+
+    /**
+     * Checks the current device and serializes a skip with reconnect's delivery update.
+     *
+     * @param task the leased push delivery
+     * @return whether the delivery is still eligible for transport
+     */
+    private boolean canSendPush(Task task) {
+        final long started = MethodTiming.start(StaffAlertDispatcher.class, "canSendPush(Task)");
+        try {
+            return Boolean.TRUE.equals(
+                    transactions.execute(
+                            status -> {
+                                var claimed =
+                                        jdbc.query(
+                                                """
+SELECT catch_up FROM staff_alert_deliveries WHERE id=? AND state='SENDING' AND lease_token=? FOR UPDATE
+""",
+                                                (rs, row) -> rs.getBoolean(1),
+                                                task.id(),
+                                                task.lease());
+                                if (claimed.isEmpty()) return false;
+                                boolean catchUp = claimed.getFirst();
+                                boolean live =
+                                        push.configured()
+                                                && Boolean.TRUE.equals(
+                                                        jdbc.queryForObject(
+                                                                """
+SELECT EXISTS (SELECT 1 FROM staff_push_subscriptions s
+JOIN staff_sessions v ON v.token_hash=s.session_hash
+JOIN staff_users u ON u.id=s.staff_id
+JOIN staff_order_alerts e ON e.id=?
+WHERE s.id=? AND s.staff_id=? AND s.environment=?
+  AND s.revoked_at IS NULL AND s.paused_at IS NULL AND v.revoked_at IS NULL
+  AND v.expires_at > CURRENT_TIMESTAMP AND u.active
+  AND (? OR (s.subscribed_at <= e.created_at AND e.created_at > CURRENT_TIMESTAMP - INTERVAL '5 minutes'
+    AND (e.kind IN ('PREPARATION_DUE','PREPARATION_OVERDUE','READY_OVERDUE')
+      OR NOT EXISTS (SELECT 1 FROM staff_order_alert_reads r WHERE r.event_id=e.id AND r.staff_id=u.id)))))
+""",
+                                                                Boolean.class,
+                                                                task.event().id(),
+                                                                task.subscriptionId(),
+                                                                task.staffId(),
+                                                                alerts.scope(),
+                                                                catchUp));
+                                if (!live) finish(task, "SKIPPED", null);
+                                return live;
+                            }));
+        } finally {
+            MethodTiming.finish(started, StaffAlertDispatcher.class, "canSendPush(Task)");
         }
     }
 

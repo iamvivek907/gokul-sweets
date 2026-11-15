@@ -109,7 +109,7 @@ public class StaffPushSubscriptions {
                     jdbc.query(
                             """
 SELECT s.id, s.staff_id, s.session_hash, s.public_key, s.auth_secret,
-  s.revoked_at IS NOT NULL OR v.revoked_at IS NOT NULL OR NOT u.active inactive
+  s.revoked_at IS NOT NULL OR v.revoked_at IS NOT NULL OR NOT u.active inactive, s.paused_at IS NOT NULL
 FROM staff_push_subscriptions s JOIN staff_sessions v ON v.token_hash = s.session_hash
 JOIN staff_users u ON u.id = s.staff_id WHERE s.environment = ? AND s.endpoint_hash = ? FOR UPDATE OF s
 """,
@@ -120,7 +120,8 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.environment = ? AND s.endpoint_h
                                             rs.getString(3),
                                             rs.getString(4),
                                             rs.getString(5),
-                                            rs.getBoolean(6)),
+                                            rs.getBoolean(6),
+                                            rs.getBoolean(7)),
                             alerts.scope(),
                             hash);
             var old = existing.isEmpty() ? null : existing.getFirst();
@@ -143,7 +144,8 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.environment = ? AND s.endpoint_h
                             """
 SELECT COUNT(*) FROM staff_push_subscriptions s JOIN staff_sessions v ON v.token_hash = s.session_hash
 JOIN staff_users u ON u.id = s.staff_id WHERE s.environment = ? AND s.staff_id = ? AND s.endpoint_hash <> ?
-  AND s.revoked_at IS NULL AND s.paused_at IS NULL AND v.revoked_at IS NULL AND u.active
+  AND s.revoked_at IS NULL AND s.paused_at IS NULL AND v.revoked_at IS NULL
+  AND v.expires_at > CURRENT_TIMESTAMP AND u.active
 """,
                             Long.class,
                             alerts.scope(),
@@ -154,6 +156,17 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.environment = ? AND s.staff_id =
                         HttpStatus.CONFLICT, "Maximum five live staff browsers.");
             if (input.registrationId() != null) {
                 // Existing-device restoration must never recreate a removed subscription.
+                var activeSession =
+                        jdbc.query(
+                                """
+SELECT token_hash FROM staff_sessions WHERE token_hash=? AND staff_id=?
+  AND revoked_at IS NULL AND expires_at>CURRENT_TIMESTAMP FOR SHARE
+""",
+                                (rs, row) -> rs.getString(1),
+                                session,
+                                staffId);
+                if (activeSession.isEmpty())
+                    throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
                 var restored =
                         jdbc.query(
                                 """
@@ -175,6 +188,7 @@ RETURNING s.id
                                 input.publicKey(),
                                 input.authSecret());
                 if (restored.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+                if (old != null && old.paused()) queuePendingOrders(staffId, restored.getFirst());
                 return new Result(restored.getFirst());
             }
             if (differentOwner && !old.inactive() && !sameDevice)
@@ -214,6 +228,41 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     __gokulMethodStartedNanos,
                     StaffPushSubscriptions.class,
                     "subscribe(long,String,Input)");
+        }
+    }
+
+    /**
+     * Queues never-delivered new-order alerts for orders still waiting for staff action.
+     *
+     * @param staffId the authenticated staff account
+     * @param deviceId the resumed registration
+     */
+    private void queuePendingOrders(long staffId, UUID deviceId) {
+        final long started =
+                MethodTiming.start(StaffPushSubscriptions.class, "queuePendingOrders(long,UUID)");
+        try {
+            jdbc.update(
+                    """
+INSERT INTO staff_alert_deliveries AS d(event_id, staff_id, channel, subscription_id, catch_up)
+SELECT e.id, u.id, 'PUSH', ?, TRUE
+FROM orders o JOIN staff_order_alerts e ON e.order_id=o.id AND e.branch_id=o.branch_id
+JOIN staff_users u ON u.id=?
+WHERE o.order_status='CONFIRMED' AND e.environment=? AND e.kind='NEW_ORDER' AND
+"""
+                            + StaffOrderAlerts.ELIGIBLE
+                            + """
+ON CONFLICT (event_id, subscription_id) WHERE channel='PUSH' DO UPDATE
+SET catch_up=TRUE, state=CASE WHEN d.state='SKIPPED' THEN 'QUEUED' ELSE d.state END,
+    attempts=CASE WHEN d.state='SKIPPED' THEN 0 ELSE d.attempts END,
+    next_attempt_at=CASE WHEN d.state='SKIPPED' THEN CURRENT_TIMESTAMP ELSE d.next_attempt_at END
+WHERE d.state IN ('QUEUED','SENDING','SKIPPED')
+""",
+                    deviceId,
+                    staffId,
+                    alerts.scope());
+        } finally {
+            MethodTiming.finish(
+                    started, StaffPushSubscriptions.class, "queuePendingOrders(long,UUID)");
         }
     }
 
@@ -292,6 +341,7 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.id = ? AND s.environment = ? AND
      * @param publicKey the public key
      * @param auth the auth
      * @param inactive the inactive
+     * @param paused whether the device was paused on sign-out
      */
     private record Existing(
             UUID id,
@@ -299,5 +349,6 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.id = ? AND s.environment = ? AND
             String session,
             String publicKey,
             String auth,
-            boolean inactive) {}
+            boolean inactive,
+            boolean paused) {}
 }

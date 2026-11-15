@@ -15,6 +15,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -49,6 +50,8 @@ public class StaffSessionService {
     private final AuthenticationManager authenticationManager;
 
     private final org.springframework.security.crypto.password.PasswordEncoder passwords;
+
+    private final TransactionTemplate transactions;
 
     private final SecureRandom random = new SecureRandom();
 
@@ -172,10 +175,32 @@ public class StaffSessionService {
                     if (!mfa.verify(user.getId(), code))
                         throw new IllegalArgumentException("Invalid authenticator code.");
                 }
-                revoke(previousCookie);
-                jdbc.update("DELETE FROM staff_login_limits WHERE username = ?", limitKey);
-                audit(user.getId(), "SIGN_IN");
-                return issue(user);
+                SignIn result =
+                        transactions.execute(
+                                status -> {
+                                    SignIn next = issue(user);
+                                    if (previousCookie != null
+                                            && previousCookie.matches("[A-Za-z0-9_-]{43}")) {
+                                        jdbc.update(
+                                                """
+UPDATE staff_push_subscriptions s SET session_hash=?
+FROM staff_sessions old
+WHERE s.session_hash=old.token_hash AND old.token_hash=? AND old.staff_id=? AND s.staff_id=old.staff_id
+  AND old.revoked_at IS NULL AND old.expires_at>? AND s.revoked_at IS NULL AND s.paused_at IS NULL
+""",
+                                                hash(next.token()),
+                                                hash(previousCookie),
+                                                user.getId(),
+                                                Timestamp.from(now));
+                                        revoke(previousCookie);
+                                    }
+                                    jdbc.update(
+                                            "DELETE FROM staff_login_limits WHERE username = ?",
+                                            limitKey);
+                                    audit(user.getId(), "SIGN_IN");
+                                    return next;
+                                });
+                return result;
             } catch (AuthenticationException | IllegalArgumentException error) {
                 jdbc.update(
                         """

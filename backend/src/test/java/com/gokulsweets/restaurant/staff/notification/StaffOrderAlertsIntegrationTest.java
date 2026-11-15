@@ -55,6 +55,7 @@ class StaffOrderAlertsIntegrationTest {
     @Autowired StaffAlertDispatcher dispatcher;
     @Autowired StaffPushSubscriptions subscriptions;
     @Autowired StaffSessionService sessions;
+    @Autowired org.springframework.security.crypto.password.PasswordEncoder passwords;
     @Autowired PlatformTransactionManager manager;
     @MockitoBean WebPushTransport push;
     @MockitoBean StaffAlertEmail email;
@@ -435,8 +436,9 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
     }
 
     @Test
-    void phoneDeliverySurvivesSessionExpiryButStopsOnSignOut() throws Exception {
-        subscriptions.subscribe(staff, cookie, input("persistent-phone-" + UUID.randomUUID()));
+    void expiredStaffSessionCannotQueueOrSendPhoneAlerts() throws Exception {
+        var device =
+                subscriptions.subscribe(staff, cookie, input("expired-phone-" + UUID.randomUUID()));
         jdbc.update(
                 "UPDATE staff_sessions SET expires_at=CURRENT_TIMESTAMP - INTERVAL '1 minute'"
                         + " WHERE token_hash=?",
@@ -445,7 +447,23 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
         alerts.paymentConfirmed(payment);
         long paid = latest();
         dispatcher.dispatchBatch();
-        verify(push)
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM staff_alert_deliveries WHERE event_id=? AND"
+                                        + " subscription_id=?",
+                                Long.class,
+                                paid,
+                                device.id()))
+                .isZero();
+
+        jdbc.update(
+                "INSERT INTO staff_alert_deliveries(event_id, staff_id, channel, subscription_id)"
+                        + " VALUES (?, ?, 'PUSH', ?)",
+                paid,
+                staff,
+                device.id());
+        dispatcher.dispatchBatch();
+        verify(push, never())
                 .sendStaff(
                         anyString(),
                         anyString(),
@@ -455,22 +473,125 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                         anyString(),
                         anyString(),
                         any(UUID.class));
+    }
 
-        sessions.revoke(cookie);
-        now(17, 0);
-        alerts.generateReminders();
-        long due = latest();
+    @Test
+    void sameAccountSignInTransfersPhoneBeforeOldSessionIsRevoked() throws Exception {
+        String username =
+                jdbc.queryForObject(
+                        "SELECT username FROM staff_users WHERE id=?", String.class, staff);
+        String password = "Staff-password-2026";
+        jdbc.update(
+                "UPDATE staff_users SET password_hash=? WHERE id=?",
+                passwords.encode(password),
+                staff);
+        String oldCookie = issueFor(staff);
+        var device =
+                subscriptions.subscribe(
+                        staff, oldCookie, input("rotated-phone-" + UUID.randomUUID()));
+        var otherCookie = issueFor(staff);
+        var otherDevice =
+                subscriptions.subscribe(
+                        staff, otherCookie, input("other-phone-" + UUID.randomUUID()));
+        alerts.paymentConfirmed(payment);
+
+        var next = sessions.login(username, password, null, "127.0.0.1", oldCookie);
+
+        assertThat(sessions.verify(oldCookie)).isNull();
+        assertThat(subscriptions.live(staff, device.id(), next.token())).isTrue();
+        assertThat(subscriptions.live(staff, otherDevice.id(), otherCookie)).isTrue();
+        dispatcher.dispatchBatch();
+        verify(push)
+                .sendStaff(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(latest()),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(device.id()));
+    }
+
+    @Test
+    void restoredPhoneAlertsOnceForAnOlderOrderThatStillNeedsAction() throws Exception {
+        var browser = input("catch-up-phone-" + UUID.randomUUID());
+        var device = subscriptions.subscribe(staff, cookie, browser);
+        var restoration =
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(), browser.publicKey(), browser.authSecret(), device.id());
+        when(push.sendStaff(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        anyLong(),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(device.id())))
+                .thenReturn(201);
+        sessions.signOut(staff, device.id(), cookie);
+        alerts.paymentConfirmed(payment);
+        long event = latest();
+        jdbc.update(
+                "UPDATE staff_order_alerts SET created_at=CURRENT_TIMESTAMP - INTERVAL '1 hour'"
+                        + " WHERE id=?",
+                event);
         dispatcher.dispatchBatch();
         verify(push, never())
                 .sendStaff(
                         anyString(),
                         anyString(),
                         anyString(),
-                        eq(due),
+                        eq(event),
                         anyString(),
                         anyString(),
                         anyString(),
-                        any(UUID.class));
+                        eq(device.id()));
+
+        var next = issueFor(staff);
+        subscriptions.subscribe(staff, next, restoration);
+        dispatcher.dispatchBatch();
+        sessions.signOut(staff, device.id(), next);
+        subscriptions.subscribe(staff, issueFor(staff), restoration);
+        dispatcher.dispatchBatch();
+
+        verify(push, times(1))
+                .sendStaff(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(event),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(device.id()));
+    }
+
+    @Test
+    void restoredPhoneSkipsCatchUpWhenAnotherDeviceStartsTheOrder() throws Exception {
+        var browser = input("handled-order-" + UUID.randomUUID());
+        var device = subscriptions.subscribe(staff, cookie, browser);
+        sessions.signOut(staff, device.id(), cookie);
+        alerts.paymentConfirmed(payment);
+        var restoration =
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(), browser.publicKey(), browser.authSecret(), device.id());
+        subscriptions.subscribe(staff, issueFor(staff), restoration);
+
+        status("PREPARING");
+        dispatcher.dispatchBatch();
+
+        verify(push, never())
+                .sendStaff(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(latest()),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(device.id()));
     }
 
     @Test
