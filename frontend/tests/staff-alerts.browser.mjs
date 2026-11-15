@@ -12,13 +12,17 @@ const csrf = "test-only-staff-csrf";
 const base = process.env.BROWSER_BASE ?? "http://127.0.0.1:3311";
 await context.addInitScript(() => {
     window._permissionRequests = 0;
-    class Notification {static permission = "default"; static async requestPermission() {
-        window._permissionRequests++; this.permission = window._denyPush ? "denied" : "granted"; return this.permission;
+    Object.defineProperty(navigator, "standalone", {value: localStorage.getItem("test-installed") === "yes"});
+    class Notification {static permission = localStorage.getItem("test-notification-permission") ?? "default"; static async requestPermission() {
+        window._permissionRequests++;
+        this.permission = window._denyPush ? "denied" : "granted";
+        if (navigator.standalone) localStorage.setItem("test-notification-permission", this.permission);
+        return this.permission;
     }}
     Object.defineProperty(window, "Notification", {value: Notification, configurable: true});
     const subscription = {endpoint: "https://fcm.googleapis.com/fcm/send/staff-browser-test", toJSON: () => ({keys: {p256dh: "test-key", auth: "test-auth"}}), async unsubscribe() {return true;}};
     const registration = {async showNotification(title,options){window._testNotification={title,options};},pushManager: {async getSubscription() {return subscription;}, async subscribe() {return subscription;}}};
-    Object.defineProperty(navigator, "serviceWorker", {value: {async register() {return registration;}, ready: Promise.resolve(registration), async getRegistration() {return registration;}, async getRegistrations() {return [];}}});
+    Object.defineProperty(navigator, "serviceWorker", {value: Object.assign(new EventTarget(), {async register() {return registration;}, ready: Promise.resolve(registration), async getRegistration() {return registration;}, async getRegistrations() {return [];}})});
 });
 const order = () => ({orderNumber: "STAFF-ORDER", branchId: 1, branchName: "Main branch", branchAddress: "Test branch",
     customerName: "Test customer", customerPhone: "9876543210", pickupDate: "2026-10-01", pickupStartTime: "18:00", pickupEndTime: "18:30",
@@ -110,5 +114,31 @@ try {
     await page.getByText("Staff alerts are not enabled yet.", {exact: false}).waitFor();
     assert.equal(await page.getByRole("button", {name: "Enable staff push for this browser"}).count(), 0);
     assert.equal(await page.getByRole("link", {name: /Staff alerts,/}).count(), 0);
+    enabled = true;
+    await page.setViewportSize({width: 390, height: 844});
+    await page.evaluate(() => {
+        localStorage.setItem("test-installed", "yes");
+        for (const key of Object.keys(localStorage)) if (key.startsWith("gokul-staff-push:")) localStorage.removeItem(key);
+    });
+    await page.goto(`${base}/admin/order-desk`);
+    const setup = page.getByRole("region", {name: "Get order alerts on this phone"});
+    await setup.waitFor();
+    assert.equal(await page.evaluate(() => window._permissionRequests), 0);
+    await setup.getByRole("button", {name: "Not now"}).click();
+    await page.reload();
+    await page.getByRole("link", {name: /Staff alerts,/}).waitFor();
+    assert.equal(await setup.count(), 0, "a skipped setup stays quiet after reload");
+    await page.evaluate(() => {
+        for (const key of Object.keys(localStorage)) if (key.endsWith(":setup-seen")) localStorage.removeItem(key);
+    });
+    await page.reload();
+    await setup.getByRole("button", {name: "Enable phone alerts"}).click();
+    await setup.waitFor({state: "hidden"});
+    assert.equal(await page.evaluate(() => window._permissionRequests), 1);
+    assert.equal(registered, true);
+    await page.reload();
+    await page.getByRole("link", {name: /Staff alerts,/}).waitFor();
+    assert.equal(await setup.count(), 0, "an enrolled phone does not get another setup offer");
+    assert.equal(await page.evaluate(() => window._permissionRequests), 0);
     console.log("PASS: staff permission gesture, denial, registration, honest offline revoke/read, CSRF, modern mobile layout, exact order/actions, IST estimate and flag OFF.");
 } catch (error) {console.error("URL", page.url(), "BODY", (await page.locator("body").innerText()).slice(0,2500)); throw error;} finally {await browser.close();}

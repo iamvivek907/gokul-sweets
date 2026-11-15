@@ -1,8 +1,26 @@
 import {ADMIN_API_BASE_URL} from "@/lib/constants";
+import {applicationServerKey} from "@/lib/notificationAlerts";
 import {adminFetch} from "@/services/adminApi";
 
 export const STAFF_ALERT_DEVICE_RESTORED = "gokul-staff-alert-device-restored";
 export const staffAlertDeviceKey = (staffId?: number) => `gokul-staff-push:${ADMIN_API_BASE_URL}:${staffId}`;
+
+export const staffAlertPromptKey = (staffId: number) => `${staffAlertDeviceKey(staffId)}:setup-seen`;
+
+export function readStaffAlertDevice(staffId: number) {
+    try {
+        const id = localStorage.getItem(staffAlertDeviceKey(staffId));
+        return id && /^[0-9a-f-]{36}$/i.test(id) ? id : null;
+    } catch {return null;}
+}
+
+export function supportsStaffPush() {
+    return window.isSecureContext && "Notification" in window && "PushManager" in window && "serviceWorker" in navigator;
+}
+
+export function dismissStaffAlertSetup(staffId: number) {
+    try {localStorage.setItem(staffAlertPromptKey(staffId), "1");} catch { /* This visit still honours dismissal. */ }
+}
 
 export type StaffAlertSettings = {enabled: boolean; environment: string; staffId: number; pushConfigured: boolean;
     applicationServerKey: string | null; deviceActive: boolean; emailConfigured: boolean; emailTestRouting?: boolean; reminderMinutes: number; escalationMinutes: number};
@@ -15,4 +33,47 @@ export async function staffAlertsRequest<T>(path = "", init?: RequestInit): Prom
     const response = await adminFetch(`/api/admin/notifications${path}`, "staff-session", {...init, headers});
     if (!response.ok) throw new Error(response.status === 401 ? "Sign in again to use staff alerts." : "Could not confirm this change. Check your connection and try again.");
     return response.status === 204 ? undefined as T : response.json() as Promise<T>;
+}
+
+
+/** Start this call from the staff member's tap, before any asynchronous work. */
+export async function enableStaffDeviceAlerts(settings: StaffAlertSettings, scope?: AbortSignal): Promise<NotificationPermission> {
+    if (!settings.applicationServerKey) throw new Error("Staff notifications are unavailable.");
+    scope?.throwIfAborted();
+    const permission = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
+    if (permission !== "granted") return permission;
+    const timeout = AbortSignal.timeout(12000);
+    const signal = scope ? AbortSignal.any([scope, timeout]) : timeout;
+    let created: PushSubscription | null = null;
+    let expire: () => void = () => {};
+    const deadline = new Promise<never>((_, reject) => {
+        expire = () => reject(signal.reason);
+        signal.addEventListener("abort", expire, {once: true});
+    });
+    try {
+        signal.throwIfAborted();
+        const registration = await Promise.race([navigator.serviceWorker.register("/sw.js"), deadline]);
+        if (!registration.active) await Promise.race([navigator.serviceWorker.ready, deadline]);
+        let subscription = await Promise.race([registration.pushManager.getSubscription(), deadline]);
+        if (!subscription) {
+            subscription = await registration.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: applicationServerKey(settings.applicationServerKey)});
+            created = subscription;
+        }
+        signal.throwIfAborted();
+        const keys = subscription.toJSON().keys;
+        const result = await staffAlertsRequest<{id: string}>("/push-subscriptions", {
+            method: "POST", signal, body: JSON.stringify({endpoint: subscription.endpoint, publicKey: keys?.p256dh, authSecret: keys?.auth})
+        });
+        try {localStorage.setItem(staffAlertDeviceKey(settings.staffId), result.id);}
+        catch {
+            await staffAlertsRequest(`/push-subscriptions/${result.id}`, {method: "DELETE", signal: AbortSignal.timeout(8000)});
+            throw new Error("This device could not save its alert registration. Try again from Staff notifications.");
+        }
+        dismissStaffAlertSetup(settings.staffId);
+        window.dispatchEvent(new Event(STAFF_ALERT_DEVICE_RESTORED));
+        return permission;
+    } catch (error) {
+        if (created) await created.unsubscribe().catch(() => false);
+        throw error;
+    } finally {signal.removeEventListener("abort", expire);}
 }

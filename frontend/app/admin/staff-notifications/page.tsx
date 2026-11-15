@@ -6,10 +6,9 @@ import {useCallback, useEffect, useState} from "react";
 import Link from "next/link";
 import {usePwaInstall} from "@/hooks/usePwaInstall";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
-import {applicationServerKey} from "@/lib/notificationAlerts";
 import {formatBusinessTimestamp} from "@/lib/businessTime";
 import NotificationIcon from "@/components/customer/NotificationIcon";
-import {STAFF_ALERT_DEVICE_RESTORED, staffAlertDeviceKey, staffAlertsRequest, type StaffAlertSettings, type StaffInbox} from "@/services/staffAlertsApi";
+import {STAFF_ALERT_DEVICE_RESTORED, dismissStaffAlertSetup, enableStaffDeviceAlerts, readStaffAlertDevice, staffAlertDeviceKey, staffAlertsRequest, supportsStaffPush, type StaffAlertSettings, type StaffInbox} from "@/services/staffAlertsApi";
 
 export default function StaffNotificationsPage() {
     const {profile, hasPermission} = useAdminAuth();
@@ -28,17 +27,16 @@ export default function StaffNotificationsPage() {
     const [supported, setSupported] = useState(false);
     const key = staffAlertDeviceKey(profile?.staffId);
     const load = useCallback(async (signal?: AbortSignal) => {
-        let device: string | null = null;
-        try {device = localStorage.getItem(key); if (device && !/^[0-9a-f-]{36}$/i.test(device)) device = null;} catch { /* inbox works without storage */ }
+        const device = profile ? readStaffAlertDevice(profile.staffId) : null;
         const next = await staffAlertsRequest<StaffAlertSettings>(`/settings${device ? `?deviceId=${encodeURIComponent(device)}` : ""}`, {signal});
         if (signal?.aborted) return;
         setSettings(next); setDeviceId(device); setPermission("Notification" in window ? Notification.permission : "default");
-        setSupported(window.isSecureContext && "Notification" in window && "PushManager" in window && "serviceWorker" in navigator);
+        setSupported(supportsStaffPush());
         if (next.enabled) {
             const result = await staffAlertsRequest<StaffInbox>(`?${query}`, {signal});
             if (!signal?.aborted) {setInbox(result);}
         }
-    }, [key, query]);
+    }, [profile, query]);
     useEffect(() => {
         if (!profile || !hasPermission("ORDER_VIEW")) return;
         const controller = new AbortController();
@@ -72,25 +70,13 @@ export default function StaffNotificationsPage() {
     }
     async function enablePush() {
         if (!settings?.applicationServerKey || !supported) return;
-        let created: PushSubscription | null = null;
-        // Permission request must be invoked directly from the click, before any await.
-        const requested = Notification.requestPermission();
         await perform(async () => {
-            const choice = await requested; setPermission(choice);
+            const choice = await enableStaffDeviceAlerts(settings);
+            setPermission(choice);
             if (choice !== "granted") {setMessage("Push permission was not granted. Staff alerts remain in this inbox and the preparation queue."); return;}
-            try {
-                const registration = await navigator.serviceWorker.register("/sw.js"); await navigator.serviceWorker.ready;
-                let subscription = await registration.pushManager.getSubscription();
-                if (!subscription) {subscription = await registration.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: applicationServerKey(settings.applicationServerKey!)}); created = subscription;}
-                const keys = subscription.toJSON().keys;
-                const result = await staffAlertsRequest<{id: string}>("/push-subscriptions", {method: "POST", body: JSON.stringify({endpoint: subscription.endpoint, publicKey: keys?.p256dh, authSecret: keys?.auth})});
-                setDeviceId(result.id);
-                try {localStorage.setItem(key, result.id);} catch {
-                    await staffAlertsRequest(`/push-subscriptions/${result.id}`, {method: "DELETE"});
-                    setDeviceId(null); throw new Error("This browser cannot remember its registration. Staff push was disabled; use the queue.");
-                }
-                await load(); setMessage("Staff push is registered for this signed-in browser. This phone stays registered through normal sign-in expiry.");
-            } catch (reason) {if (created) await created.unsubscribe().catch(() => false); throw reason;}
+            setDeviceId(readStaffAlertDevice(settings.staffId));
+            await load();
+            setMessage("This phone stays registered through normal sign-in expiry.");
         });
     }
     async function testDeviceSound() {
@@ -146,7 +132,7 @@ export default function StaffNotificationsPage() {
                     <button type="button" disabled={busy || needsHomeScreen || !supported || !settings.pushConfigured || permission === "denied"} onClick={() => void enablePush()} className="min-h-11 rounded-xl bg-[#173c39] px-4 text-sm font-semibold text-white disabled:opacity-50">{settings.deviceActive ? "Check staff registration" : "Enable staff push for this browser"}</button>
                     {deviceId && <button type="button" disabled={busy} onClick={() => void perform(async () => {
                         await staffAlertsRequest(`/push-subscriptions/${deviceId}`, {method: "DELETE"});
-                        setDeviceId(null); try {localStorage.removeItem(key);} catch { /* server revocation succeeded */ }
+                        setDeviceId(null); dismissStaffAlertSetup(settings.staffId); try {localStorage.removeItem(key);} catch { /* server revocation succeeded */ }
                         await load(); setMessage("Staff push disabled for this browser. An already accepted notification may still arrive.");
                     })} className="min-h-11 rounded-xl border px-4 text-sm">Disable staff push</button>}
                 </div>

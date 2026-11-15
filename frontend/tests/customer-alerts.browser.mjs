@@ -27,8 +27,8 @@ await context.addInitScript(() => {
         if (!options.userVisibleOnly) throw new Error("Invisible subscription");
         window._pushSubscriptions++; subscribed = subscription; return subscription;
     }}, async unregister() {return true;}};
-    Object.defineProperty(navigator, "serviceWorker", {value: {async register() {return registration;}, ready: Promise.resolve(registration),
-        async getRegistration() {return registration;}, async getRegistrations() {return [];}}});
+    Object.defineProperty(navigator, "serviceWorker", {value: Object.assign(new EventTarget(), {async register() {return registration;}, ready: Promise.resolve(registration),
+        async getRegistration() {return registration;}, async getRegistrations() {return [];}})});
 });
 await context.route("**/api/**", async route => {
     const path = new URL(route.request().url()).pathname;
