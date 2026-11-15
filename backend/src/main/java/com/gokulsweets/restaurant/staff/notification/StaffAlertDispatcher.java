@@ -255,7 +255,7 @@ SELECT e.*, COALESCE(o.order_number,'Request '||LEFT(e.enquiry_id::text,8)) orde
 JOIN staff_order_alerts e ON e.id = d.event_id LEFT JOIN orders o ON o.id = e.order_id
 LEFT JOIN staff_push_subscriptions s ON s.id = d.subscription_id
 WHERE e.environment = ? AND d.state = 'QUEUED' AND d.next_attempt_at <= CURRENT_TIMESTAMP
-ORDER BY d.id LIMIT 1 FOR UPDATE OF d SKIP LOCKED
+ORDER BY d.catch_up, d.id LIMIT 1 FOR UPDATE OF d SKIP LOCKED
 """,
                             (rs, row) ->
                                     new Task(

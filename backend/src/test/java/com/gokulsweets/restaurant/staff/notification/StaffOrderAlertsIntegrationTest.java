@@ -501,12 +501,13 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
         assertThat(subscriptions.live(staff, device.id(), next.token())).isTrue();
         assertThat(subscriptions.live(staff, otherDevice.id(), otherCookie)).isTrue();
         dispatcher.dispatchBatch();
+        long event = latest();
         verify(push)
                 .sendStaff(
                         anyString(),
                         anyString(),
                         anyString(),
-                        eq(latest()),
+                        eq(event),
                         anyString(),
                         anyString(),
                         anyString(),
@@ -581,13 +582,109 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
 
         status("PREPARING");
         dispatcher.dispatchBatch();
-
+        long event = latest();
         verify(push, never())
                 .sendStaff(
                         anyString(),
                         anyString(),
                         anyString(),
-                        eq(latest()),
+                        eq(event),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(device.id()));
+    }
+
+    @Test
+    void livePreparationAlertSendsBeforeAnOlderCatchUp() throws Exception {
+        var browser = input("priority-phone-" + UUID.randomUUID());
+        var device = subscriptions.subscribe(staff, cookie, browser);
+        sessions.signOut(staff, device.id(), cookie);
+        alerts.paymentConfirmed(payment);
+        long paid = latest();
+        subscriptions.subscribe(
+                staff,
+                issueFor(staff),
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(),
+                        browser.publicKey(),
+                        browser.authSecret(),
+                        device.id()));
+        now(17, 0);
+        alerts.generateReminders();
+        long due = latest();
+
+        dispatcher.dispatchBatch();
+
+        assertThat(due).isNotEqualTo(paid);
+        var order = inOrder(push);
+        order.verify(push)
+                .sendStaff(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(due),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(device.id()));
+        order.verify(push)
+                .sendStaff(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(paid),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(device.id()));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"503, 1", "429, 1", "400, 0"})
+    void reconnectGrantsOnlyOneExtraAttemptForAnExhaustedTransientFailure(
+            int previousStatus, int extraAttempts) throws Exception {
+        var browser = input("retry-phone-" + UUID.randomUUID());
+        var device = subscriptions.subscribe(staff, cookie, browser);
+        var restoration =
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(), browser.publicKey(), browser.authSecret(), device.id());
+        alerts.paymentConfirmed(payment);
+        long event = latest();
+        jdbc.update(
+                """
+INSERT INTO staff_alert_deliveries(event_id, staff_id, channel, subscription_id, state, attempts, last_http_status)
+VALUES (?, ?, 'PUSH', ?, 'FAILED', 3, ?)
+""",
+                event,
+                staff,
+                device.id(),
+                previousStatus);
+        when(push.sendStaff(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(event),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(device.id())))
+                .thenReturn(503);
+
+        sessions.signOut(staff, device.id(), cookie);
+        String next = issueFor(staff);
+        subscriptions.subscribe(staff, next, restoration);
+        dispatcher.dispatchBatch();
+        sessions.signOut(staff, device.id(), next);
+        subscriptions.subscribe(staff, issueFor(staff), restoration);
+        dispatcher.dispatchBatch();
+
+        verify(push, times(extraAttempts))
+                .sendStaff(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(event),
                         anyString(),
                         anyString(),
                         anyString(),

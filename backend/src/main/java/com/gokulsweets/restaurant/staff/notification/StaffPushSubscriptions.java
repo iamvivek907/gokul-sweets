@@ -252,10 +252,15 @@ WHERE o.order_status='CONFIRMED' AND e.environment=? AND e.kind='NEW_ORDER' AND
                             + StaffOrderAlerts.ELIGIBLE
                             + """
 ON CONFLICT (event_id, subscription_id) WHERE channel='PUSH' DO UPDATE
-SET catch_up=TRUE, state=CASE WHEN d.state='SKIPPED' THEN 'QUEUED' ELSE d.state END,
-    attempts=CASE WHEN d.state='SKIPPED' THEN 0 ELSE d.attempts END,
-    next_attempt_at=CASE WHEN d.state='SKIPPED' THEN CURRENT_TIMESTAMP ELSE d.next_attempt_at END
+SET catch_up=TRUE,
+    state=CASE WHEN d.state IN ('SKIPPED','FAILED') THEN 'QUEUED' ELSE d.state END,
+    attempts=CASE WHEN d.state='FAILED' OR (d.state='SKIPPED' AND d.reconnect_retry_used) THEN 2
+                  WHEN d.state='SKIPPED' THEN 0 ELSE d.attempts END,
+    next_attempt_at=CASE WHEN d.state IN ('SKIPPED','FAILED') THEN CURRENT_TIMESTAMP ELSE d.next_attempt_at END,
+    reconnect_retry_used=d.reconnect_retry_used OR d.state='FAILED'
 WHERE d.state IN ('QUEUED','SENDING','SKIPPED')
+   OR (d.state='FAILED' AND d.attempts=3 AND NOT d.reconnect_retry_used
+       AND (d.last_http_status IS NULL OR d.last_http_status=429 OR d.last_http_status>=500))
 """,
                     deviceId,
                     staffId,
