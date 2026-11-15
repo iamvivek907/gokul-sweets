@@ -7,6 +7,7 @@ import com.gokulsweets.restaurant.branch.Branch;
 import com.gokulsweets.restaurant.config.EnhancementProperties;
 import com.gokulsweets.restaurant.inventory.dto.CustomerInventoryCheckRequest;
 import com.gokulsweets.restaurant.inventory.service.CustomerInventoryAvailabilityService;
+import com.gokulsweets.restaurant.menu.MenuCatalogService;
 import com.gokulsweets.restaurant.menu.MenuService;
 import com.gokulsweets.restaurant.order.entity.Order;
 import com.gokulsweets.restaurant.order.enums.*;
@@ -32,6 +33,7 @@ class PickupAddOnTest {
             new PickupAddOnService(
                     jdbc,
                     menu,
+                    mock(MenuCatalogService.class),
                     inventory,
                     orders,
                     validation,

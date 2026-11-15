@@ -3,6 +3,7 @@ package com.gokulsweets.restaurant.recommendation;
 import com.gokulsweets.restaurant.config.EnhancementProperties;
 import com.gokulsweets.restaurant.inventory.dto.CustomerInventoryCheckRequest;
 import com.gokulsweets.restaurant.inventory.service.CustomerInventoryAvailabilityService;
+import com.gokulsweets.restaurant.menu.MenuCatalogService;
 import com.gokulsweets.restaurant.menu.MenuService;
 import com.gokulsweets.restaurant.menu.dto.MenuProductResponse;
 import com.gokulsweets.restaurant.observability.MethodTiming;
@@ -34,6 +35,8 @@ public class PickupAddOnService {
     private final JdbcTemplate jdbc;
 
     private final MenuService menu;
+
+    private final MenuCatalogService catalog;
 
     private final CustomerInventoryAvailabilityService inventory;
 
@@ -286,16 +289,16 @@ public class PickupAddOnService {
                     && (!order.getPickupSlot().getId().equals(pickupSlotId)
                             || order.getPickupType() != pickupType))
                 throw new IllegalArgumentException("Review the reserved pickup slot.");
+            // An explicit pickup uses the branch catalogue. The slot check below
+            // evaluates service windows, capacity, and stock at the selected time.
+            var categories =
+                    pickupSlotId == null ? menu.getMenu(branch) : catalog.get(branch).categories();
             var products = new HashMap<Long, MenuProductResponse>();
-            menu.getMenu(branch)
-                    .forEach(
-                            c ->
-                                    c.products()
-                                            .forEach(
-                                                    p -> {
-                                                        if (p.available())
-                                                            products.put(p.id(), p);
-                                                    }));
+            for (var category : categories) {
+                for (var product : category.products()) {
+                    if (product.available()) products.put(product.id(), product);
+                }
+            }
             boolean collectTax =
                     Boolean.TRUE.equals(
                             jdbc.queryForObject(
@@ -376,8 +379,9 @@ WHERE pairs.n>=3 AND (pairs.a IN (
                 long seed = a ? row[0] : row[1],
                         candidate = a ? row[1] : row[0],
                         seedOrders = a ? row[3] : row[4];
-                if (seedOrders < 5 || row[2] > seedOrders || !candidatesWithPrices.contains(candidate))
-                    continue;
+                if (seedOrders < 5
+                        || row[2] > seedOrders
+                        || !candidatesWithPrices.contains(candidate)) continue;
                 double confidence = (double) row[2] / seedOrders;
                 if (confidence < .1) continue;
                 var pair = new Pair(seed, candidate, confidence, row[2]);

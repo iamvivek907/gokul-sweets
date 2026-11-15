@@ -63,7 +63,7 @@ export default function MobileMenuSuggestions({branchId,products,groups=[],picku
   const deadline=AbortSignal.any([c.signal,AbortSignal.timeout(8000)]);
   void retryMenuRead(signal=>apiClient<Suggestion[]>(`/api/menu/pickup-addons?branchId=${branchId}${slotQuery}`,{
    method:"POST",body:request,credentials:"include",signal
-  }),deadline,3000)
+  }),deadline)
    .then(items=>{if(!c.signal.aborted)setBranchResult({key,items:Array.isArray(items)?items.filter(item=>Number.isSafeInteger(item?.product?.id)&&typeof item.reason==="string"&&Number.isFinite(item.portionTotal)&&(item.weightGrams===null||Number.isSafeInteger(item.weightGrams)&&item.weightGrams>0)):[]});})
    .catch(()=>{if(!c.signal.aborted)setBranchResult({key,items:[]});});
   return()=>c.abort();

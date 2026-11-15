@@ -7,7 +7,7 @@ const product=(id,name,categoryId,categoryName,price)=>({id,name,categoryId,cate
 const sweets=[product(1,'Rasgulla',1,'Sweets',15),{...product(2,'Gulab Jamun',1,'Sweets',500),saleMode:'WEIGHT',minimumWeightGrams:250,weightStepGrams:50}],dairy=[product(3,'Dahi 200 g',2,'Dairy',25),product(4,'Dahi 400 g',2,'Dairy',50),product(5,'Dahi 1 kg',2,'Dairy',120),product(6,'Dahi 5 kg',2,'Dairy',550)],snacks=[product(7,'Butter biscuits',3,'Snacks',40),product(8,'Namkeen',3,'Snacks',60)],products=[...sweets,...dairy,...snacks];
 const groups=[{key:'dahi',title:'Dahi',choices:dairy.map(p=>({productId:p.id,label:p.name.replace('Dahi ','')+' pack'}))}],slot={id:1,branchId:1,slotDate:date,startTime:'18:00:00',endTime:'19:00:00',active:true,remainingCapacity:20,priorityEnabled:false};
 const browser=await chromium.launch({headless:true});
-try{for(const width of [320,390,640]){for(const outcome of ["populated","empty","failed",...(width===390?["no-verified-pairings","recovered"]:[])]){
+try{for(const width of [320,390,640]){for(const outcome of ["populated","empty","failed",...(width===390?["no-verified-pairings","recovered","slow-pairings"]:[])]){
  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',reducedMotion:width===640?'reduce':'no-preference'}),page=await context.newPage();page.setDefaultTimeout(15000);let blockRasgulla=false,delay=false,releaseOffers,releasePairings;let pairingCalls=0;const offersGate=new Promise(resolve=>releaseOffers=resolve),pairingsGate=new Promise(resolve=>releasePairings=resolve);const errors=[];page.on('pageerror',e=>errors.push(e.message));
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type'};
  await context.route('**/api/**',async route=>{const path=new URL(route.request().url()).pathname;let json=[];
@@ -18,7 +18,7 @@ try{for(const width of [320,390,640]){for(const outcome of ["populated","empty",
   else if(path==='/api/menu/offers'){await offersGate;if(outcome==='failed')return route.fulfill({status:503,json:{message:'Unavailable'},headers});json=outcome==='empty'?[]:[{rebateId:3,code:'PUBLIC20',name:'Public offer',description:'Standard pickup',rebateType:'FIXED_AMOUNT',rebateValue:20,minimumOrderAmount:200,maximumDiscountAmount:null,tiers:[]}];}else if(path==='/api/menu/portion-groups')json={version:1,groups};
   else if(path==='/api/storefront/customer-identity')json={enabled:true};else if(path==='/api/customer/identity/me')json={authenticated:true,name:'Vivek',phone:'+919876543210'};
   else if(path.endsWith('/availability')){if(delay)await new Promise(r=>setTimeout(r,1500));json={today:date,maximumDate:date,dates:[{date,available:true,items:products.map(p=>({productId:p.id,available:p.id!==6&&!(p.id===2&&outcome==='no-verified-pairings')&&!(p.id===1&&blockRasgulla),code:p.id===6?'NO_INVENTORY':p.id===1&&blockRasgulla?'QUANTITY_TOO_LARGE':null})),slots:[{slot,normalAvailable:true,priorityAvailable:false,issues:[]}]}]};}
-  else if(path==='/api/menu/pickup-addons'){await pairingsGate;pairingCalls++;if(outcome==='failed'||outcome==='no-verified-pairings')return route.fulfill({status:400,json:{message:'Choose distinct products available at this branch.'},headers});if(outcome==='recovered'&&pairingCalls===1)return route.fulfill({status:503,json:{message:'Unavailable'},headers});json=outcome==='empty'?[]:[snacks[0],dairy[1],dairy[0],sweets[1]].map(product=>({product,weightGrams:product.saleMode==='WEIGHT'?250:null,portionPrice:product.saleMode==='WEIGHT'?125:product.price,portionTotal:product.saleMode==='WEIGHT'?125:product.price,reason:'Something extra',slotVerified:true,includesTax:true}));}else if(path==='/api/menu/pickup-addons/check')json={orderable:true};
+  else if(path==='/api/menu/pickup-addons'){await pairingsGate;pairingCalls++;if(outcome==='failed'||outcome==='no-verified-pairings')return route.fulfill({status:400,json:{message:'Choose distinct products available at this branch.'},headers});if(outcome==='recovered'&&pairingCalls===1)return route.fulfill({status:503,json:{message:'Unavailable'},headers});if(outcome==='slow-pairings')await new Promise(resolve=>setTimeout(resolve,3500));json=outcome==='empty'?[]:[snacks[0],dairy[1],dairy[0],sweets[1]].map(product=>({product,weightGrams:product.saleMode==='WEIGHT'?250:null,portionPrice:product.saleMode==='WEIGHT'?125:product.price,portionTotal:product.saleMode==='WEIGHT'?125:product.price,reason:'Something extra',slotVerified:true,includesTax:true}));}else if(path==='/api/menu/pickup-addons/check')json={orderable:true};
   await route.fulfill({json,headers}).catch(()=>{});
  });
  await context.addInitScript(({branch,date,slot})=>{localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date}));localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify({date,slot,pickupType:'NORMAL'}));},{branch,date,slot});
@@ -39,7 +39,9 @@ try{for(const width of [320,390,640]){for(const outcome of ["populated","empty",
   await page.getByRole('button',{name:'All',exact:true}).click();await page.locator('#gokul-product-7').waitFor();
  }
  await row.getByRole('button',{name:'Add Rasgulla to cart',exact:true}).click();await page.locator('.mobile-menu-pairing-skeleton').waitFor();
+ const slowResponse=outcome==='slow-pairings'?page.waitForResponse(response=>new URL(response.url()).pathname==='/api/menu/pickup-addons'&&response.ok(),{timeout:7000}):null;
  const next=page.locator('#gokul-product-3'),pairingBefore=await documentY(next);releasePairings();
+ if(slowResponse)await slowResponse;
  if(outcome==='no-verified-pairings'){
   await page.getByRole('region',{name:'Pairs well with your selection'}).waitFor({state:'hidden'});
   assert.ok(await documentY(next)<pairingBefore,'the empty rail reclaims its space');
@@ -49,6 +51,7 @@ try{for(const width of [320,390,640]){for(const outcome of ["populated","empty",
  }
  assert.equal(await page.getByText('We couldn’t load pairings. Try again.',{exact:true}).count(),0);
  assert.equal(await page.getByRole('button',{name:'Retry pairings',exact:true}).count(),0);
+ if(slowResponse)assert.equal(pairingCalls,1,'an in-budget response completes on the first attempt');
  if(outcome==='recovered')assert.ok(pairingCalls>=2,'a transient request recovers without a prompt');
  if(outcome==='populated'){
   assert.equal(await page.locator('.mobile-menu-pairings-inline').getByRole('heading',{name:'Butter biscuits',exact:true}).count(),0,'unrelated generic suggestions are omitted');
