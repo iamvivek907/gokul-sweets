@@ -196,6 +196,7 @@ function todayInBusinessZone() {
 
 function sameStaffDetails(original: AdminStaff, current: AdminStaff) {
     return original.id === current.id
+        && original.updatedAt === current.updatedAt
         && original.fullName === current.fullName
         && original.phone === current.phone
         && original.roleName === current.roleName
@@ -314,6 +315,7 @@ export default function AdminStaffPage() {
     const [loadAttempt, setLoadAttempt] = useState(0);
     const loadedStaff = useRef(false);
     const mutation = useRef<AbortController | null>(null);
+    const writeRevision = useRef(0);
     const [editingSnapshot, setEditingSnapshot] = useState<AdminStaff | null>(null);
     useEffect(() => () => mutation.current?.abort(), []);
 
@@ -491,13 +493,17 @@ export default function AdminStaffPage() {
                 new AbortController();
 
 
-            const initialLoad = !loadedStaff.current;
-            const listRequest = getAdminStaff(authorization, controller.signal);
-            const optionsRequest = initialLoad ? getAdminStaffOptions(authorization, controller.signal) : null;
-
-            Promise.all([listRequest, optionsRequest])
-                .then(([staffResult, optionsResult]) => {
-                    if (controller.signal.aborted) return;
+            const session = authorization;
+            let pending = false;
+            function refresh() {
+                if (pending || mutation.current || controller.signal.aborted || document.visibilityState !== "visible") return;
+                pending = true;
+                const attempt = writeRevision.current;
+                const initialLoad = !loadedStaff.current;
+                const list = getAdminStaff(session, controller.signal);
+                const options = initialLoad ? getAdminStaffOptions(session, controller.signal) : null;
+                void Promise.all([list, options]).then(([staffResult, optionsResult]) => {
+                    if (controller.signal.aborted || mutation.current || attempt !== writeRevision.current) return;
                     setStaff(staffResult);
                     if (optionsResult) {
                         const firstStaff = staffResult[0] ?? null;
@@ -508,33 +514,24 @@ export default function AdminStaffPage() {
                         loadedStaff.current = true;
                     }
                     setLoading(false);
-                })
-                .catch(
-                    exception => {
-
-                        if (controller.signal.aborted) {
-
-                            return;
-                        }
-
-
-                        setError(
-                            exception instanceof Error
-                                ? exception.message
-                                : "Unable to load staff management."
-                        );
-
-
-                        setLoading(
-                            false
-                        );
+                }).catch(exception => {
+                    if (!controller.signal.aborted && initialLoad) {
+                        setError(exception instanceof Error ? exception.message : "Unable to load staff management.");
+                        setLoading(false);
                     }
-                );
-
+                }).finally(() => {pending = false;});
+            }
+            refresh();
+            const timer = window.setInterval(refresh, 30_000);
+            window.addEventListener("focus", refresh);
+            document.addEventListener("visibilitychange", refresh);
 
             return () => {
 
                 controller.abort();
+                window.clearInterval(timer);
+                window.removeEventListener("focus", refresh);
+                document.removeEventListener("visibilitychange", refresh);
             };
 
         },
@@ -705,6 +702,7 @@ export default function AdminStaffPage() {
 
         const controller = new AbortController();
         mutation.current = controller;
+        writeRevision.current++;
         setSaving(
             true
         );
@@ -1079,8 +1077,8 @@ export default function AdminStaffPage() {
                         ? []
                         : form.branchIds,
 
-                active:
-                    form.active
+                active: form.active,
+                expectedUpdatedAt: editingSnapshot?.updatedAt
             };
 
 
@@ -1162,6 +1160,7 @@ export default function AdminStaffPage() {
 
         const controller = new AbortController();
         mutation.current = controller;
+        writeRevision.current++;
         setSaving(
             true
         );

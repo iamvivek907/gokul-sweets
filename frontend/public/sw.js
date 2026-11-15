@@ -2,6 +2,7 @@ const VERSION =
     "v3";
 
 const PUSH_DEDUPE_CACHE = "gokul-push-dedupe-v1";
+const ORDER_PUSH_BINDING_CACHE = "gokul-order-push-binding-v1";
 
 const STATIC_CACHE =
     `gokul-static-${VERSION}`;
@@ -58,7 +59,8 @@ self.addEventListener(
             PAGE_CACHE,
             IMAGE_CACHE,
             IMAGE_META_CACHE,
-            PUSH_DEDUPE_CACHE
+            PUSH_DEDUPE_CACHE,
+            ORDER_PUSH_BINDING_CACHE
         ];
 
         event.waitUntil(
@@ -794,6 +796,17 @@ function notificationDestination(value, staff = false, marketing = false) {
     if (staff) return typeof value === "string" && (/^\/admin\/orders\/[A-Za-z0-9_%.-]{1,200}$/.test(value) || /^\/admin\/occasion-enquiries\?branch=[0-9]{1,20}&enquiry=[a-f0-9-]{36}$/.test(value)) ? value : "/admin/staff-notifications";
     return typeof value === "string" && (/^\/orders\/[A-Za-z0-9_%.-]{1,200}(?:#order-review)?$/.test(value) || /^\/occasions(?:#occasion-|\/requests\?enquiry=)[A-Za-z0-9_%.-]{1,200}$/.test(value)) ? value : "/profile#account-notifications";
 }
+async function matchesOrderPushBinding(payload, staff) {
+    try {
+        const cache = await caches.open(ORDER_PUSH_BINDING_CACHE);
+        const key = new Request(new URL(`/.__gokul-order-push/${staff ? "staff" : "customer"}`, self.location.origin));
+        const response = await cache.match(key);
+        const binding = response ? await response.json() : null;
+        if (!payload.registrationId) return !binding;
+        return binding?.registrationId === payload.registrationId;
+    } catch {return !payload.registrationId;}
+}
+
 let pushSequence = Promise.resolve();
 self.addEventListener("push", event => {
     let payload;
@@ -818,6 +831,7 @@ self.addEventListener("push", event => {
         if (seen.includes(eventId)) return;
         const staff = eventId.startsWith("staff:");
         const marketing = eventId.startsWith("marketing:");
+        if (!marketing && !await matchesOrderPushBinding(payload, staff)) return;
         const destination = notificationDestination(payload.url, staff, marketing);
         if (marketing && destination === "/profile#account-notifications") return;
         const custom = destination !== "/profile#account-notifications" && destination !== "/admin/staff-notifications";
@@ -841,8 +855,15 @@ self.addEventListener("push", event => {
         await self.registration.showNotification(title, {
             body, silent: false, ...(staff ? {vibrate: [300, 120, 300, 120, 500]} : {}), badge: "/notification-badge.svg",
             icon: "/icon-192.png", tag, renotify: staff, requireInteraction: staff,
-            data: {url: destination, staff, marketing}
+            data: {url: destination, staff, marketing, registrationId: payload.registrationId}
         });
+        if (!marketing && !await matchesOrderPushBinding(payload, staff)) {
+            try {
+                const notices = await self.registration.getNotifications({tag});
+                for (const notice of notices) if (notice.tag === tag) notice.close();
+            } catch { /* The account has changed, so nothing else from this push should run. */ }
+            return;
+        }
         if (orderedStaff) {
             staffLatest = [...staffLatest.filter(entry => entry?.[0] !== tagGroup), [tagGroup, eventId]].slice(-256);
             for (const notice of previousStaff) {

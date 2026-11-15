@@ -72,7 +72,7 @@ SELECT e.id, u.id, 'PUSH', s.id FROM staff_order_alerts e
 JOIN staff_push_subscriptions s ON s.environment = e.environment
 JOIN staff_users u ON u.id = s.staff_id JOIN staff_sessions v ON v.token_hash = s.session_hash
 WHERE e.environment = ? AND s.revoked_at IS NULL AND v.revoked_at IS NULL
-  AND v.staff_updated_at = u.updated_at
+
   AND e.created_at >= s.subscribed_at AND e.created_at > CURRENT_TIMESTAMP - INTERVAL '5 minutes'
   AND (e.kind IN ('PREPARATION_DUE','PREPARATION_OVERDUE','READY_OVERDUE')
     OR NOT EXISTS (SELECT 1 FROM staff_order_alert_reads r WHERE r.event_id = e.id AND r.staff_id = u.id))
@@ -127,7 +127,7 @@ WHERE e.environment = ? AND e.kind IN ('PREPARATION_OVERDUE','READY_OVERDUE')
 SELECT EXISTS (SELECT 1 FROM staff_push_subscriptions s JOIN staff_sessions v ON v.token_hash = s.session_hash
 JOIN staff_users u ON u.id = s.staff_id WHERE s.id = ? AND s.staff_id = ? AND s.environment = ?
   AND s.revoked_at IS NULL AND v.revoked_at IS NULL
-  AND v.staff_updated_at = u.updated_at AND u.active
+  AND u.active
   AND (? IN ('PREPARATION_DUE','PREPARATION_OVERDUE','READY_OVERDUE')
     OR NOT EXISTS (SELECT 1 FROM staff_order_alert_reads r WHERE r.event_id = ? AND r.staff_id = u.id)))
 """,
@@ -166,7 +166,8 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.id = ? AND s.staff_id = ? AND s.
                                             task.event().id(),
                                             task.event().title(),
                                             task.event().message(),
-                                            path)
+                                            path,
+                                            task.subscriptionId())
                                     : email.send(
                                             task.staffId(),
                                             task.event().title(),

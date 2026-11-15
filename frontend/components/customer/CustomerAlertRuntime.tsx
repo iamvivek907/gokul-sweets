@@ -23,18 +23,19 @@ export default function CustomerAlertRuntime() {
             const controller = new AbortController();
             pending = controller;
             try {
-                const [settings, inbox] = await Promise.all([
-                    apiClient<AlertSettings>("/api/customer/identity/notification-alerts", {credentials: "include", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(8000)])}),
-                    readCustomerInbox(controller.signal)
-                ]);
+                const settings = await apiClient<AlertSettings>("/api/customer/identity/notification-alerts", {
+                    credentials: "include", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(8000)])
+                });
                 if (!active || pending !== controller || controller.signal.aborted) return;
                 if (settings.pushConfigured && handoffScope !== settings.scopeId) {
                     try {
                         await pausePreviousCustomerAlerts(settings.scopeId, AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]));
                         if (!controller.signal.aborted) handoffScope = settings.scopeId;
                     } catch { /* Recheck when the next poll or identity change arrives. */ }
-                    if (!active || pending !== controller || controller.signal.aborted) return;
                 }
+                if (!active || pending !== controller || controller.signal.aborted) return;
+                const inbox = await readCustomerInbox(controller.signal);
+                if (!active || pending !== controller || controller.signal.aborted) return;
                 const max = Math.max(0, ...inbox.messages.map(message => message.id));
                 const key = `gokul-alert-cursor:${API_BASE_URL}:${settings.scopeId}`;
                 const baseline = initial || scope !== settings.scopeId;

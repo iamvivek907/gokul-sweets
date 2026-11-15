@@ -237,7 +237,10 @@ public class StaffAlertsController {
                         StaffAlertsController.class,
                         "subscribe(StaffPushSubscriptions.Input,HttpServletRequest)");
         try {
-            long staffId = staff();
+            long staffId =
+                    input != null && input.pausePrevious()
+                            ? authorization.getCurrentStaff().getId()
+                            : staff();
             enabled();
             return ResponseEntity.ok()
                     .cacheControl(CacheControl.noStore())

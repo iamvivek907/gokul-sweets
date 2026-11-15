@@ -208,7 +208,8 @@ VALUES ('DEV', ?, ?, 'PAYMENT_PAID', 'ORDER', 'TEST-ORDER', 'Payment received', 
                         eq(event),
                         anyString(),
                         anyString(),
-                        anyString());
+                        anyString(),
+                        any(UUID.class));
 
         var next = sessions.issue(ConsentEnvironment.DEV, subject, Instant.now());
         var restoration =
@@ -271,7 +272,8 @@ VALUES ('DEV', ?, ?, 'PAYMENT_PAID', 'ORDER', 'TEST-ORDER', 'Payment received', 
                         eq(event),
                         anyString(),
                         anyString(),
-                        anyString()))
+                        anyString(),
+                        any(UUID.class)))
                 .thenReturn(201);
         dispatcher.dispatchBatch();
         dispatcher.dispatchBatch();
@@ -283,7 +285,8 @@ VALUES ('DEV', ?, ?, 'PAYMENT_PAID', 'ORDER', 'TEST-ORDER', 'Payment received', 
                         eq(event),
                         anyString(),
                         anyString(),
-                        anyString());
+                        anyString(),
+                        any(UUID.class));
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT state FROM customer_push_deliveries WHERE event_id = ?",
@@ -298,7 +301,8 @@ VALUES ('DEV', ?, ?, 'PAYMENT_PAID', 'ORDER', 'TEST-ORDER', 'Payment received', 
                         eq(gone),
                         anyString(),
                         anyString(),
-                        anyString()))
+                        anyString(),
+                        any(UUID.class)))
                 .thenReturn(410);
         dispatcher.dispatchBatch();
         assertThat(
@@ -318,7 +322,8 @@ VALUES ('DEV', ?, ?, 'PAYMENT_PAID', 'ORDER', 'TEST-ORDER', 'Payment received', 
                         eq(later),
                         anyString(),
                         anyString(),
-                        anyString());
+                        anyString(),
+                        any(UUID.class));
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM customer_notification_events WHERE subject_id"
@@ -375,7 +380,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'PREPARING', CURRENT_TIMESTAMP)
                         eq(ready),
                         anyString(),
                         anyString(),
-                        anyString()))
+                        anyString(),
+                        any(UUID.class)))
                 .thenReturn(201);
         dispatcher.dispatchBatch();
         verify(transport, never())
@@ -386,7 +392,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'PREPARING', CURRENT_TIMESTAMP)
                         eq(old),
                         anyString(),
                         anyString(),
-                        anyString());
+                        anyString(),
+                        any(UUID.class));
         verify(transport)
                 .send(
                         anyString(),
@@ -395,7 +402,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'PREPARING', CURRENT_TIMESTAMP)
                         eq(ready),
                         eq("Your order is ready for pickup"),
                         contains("Push branch"),
-                        eq("/orders/" + number));
+                        eq("/orders/" + number),
+                        any(UUID.class));
         assertThat(inbox.page("DEV", subject, null).messages()).hasSize(2);
         assertThat(
                         jdbc.queryForObject(
@@ -451,7 +459,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'PREPARING', CURRENT_TIMESTAMP)
                         eq(completion),
                         anyString(),
                         anyString(),
-                        anyString()))
+                        anyString(),
+                        any(UUID.class)))
                 .thenReturn(201);
         dispatcher.dispatchBatch();
         dispatcher.dispatchBatch();
@@ -463,7 +472,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'PREPARING', CURRENT_TIMESTAMP)
                         eq(completion),
                         anyString(),
                         contains("completely optional"),
-                        eq("/orders/" + number + "#order-review"));
+                        eq("/orders/" + number + "#order-review"),
+                        any(UUID.class));
     }
 
     @Test
@@ -512,7 +522,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'PREPARING', CURRENT_TIMESTAMP)
                         anyLong(),
                         anyString(),
                         anyString(),
-                        anyString());
+                        anyString(),
+                        any(UUID.class));
     }
 
     @Test
@@ -565,7 +576,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'PREPARING', CURRENT_TIMESTAMP)
                         anyLong(),
                         anyString(),
                         anyString(),
-                        anyString());
+                        anyString(),
+                        any(UUID.class));
     }
 
     @Test
@@ -581,7 +593,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'PREPARING', CURRENT_TIMESTAMP)
                         eq(event),
                         anyString(),
                         anyString(),
-                        anyString()))
+                        anyString(),
+                        any(UUID.class)))
                 .thenReturn(503);
         dispatcher.dispatchBatch();
         dispatcher.dispatchBatch();
@@ -593,7 +606,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'PREPARING', CURRENT_TIMESTAMP)
                         eq(event),
                         anyString(),
                         anyString(),
-                        anyString());
+                        anyString(),
+                        any(UUID.class));
         for (int i = 0; i < 2; i++) {
             jdbc.update(
                     "UPDATE customer_push_deliveries SET next_attempt_at = CURRENT_TIMESTAMP WHERE"
@@ -615,7 +629,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'PREPARING', CURRENT_TIMESTAMP)
                         eq(event),
                         anyString(),
                         anyString(),
-                        anyString());
+                        anyString(),
+                        any(UUID.class));
     }
 
     @Test
@@ -638,7 +653,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'PREPARING', CURRENT_TIMESTAMP)
                         anyLong(),
                         anyString(),
                         anyString(),
-                        anyString());
+                        anyString(),
+                        any(UUID.class));
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT state FROM customer_push_deliveries WHERE event_id = ?",
@@ -660,7 +676,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'PREPARING', CURRENT_TIMESTAMP)
                         anyLong(),
                         anyString(),
                         anyString(),
-                        anyString());
+                        anyString(),
+                        any(UUID.class));
         assertThatThrownBy(
                         () ->
                                 preferences.save(

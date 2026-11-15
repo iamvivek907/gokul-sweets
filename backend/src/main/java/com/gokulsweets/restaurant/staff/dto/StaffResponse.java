@@ -12,6 +12,7 @@ import java.util.Set;
  * @param active the active
  * @param roleName the role name
  * @param branchIds the branch ids
+ * @param updatedAt the current staff details revision
  */
 public record StaffResponse(
         Long id,
@@ -20,4 +21,5 @@ public record StaffResponse(
         String phone,
         boolean active,
         String roleName,
-        Set<Long> branchIds) {}
+        Set<Long> branchIds,
+        java.time.LocalDateTime updatedAt) {}

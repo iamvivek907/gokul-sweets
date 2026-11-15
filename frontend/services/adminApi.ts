@@ -69,11 +69,12 @@ export function invalidateAdminSessionCheck() {
     verifiedStaffId = null;
 }
 
-export async function logoutAdmin(signal?: AbortSignal): Promise<AdminProfile | null> {
+export async function logoutAdmin(signal?: AbortSignal, deviceId?: string | null): Promise<AdminProfile | null> {
     const timeout = AbortSignal.timeout(10000);
     const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
     try {
-        const response = await adminFetch("/api/admin/auth/logout", "staff-session", {
+        const suffix = deviceId ? `?deviceId=${encodeURIComponent(deviceId)}` : "";
+        const response = await adminFetch(`/api/admin/auth/logout${suffix}`, "staff-session", {
             method: "POST", signal: requestSignal
         });
         if (response.ok) {

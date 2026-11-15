@@ -1,5 +1,6 @@
 import {ADMIN_API_BASE_URL} from "@/lib/constants";
 import {applicationServerKey} from "@/lib/notificationAlerts";
+import {setOrderPushBinding} from "@/lib/orderPushBinding";
 import {adminFetch} from "@/services/adminApi";
 
 export const STAFF_ALERT_DEVICE_RESTORED = "gokul-staff-alert-device-restored";
@@ -84,6 +85,7 @@ export async function enableStaffDeviceAlerts(settings: StaffAlertSettings, scop
             await staffAlertsRequest(`/push-subscriptions/${result.id}`, {method: "DELETE", signal: AbortSignal.timeout(8000)}, settings.staffId);
             throw new Error("This device could not save its alert registration. Try again from Staff notifications.");
         }
+        await setOrderPushBinding("staff", String(settings.staffId), result.id, signal);
         dismissStaffAlertSetup(settings.staffId);
         window.dispatchEvent(new Event(STAFF_ALERT_DEVICE_RESTORED));
         return permission;

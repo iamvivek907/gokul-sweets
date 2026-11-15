@@ -1,4 +1,5 @@
 "use client";
+import {clearOrderPushBinding} from "@/lib/orderPushBinding";
 import AdminHelp from "@/components/admin/AdminHelp";
 import {T} from "@/lib/language";
 
@@ -132,6 +133,7 @@ export default function StaffNotificationsPage() {
                     <button type="button" disabled={busy || needsHomeScreen || !supported || !settings.pushConfigured || permission === "denied"} onClick={() => void enablePush()} className="min-h-11 rounded-xl bg-[#173c39] px-4 text-sm font-semibold text-white disabled:opacity-50">{settings.deviceActive ? "Check staff registration" : "Enable staff push for this browser"}</button>
                     {deviceId && <button type="button" disabled={busy} onClick={() => void perform(async () => {
                         await staffAlertsRequest(`/push-subscriptions/${deviceId}`, {method: "DELETE"});
+                        await clearOrderPushBinding("staff", String(settings.staffId));
                         setDeviceId(null); dismissStaffAlertSetup(settings.staffId); try {localStorage.removeItem(key);} catch { /* server revocation succeeded */ }
                         await load(); setMessage("Staff push disabled for this browser. An already accepted notification may still arrive.");
                     })} className="min-h-11 rounded-xl border px-4 text-sm">Disable staff push</button>}

@@ -13,6 +13,7 @@ export interface AdminStaff {
     roleName: string;
 
     branchIds: number[];
+    updatedAt?: string;
 }
 
 
@@ -73,4 +74,5 @@ export interface UpdateAdminStaffRequest {
     branchIds: number[];
 
     active: boolean;
+    expectedUpdatedAt?: string;
 }

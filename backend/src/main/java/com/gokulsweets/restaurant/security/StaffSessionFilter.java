@@ -120,15 +120,10 @@ public class StaffSessionFilter extends OncePerRequestFilter {
                 sessions.auditSensitiveAction(verified.staffId());
             }
             String token = StaffSessionService.cookie(request);
-            if (!path.equals("/api/admin/auth/logout") && !administrator) {
-                if (!sessions.renewStaff(verified, token, current)) {
-                    response.sendError(401);
-                    return;
-                }
+            if (path.equals("/api/admin/auth/me") && sessions.refreshCookie(verified, token)) {
                 response.addHeader(
                         "Set-Cookie",
-                        AdminAuthController.cookie(
-                                        token, StaffSessionService.sessionLifetime(current))
+                        AdminAuthController.cookie(token, StaffSessionService.SESSION_COOKIE_AGE)
                                 .toString());
             }
             UserDetails details = users.loadUserByUsername(verified.username());

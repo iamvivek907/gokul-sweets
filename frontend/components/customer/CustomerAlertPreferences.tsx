@@ -1,4 +1,5 @@
 "use client";
+import {clearOrderPushBinding} from "@/lib/orderPushBinding";
 import Link from "next/link";
 import {T} from "@/lib/language";
 
@@ -92,6 +93,7 @@ export default function CustomerAlertPreferences() {
         try {
             // Server first: a failed request must never claim notifications are disabled.
             await apiClient<void>(`${base}/push-subscriptions/${pushId}`, {method: "DELETE", credentials: "include"});
+            await clearOrderPushBinding("customer", settings.scopeId);
             setPushId(null); localStorage.removeItem(`gokul-push-device:${settings.scopeId}`);
             if ("serviceWorker" in navigator) {
                 const registration = await navigator.serviceWorker.getRegistration();

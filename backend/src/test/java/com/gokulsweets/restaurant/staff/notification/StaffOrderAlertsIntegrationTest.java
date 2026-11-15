@@ -218,7 +218,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                         eq(event.id()),
                         anyString(),
                         anyString(),
-                        eq(event.targetUrl())))
+                        eq(event.targetUrl()),
+                        any(UUID.class)))
                 .thenReturn(201);
         dispatcher.dispatchBatch();
         verify(push)
@@ -229,7 +230,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                         eq(event.id()),
                         anyString(),
                         anyString(),
-                        eq(event.targetUrl()));
+                        eq(event.targetUrl()),
+                        any(UUID.class));
         jdbc.update("UPDATE occasion_enquiries SET status='QUOTED' WHERE id=?", request);
         alerts.occasionReviewed(request);
         assertThat(alerts.page(staff, null).unreadCount()).isZero();
@@ -322,7 +324,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                         anyLong(),
                         anyString(),
                         anyString(),
-                        anyString());
+                        anyString(),
+                        any(UUID.class));
     }
 
     @Test
@@ -350,7 +353,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                         anyLong(),
                         anyString(),
                         anyString(),
-                        anyString());
+                        anyString(),
+                        any(UUID.class));
         assertThat(alerts.page(staff, null).messages())
                 .allMatch(message -> !message.actionRequired());
     }
@@ -405,6 +409,22 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
     }
 
     @Test
+    void signingOutPausesTheOlderRegistrationWithoutRevokingAnotherPhone() {
+        var old = subscriptions.subscribe(staff, cookie, input("old-device-" + UUID.randomUUID()));
+        var otherCookie = issueFor(staff);
+        var other =
+                subscriptions.subscribe(
+                        staff, otherCookie, input("other-device-" + UUID.randomUUID()));
+        var newCookie = issueFor(staff);
+
+        sessions.signOut(staff, old.id(), newCookie);
+
+        assertThat(sessions.verify(newCookie)).isNull();
+        assertThat(subscriptions.live(staff, old.id(), cookie)).isFalse();
+        assertThat(subscriptions.live(staff, other.id(), otherCookie)).isTrue();
+    }
+
+    @Test
     void phoneDeliverySurvivesSessionExpiryButStopsOnSignOut() throws Exception {
         subscriptions.subscribe(staff, cookie, input("persistent-phone-" + UUID.randomUUID()));
         jdbc.update(
@@ -423,7 +443,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                         eq(paid),
                         anyString(),
                         anyString(),
-                        anyString());
+                        anyString(),
+                        any(UUID.class));
 
         sessions.revoke(cookie);
         now(17, 0);
@@ -438,7 +459,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                         eq(due),
                         anyString(),
                         anyString(),
-                        anyString());
+                        anyString(),
+                        any(UUID.class));
     }
 
     @Test
@@ -459,7 +481,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                         eq(due),
                         anyString(),
                         anyString(),
-                        anyString());
+                        anyString(),
+                        any(UUID.class));
         now(17, 2);
         alerts.generateReminders();
         status("PREPARING");
@@ -472,7 +495,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                         anyLong(),
                         anyString(),
                         anyString(),
-                        anyString());
+                        anyString(),
+                        any(UUID.class));
     }
 
     @Test
@@ -541,7 +565,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                         anyLong(),
                         anyString(),
                         anyString(),
-                        anyString());
+                        anyString(),
+                        any(UUID.class));
         jdbc.update(
                 "INSERT INTO role_permissions(role_id, permission_id) SELECT ?, id FROM permissions"
                         + " WHERE name = 'ORDER_VIEW'",
@@ -553,7 +578,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                         eq(event),
                         anyString(),
                         anyString(),
-                        anyString()))
+                        anyString(),
+                        any(UUID.class)))
                 .thenReturn(410);
         dispatcher.dispatchBatch();
         assertThat(subscriptions.live(staff, registered.id(), cookie)).isFalse();
@@ -619,7 +645,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                         eq(event),
                         anyString(),
                         anyString(),
-                        anyString()))
+                        anyString(),
+                        any(UUID.class)))
                 .thenReturn(201);
         var workers = Executors.newFixedThreadPool(2);
         var gate = new CountDownLatch(1);
@@ -649,7 +676,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                             eq(event),
                             anyString(),
                             anyString(),
-                            eq("/admin/orders/" + number));
+                            eq("/admin/orders/" + number),
+                            any(UUID.class));
         } finally {
             workers.shutdownNow();
         }

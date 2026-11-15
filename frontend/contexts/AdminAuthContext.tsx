@@ -2,6 +2,8 @@
 
 import {createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode} from "react";
 import {authenticateAdmin, fetchAdminProfile, invalidateAdminSessionCheck, logoutAdmin, staffCsrfRejectedEvent, staffSessionCheckEvent} from "@/services/adminApi";
+import {readStaffAlertDevice} from "@/services/staffAlertsApi";
+import {readOrderPushBinding, clearOrderPushBinding} from "@/lib/orderPushBinding";
 import type {AdminProfile} from "@/types/admin";
 
 interface AdminAuthContextValue {
@@ -83,6 +85,9 @@ export function AdminAuthProvider({children}: {children: ReactNode}) {
         window.addEventListener(staffCsrfRejectedEvent, checkChangedSession);
         window.addEventListener("focus", check);
         window.addEventListener("online", check);
+        const visible = () => {if (document.visibilityState === "visible") check();};
+        document.addEventListener("visibilitychange", visible);
+        const timer = window.setInterval(visible, 30_000);
         return () => {
             cancelCheck();
             signOutRequest.current?.abort();
@@ -91,6 +96,8 @@ export function AdminAuthProvider({children}: {children: ReactNode}) {
             window.removeEventListener(staffCsrfRejectedEvent, checkChangedSession);
             window.removeEventListener("focus", check);
             window.removeEventListener("online", check);
+            document.removeEventListener("visibilitychange", visible);
+            window.clearInterval(timer);
         };
     }, [cancelCheck, refresh]);
 
@@ -124,7 +131,10 @@ export function AdminAuthProvider({children}: {children: ReactNode}) {
         const controller = new AbortController();
         signOutRequest.current = controller;
         try {
-            const verifiedProfile = await logoutAdmin(controller.signal);
+            const bound = await readOrderPushBinding("staff");
+            const device = profile ? readStaffAlertDevice(profile.staffId) : null;
+            const verifiedProfile = await logoutAdmin(controller.signal,
+                device ?? (bound?.owner === String(profile?.staffId) ? bound?.registrationId : null));
             if (controller.signal.aborted) return;
             setProfile(verifiedProfile);
             setVerificationFailed(false);
@@ -132,12 +142,13 @@ export function AdminAuthProvider({children}: {children: ReactNode}) {
             if (verifiedProfile) {
                 throw new Error("Sign-out could not be confirmed. Check your connection and try again.");
             }
+            await clearOrderPushBinding("staff", profile ? String(profile.staffId) : undefined);
             broadcast();
         } finally {
             signOutRequest.current = null;
             if (!controller.signal.aborted) finishSessionChange();
         }
-    }, [cancelCheck, finishSessionChange]);
+    }, [cancelCheck, finishSessionChange, profile]);
 
     const hasPermission = useCallback((permission: string) => !!profile &&
         (profile.roleName === "OWNER_ADMIN" || profile.permissions.includes(permission)), [profile]);

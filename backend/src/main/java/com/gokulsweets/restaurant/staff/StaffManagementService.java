@@ -169,6 +169,15 @@ public class StaffManagementService {
         try {
             requireStaffManage();
             StaffUser actor = staffAuthorizationService.getCurrentStaff();
+            var revision = staffUserRepository.lockRevision(staffId).orElse(null);
+            if (revision != null
+                    && request.expectedUpdatedAt() != null
+                    && !revision.equals(request.expectedUpdatedAt())) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.CONFLICT,
+                        "Staff details changed on another device. Refresh the record before"
+                                + " saving.");
+            }
             StaffUser staff = getDetailedStaff(staffId);
             requireTargetManageable(actor, staff);
             Role newRole = getRole(request.roleName());
@@ -198,7 +207,10 @@ public class StaffManagementService {
             staff.setRole(newRole);
             staff.setBranches(branches);
             staff.setActive(request.active());
-            StaffUser saved = staffUserRepository.save(staff);
+            staff.setUpdatedAt(
+                    java.time.LocalDateTime.now()
+                            .truncatedTo(java.time.temporal.ChronoUnit.MICROS));
+            StaffUser saved = staffUserRepository.saveAndFlush(staff);
             log.info(
                     "Staff user updated: staffUserId={}, role={}, active={},"
                             + " updatedByStaffUserId={}",
@@ -724,7 +736,8 @@ public class StaffManagementService {
                     staff.getPhone(),
                     staff.isActive(),
                     staff.getRole().getName(),
-                    branchIds);
+                    branchIds,
+                    staff.getUpdatedAt());
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,

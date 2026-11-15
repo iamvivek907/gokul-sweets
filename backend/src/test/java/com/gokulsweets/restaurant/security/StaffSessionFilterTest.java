@@ -153,7 +153,7 @@ class StaffSessionFilterTest {
     }
 
     @Test
-    void adminNearTwelveHourExpiryCanCreateStaffAndResetPasswords() throws Exception {
+    void adminWithAnOlderSessionCanCreateStaffAndResetPasswords() throws Exception {
         flags.setSecureStaffSessions(true);
         var user = staffWithRole("OWNER_ADMIN");
         when(staff.findDetailedById(1L)).thenReturn(Optional.of(user));
@@ -179,7 +179,7 @@ class StaffSessionFilterTest {
         }
         verify(sessions, times(2)).requireCsrf(any(), eq("csrf"));
         verify(sessions, times(2)).auditSensitiveAction(1L);
-        verify(sessions, never()).renewStaff(any(), any(), any());
+        verify(sessions, never()).refreshCookie(any(), any());
     }
 
     private static StaffUser staffWithRole(String roleName) {

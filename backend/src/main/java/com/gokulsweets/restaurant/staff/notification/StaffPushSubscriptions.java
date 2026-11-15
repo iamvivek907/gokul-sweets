@@ -109,7 +109,7 @@ public class StaffPushSubscriptions {
                     jdbc.query(
                             """
 SELECT s.id, s.staff_id, s.session_hash, s.public_key, s.auth_secret,
-  s.revoked_at IS NOT NULL OR v.revoked_at IS NOT NULL OR v.staff_updated_at <> u.updated_at OR NOT u.active inactive
+  s.revoked_at IS NOT NULL OR v.revoked_at IS NOT NULL OR NOT u.active inactive
 FROM staff_push_subscriptions s JOIN staff_sessions v ON v.token_hash = s.session_hash
 JOIN staff_users u ON u.id = s.staff_id WHERE s.environment = ? AND s.endpoint_hash = ? FOR UPDATE OF s
 """,
@@ -148,7 +148,6 @@ FROM staff_sessions old, staff_users u
 WHERE s.id=? AND s.environment=? AND s.staff_id=? AND s.endpoint_hash=?
   AND s.public_key=? AND s.auth_secret=? AND s.revoked_at IS NULL
   AND old.token_hash=s.session_hash AND u.id=s.staff_id AND u.active
-  AND old.staff_updated_at=u.updated_at
 RETURNING s.id
 """,
                                 (rs, row) -> rs.getObject(1, UUID.class),
@@ -172,7 +171,7 @@ RETURNING s.id
                             """
 SELECT COUNT(*) FROM staff_push_subscriptions s JOIN staff_sessions v ON v.token_hash = s.session_hash
 JOIN staff_users u ON u.id = s.staff_id WHERE s.environment = ? AND s.staff_id = ? AND s.endpoint_hash <> ?
-  AND s.revoked_at IS NULL AND v.revoked_at IS NULL AND v.staff_updated_at = u.updated_at AND u.active
+  AND s.revoked_at IS NULL AND v.revoked_at IS NULL AND u.active
 """,
                             Long.class,
                             alerts.scope(),
@@ -267,7 +266,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 SELECT EXISTS (SELECT 1 FROM staff_push_subscriptions s JOIN staff_sessions v ON v.token_hash = s.session_hash
 JOIN staff_users u ON u.id = s.staff_id WHERE s.id = ? AND s.environment = ? AND s.staff_id = ? AND s.session_hash = ?
   AND s.revoked_at IS NULL AND v.revoked_at IS NULL AND v.expires_at > CURRENT_TIMESTAMP
-  AND v.staff_updated_at = u.updated_at AND u.active)
+  AND u.active)
 """,
                                     Boolean.class,
                                     id,

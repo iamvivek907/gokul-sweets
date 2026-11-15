@@ -1,3 +1,4 @@
+import {clearOrderPushBinding, readOrderPushBinding, setOrderPushBinding, switchOrderPushOwner} from "@/lib/orderPushBinding";
 import {apiClient} from "@/services/apiClient";
 import {applicationServerKey, type AlertSettings} from "@/lib/notificationAlerts";
 export const PUSH_REGISTRATION_CHANGED = "gokul-push-registration-changed";
@@ -35,10 +36,13 @@ export async function confirmCustomerPush(settings: AlertSettings, subscription:
     const result = await apiClient<{id: string}>("/api/customer/identity/push-subscriptions", {method: "POST", credentials: "include",
         signal: deadline(), body: JSON.stringify({registrationId, expectedSubject: settings.scopeId, endpoint: subscription.endpoint, publicKey: keys?.p256dh, authSecret: keys?.auth})});
     if (registrationId) {
-        // Restoration never changes local opt-in state or revives a disabled device.
+        await setOrderPushBinding("customer", settings.scopeId, registrationId, signal);
         return;
     }
-    try {localStorage.setItem(pushDeviceKey(settings.scopeId), result.id);}
+    try {
+        localStorage.setItem(pushDeviceKey(settings.scopeId), result.id);
+        await setOrderPushBinding("customer", settings.scopeId, result.id, signal);
+    }
     catch {
         await apiClient<void>(`/api/customer/identity/push-subscriptions/${result.id}`, {method: "DELETE", credentials: "include"});
         await subscription.unsubscribe();
@@ -57,6 +61,7 @@ export async function pushSubscriptionFingerprint(subscription: PushSubscription
 
 /** Pause a previous account only when this browser still holds its push subscription. */
 export async function pausePreviousCustomerAlerts(scopeId: string, signal: AbortSignal) {
+    await switchOrderPushOwner("customer", scopeId, signal).catch(() => {});
     if (!("Notification" in window) || Notification.permission !== "granted") return;
     const registration = await navigator.serviceWorker?.getRegistration();
     const subscription = await registration?.pushManager.getSubscription();
@@ -67,4 +72,22 @@ export async function pausePreviousCustomerAlerts(scopeId: string, signal: Abort
         method: "POST", credentials: "include", signal,
         body: JSON.stringify({expectedSubject: scopeId, pausePrevious: true, endpoint: subscription.endpoint, publicKey: keys?.p256dh, authSecret: keys?.auth})
     });
+    let deviceId: string | null = null;
+    try {deviceId = localStorage.getItem(pushDeviceKey(scopeId));} catch { /* No remembered device. */ }
+    if (!deviceId) return;
+    const status = await apiClient<{enabled: boolean; fingerprint: string | null}>(`/api/customer/identity/push-subscriptions/${encodeURIComponent(deviceId)}`, {credentials: "include", signal});
+    if (status.enabled && status.fingerprint === await pushSubscriptionFingerprint(subscription)) {
+        await setOrderPushBinding("customer", scopeId, deviceId, signal);
+    }
+}
+
+export async function logoutCustomerWithAlerts() {
+    const binding = await readOrderPushBinding("customer");
+    let device = binding?.registrationId;
+    if (!device && binding?.owner) {
+        try {device = localStorage.getItem(pushDeviceKey(binding.owner));} catch { /* No remembered registration. */ }
+    }
+    const path = device ? `?deviceId=${encodeURIComponent(device)}` : "";
+    await apiClient<void>(`/api/customer/identity/logout${path}`, {method: "POST", credentials: "include"});
+    await clearOrderPushBinding("customer", binding?.owner);
 }

@@ -132,7 +132,8 @@ WHERE s.id = ? AND s.revoked_at IS NULL AND v.revoked_at IS NULL
                                     task.eventId(),
                                     task.title(),
                                     task.message(),
-                                    task.url());
+                                    task.url(),
+                                    task.subscriptionId());
                     if (code >= 200 && code < 300) finish(task, "ACCEPTED", code);
                     else if (code == 404 || code == 410) {
                         transactions.executeWithoutResult(

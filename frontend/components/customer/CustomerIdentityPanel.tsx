@@ -1,4 +1,5 @@
 "use client";
+import {logoutCustomerWithAlerts} from "@/lib/customerPushRegistration";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import BrandLoading from "@/components/common/BrandLoading";
 import {notifyCustomerIdentityChanged} from "@/lib/customerIdentityEvents";
@@ -209,7 +210,7 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
         setBusy(true);
         setError(null);
         try {
-            await apiClient<void>("/api/customer/identity/logout", {method: "POST", credentials: "include"});
+            await logoutCustomerWithAlerts();
             if (alive.current) {
                 setSession({authenticated: false});
                 onSessionChange?.({authenticated: false});

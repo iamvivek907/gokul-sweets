@@ -17,7 +17,7 @@ function worker(clients = [], cacheFailure = false) {
     const caches = {async open() {if (cacheFailure) throw new Error("Cache unavailable"); return {async match(key) {const value = entries.get(key.url); return value ? new Response(value) : undefined;},
         async put(key, response) {entries.set(key.url, await response.text());}};}};
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../public/sw.js'), 'utf8'), {self, caches, URL, Request, Response, Promise, Array, String});
-    return {listeners, shown, opened, active};
+    return {listeners, shown, opened, active, entries};
 }
 test('replayed/concurrent push uses one generic notification and exact safe inbox destination', async () => {
     const runtime = worker();
@@ -175,4 +175,26 @@ test('a late new-order alert cannot replace a newer preparation reminder', async
         await send('10000000000000000001', 'Preparation is overdue');
         assert.equal([...runtime.active.keys()].filter(tag => tag.includes('GS-001')).length, 1);
     }
+});
+
+
+test('a queued alert from the previous account stays hidden after a shared-phone switch', async () => {
+    const runtime = worker();
+    const key = 'https://dev.gokulsweets.in/.__gokul-order-push/staff';
+    const send = async (id, registrationId) => {
+        let pending;
+        runtime.listeners.push({
+            data: {json: () => ({eventId: `staff:${id}`, title: 'Prepare order', url: '/admin/orders/GS-901', registrationId})},
+            waitUntil(value) {pending = value;}
+        });
+        await pending;
+    };
+    runtime.entries.set(key, JSON.stringify({owner: 'previous', registrationId: 'old-device'}));
+    await send(1, 'old-device');
+    runtime.entries.set(key, JSON.stringify({owner: 'current', registrationId: null}));
+    await send(2, 'old-device');
+    await send(3);
+    runtime.entries.set(key, JSON.stringify({owner: 'current', registrationId: 'new-device'}));
+    await send(4, 'new-device');
+    assert.deepEqual(runtime.shown.map(notice => notice.data.registrationId), ['old-device', 'new-device']);
 });

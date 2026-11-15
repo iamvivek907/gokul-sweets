@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {useEffect, useRef, useState} from "react";
 import {usePathname} from "next/navigation";
+import {setOrderPushBinding, switchOrderPushOwner} from "@/lib/orderPushBinding";
 import {usePwaInstall} from "@/hooks/usePwaInstall";
 import {T} from "@/lib/language";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
@@ -22,7 +23,8 @@ export default function StaffNotificationBell() {
     const requestScope = useRef<AbortController | null>(null);
     const [count, setCount] = useState<number | null>(null);
     useEffect(() => {
-        if (!profile || !hasPermission("ORDER_VIEW")) return;
+        if (!profile) return;
+        const canViewOrders = hasPermission("ORDER_VIEW");
         let active = true, busy = false, handoffChecked = false, retryAt = 0, failures = 0;
         const controller = new AbortController();
         requestScope.current = controller;
@@ -32,9 +34,24 @@ export default function StaffNotificationBell() {
             try {
                 const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]);
                 const staffId = profile.staffId;
+                const owner = String(staffId);
+                if (!handoffChecked || !canViewOrders) await switchOrderPushOwner("staff", owner, signal, canViewOrders).catch(() => {});
                 const stored = readStaffAlertDevice(staffId);
                 const permitted = supportsStaffPush() && Notification.permission === "granted";
                 const device = permitted ? stored : null;
+                if (!canViewOrders) {
+                    if (!handoffChecked && permitted && Date.now() >= retryAt) {
+                        try {
+                            const worker = await navigator.serviceWorker.getRegistration();
+                            const subscription = await worker?.pushManager.getSubscription();
+                            if (subscription) await syncStaffAlertDevice(subscription, staffId, signal);
+                            handoffChecked = true;
+                        } catch {
+                            retryAt = Date.now() + Math.min(120_000, 15_000 * 2 ** Math.min(failures++, 3));
+                        }
+                    }
+                    return;
+                }
                 const settings = await staffAlertsRequest<StaffAlertSettings>(`/settings${device ? `?deviceId=${encodeURIComponent(device)}` : ""}`, {signal});
                 if (!active || settings.staffId !== staffId) return;
                 if (!settings.enabled) {setCount(null); setSetup(null); setNeedsRepair(false); return;}
@@ -65,6 +82,7 @@ export default function StaffNotificationBell() {
                         retryAt = permanentlyInactive ? Infinity : Date.now() + Math.min(120_000, 15_000 * 2 ** Math.min(failures++, 3));
                     }
                 }
+                if (deviceActive && device) await setOrderPushBinding("staff", owner, device, signal).catch(() => {});
                 if (active && isStandalone && supportsStaffPush()) {
                     let seen = false;
                     try {seen = localStorage.getItem(staffAlertPromptKey(staffId)) === "1";} catch { /* Allow the optional offer. */ }
