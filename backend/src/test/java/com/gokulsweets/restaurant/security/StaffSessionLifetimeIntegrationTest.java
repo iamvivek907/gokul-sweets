@@ -27,6 +27,7 @@ import java.util.*;
         classMode = org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 class StaffSessionLifetimeIntegrationTest {
     @Autowired StaffSessionService sessions;
+    @Autowired StaffUserRepository staffUsers;
     @Autowired JdbcTemplate jdbc;
     @Autowired MutableClock clock;
 
@@ -101,6 +102,17 @@ class StaffSessionLifetimeIntegrationTest {
                         (r, n) -> r.getTimestamp(1).toLocalDateTime(),
                         user.getId()));
         return user;
+    }
+
+    @Test
+    @org.springframework.transaction.annotation.Transactional
+    void staffRevisionLockSeesChangesMadeByAnotherWriter() {
+        var user = user("COUNTER_STAFF");
+        var initial = staffUsers.lockRevision(user.getId()).orElseThrow();
+        jdbc.update(
+                "UPDATE staff_users SET updated_at=updated_at+INTERVAL '1 second' WHERE id=?",
+                user.getId());
+        assertThat(staffUsers.lockRevision(user.getId())).contains(initial.plusSeconds(1));
     }
 
     @Test

@@ -70,6 +70,7 @@ function staffInput(label) {
 }
 
 try {
+    await page.clock.install();
     await page.goto(`${base}/admin/staff`);
     await page.getByText("Could not verify your admin session. Check your connection.").waitFor();
     assert.match(page.url(), /\/admin\/staff$/);
@@ -109,7 +110,7 @@ try {
     await page.getByRole("button", {name: /Test Manager/}).click();
     await staffInput("Phone").fill("9000000000");
     managerChanged = true;
-    await page.getByRole("button", {name: "Refresh staff list", exact: true}).click();
+    await page.clock.fastForward(31_000);
     await page.getByRole("alert").filter({hasText: "This staff record changed"}).waitFor();
     assert.equal(await staffInput("Phone").inputValue(), "9000000000");
     assert.equal(await page.getByRole("button", {name: "Save Changes", exact: true}).isDisabled(), true);
