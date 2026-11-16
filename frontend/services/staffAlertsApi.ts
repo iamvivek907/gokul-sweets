@@ -9,20 +9,27 @@ export const staffAlertDeviceKey = (staffId?: number) => `gokul-staff-push:${ADM
 export const staffAlertPromptKey = (staffId: number) => `${staffAlertDeviceKey(staffId)}:setup-seen`;
 const staffAlertCancellationKey = (staffId: number) => `${staffAlertDeviceKey(staffId)}:cancellation`;
 const validRegistrationId = (id: unknown): id is string => typeof id === "string" && /^[0-9a-f-]{36}$/i.test(id);
+const unsavedStaffCancellations = new Map<number, string[]>();
 
 async function pendingStaffAlertCancellation(staffId: number) {
     let saved: unknown;
     try {saved = JSON.parse(localStorage.getItem(staffAlertCancellationKey(staffId)) ?? "null");} catch { /* The worker marker can still be read. */ }
     const cached = await readStaffPushCancellation(String(staffId));
-    return [...new Set([...cached, ...(Array.isArray(saved) ? saved : [])].filter(validRegistrationId))];
+    return [...new Set([...cached, ...(Array.isArray(saved) ? saved : []), ...(unsavedStaffCancellations.get(staffId) ?? [])].filter(validRegistrationId))];
 }
 
 async function saveStaffAlertCancellation(staffId: number, ids: string[]) {
+    let savedLocally = false;
     try {
         if (ids.length) localStorage.setItem(staffAlertCancellationKey(staffId), JSON.stringify(ids));
         else localStorage.removeItem(staffAlertCancellationKey(staffId));
+        savedLocally = true;
     } catch { /* CacheStorage can still record the intent. */ }
-    await writeStaffPushCancellation(String(staffId), ids).catch(() => {});
+    const savedInCache = await writeStaffPushCancellation(String(staffId), ids).then(() => true, () => false);
+    const saved = savedLocally || savedInCache;
+    if (ids.length && !saved) unsavedStaffCancellations.set(staffId, ids);
+    else unsavedStaffCancellations.delete(staffId);
+    return saved;
 }
 
 export function readStaffAlertDevice(staffId: number) {
@@ -145,9 +152,9 @@ export function recoverStaffAlertSetup(subscription: PushSubscription, staffId: 
         if (!await stageStaffOrderPushSetup(owner, setupId, setupFingerprint, owner, signal)) return null;
         try {
             const result = await syncStaffPushRequest(subscription, staffId, signal, setupId);
-            if (result.id !== setupId || !await bindStaffOrderPush(owner, setupId, signal, false, setupId)) return null;
-            try {localStorage.setItem(staffAlertDeviceKey(staffId), setupId);} catch { /* The confirmed binding is retained. */ }
-            return setupId;
+            if (!validRegistrationId(result.id) || !await bindStaffOrderPush(owner, result.id, signal, false, setupId)) return null;
+            try {localStorage.setItem(staffAlertDeviceKey(staffId), result.id);} catch { /* The confirmed binding is retained. */ }
+            return result.id;
         } catch (error) {
             if (error instanceof StaffAlertRequestError) {
                 if (error.status === 410) await clearStaffOrderPushSetup(owner, setupId);
@@ -192,7 +199,10 @@ export async function retryStaffAlertCancellation(staffId: number, signal: Abort
     if (!(await pendingStaffAlertCancellation(staffId)).length) return;
     await withStaffAlertDevice(async () => {
         const ids = await pendingStaffAlertCancellation(staffId);
-        if (ids.length) await finishStaffAlertCancellation(staffId, ids, signal);
+        if (ids.length) {
+            if (unsavedStaffCancellations.has(staffId)) await saveStaffAlertCancellation(staffId, ids);
+            await finishStaffAlertCancellation(staffId, ids, signal);
+        }
     }, signal);
 }
 
@@ -202,9 +212,14 @@ export function disableStaffDeviceAlerts(staffId: number) {
         const pending = await pendingStaffAlertCancellation(staffId);
         const ids = [...new Set([staged, bound, remembered, ...pending].filter(validRegistrationId))];
         if (!ids.length) throw new Error("Could not identify this phone’s alert registration. Push disable could not be confirmed.");
-        await saveStaffAlertCancellation(staffId, ids);
+        const saved = await saveStaffAlertCancellation(staffId, ids);
         dismissStaffAlertSetup(staffId);
-        await finishStaffAlertCancellation(staffId, ids);
+        try {
+            await finishStaffAlertCancellation(staffId, ids);
+        } catch (error) {
+            if (saved) throw error;
+            throw new Error("Could not confirm Disable or save it on this browser. Keep this page open and retry when connected.", {cause: error});
+        }
     });
 }
 
@@ -294,7 +309,7 @@ async function enrollStaffDevice(settings: StaffAlertSettings, applicationKey: s
             if (retrying) {
                 try {
                     const recovered = await syncStaffPushRequest(subscription, settings.staffId, signal, id);
-                    if (recovered.id === id) return {id, created: false};
+                    if (validRegistrationId(recovered.id)) return {id: recovered.id, created: false};
                 } catch (error) {
                     if (!(error instanceof StaffAlertRequestError && error.status === 404)) throw error;
                 }

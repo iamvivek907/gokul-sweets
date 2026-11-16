@@ -435,17 +435,73 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
     }
 
     @Test
+    void cancellingAReusedSetupRevokesItsCanonicalRegistration() {
+        var browser = input("reused-setup-" + UUID.randomUUID());
+        var existing = subscriptions.subscribe(staff, cookie, browser);
+        var alias = UUID.randomUUID();
+        var setup =
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(),
+                        browser.publicKey(),
+                        browser.authSecret(),
+                        null,
+                        staff,
+                        false,
+                        alias);
+        var restore =
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(), browser.publicKey(), browser.authSecret(), alias);
+
+        assertThat(subscriptions.subscribe(staff, cookie, setup))
+                .isEqualTo(new StaffPushSubscriptions.Result(existing.id(), false));
+        assertThat(subscriptions.subscribe(staff, cookie, setup).id()).isEqualTo(existing.id());
+
+        sessions.signOutDevices(staff, java.util.List.of(alias), cookie);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT paused_at IS NOT NULL FROM staff_push_subscriptions WHERE"
+                                        + " id=?",
+                                Boolean.class,
+                                existing.id()))
+                .isTrue();
+        var nextCookie = issueFor(staff);
+        assertThat(subscriptions.subscribe(staff, nextCookie, restore).id())
+                .isEqualTo(existing.id());
+        subscriptions.revoke(staff, alias);
+        assertThat(subscriptions.live(staff, existing.id(), nextCookie)).isFalse();
+
+        var replacement = subscriptions.subscribe(staff, nextCookie, browser);
+        subscriptions.revoke(staff, alias);
+        assertThat(subscriptions.live(staff, replacement.id(), nextCookie)).isTrue();
+
+        for (var request : java.util.List.of(setup, restore)) {
+            assertThatThrownBy(() -> subscriptions.subscribe(staff, nextCookie, request))
+                    .isInstanceOfSatisfying(
+                            org.springframework.web.server.ResponseStatusException.class,
+                            error -> assertThat(error.getStatusCode().value()).isEqualTo(410));
+        }
+    }
+
+    @Test
     void disableBeforeSetupCommitsRemainsIdempotentAndBlocksTheOldId() {
         var browser = input("cancelled-setup-" + UUID.randomUUID());
         var cancelledId = UUID.randomUUID();
-        var late = new StaffPushSubscriptions.Input(
-                browser.endpoint(), browser.publicKey(), browser.authSecret(), null, staff, false, cancelledId);
+        var late =
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(),
+                        browser.publicKey(),
+                        browser.authSecret(),
+                        null,
+                        staff,
+                        false,
+                        cancelledId);
 
         subscriptions.revoke(staff, cancelledId);
         subscriptions.revoke(staff, cancelledId);
 
         assertThatThrownBy(() -> subscriptions.subscribe(staff, cookie, late))
-                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                .isInstanceOfSatisfying(
+                        org.springframework.web.server.ResponseStatusException.class,
                         error -> assertThat(error.getStatusCode().value()).isEqualTo(410));
         assertThat(subscriptions.live(staff, cancelledId, cookie)).isFalse();
 
@@ -458,20 +514,33 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
     void revokedRegistrationCannotBeRestoredOrReusedAsASetupId() {
         var browser = input("revoked-setup-" + UUID.randomUUID());
         var registration = subscriptions.subscribe(staff, cookie, browser);
-        var restore = new StaffPushSubscriptions.Input(
-                browser.endpoint(), browser.publicKey(), browser.authSecret(), registration.id());
-        var replay = new StaffPushSubscriptions.Input(
-                browser.endpoint(), browser.publicKey(), browser.authSecret(), null, staff, false, registration.id());
+        var restore =
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(),
+                        browser.publicKey(),
+                        browser.authSecret(),
+                        registration.id());
+        var replay =
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(),
+                        browser.publicKey(),
+                        browser.authSecret(),
+                        null,
+                        staff,
+                        false,
+                        registration.id());
 
         subscriptions.revoke(staff, registration.id());
 
         for (var request : java.util.List.of(restore, replay)) {
             assertThatThrownBy(() -> subscriptions.subscribe(staff, cookie, request))
-                    .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                    .isInstanceOfSatisfying(
+                            org.springframework.web.server.ResponseStatusException.class,
                             error -> assertThat(error.getStatusCode().value()).isEqualTo(410));
         }
         assertThat(subscriptions.live(staff, registration.id(), cookie)).isFalse();
-        assertThat(subscriptions.subscribe(staff, cookie, browser).id()).isNotEqualTo(registration.id());
+        assertThat(subscriptions.subscribe(staff, cookie, browser).id())
+                .isNotEqualTo(registration.id());
     }
 
     @Test

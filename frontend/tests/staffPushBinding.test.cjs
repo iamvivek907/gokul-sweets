@@ -346,6 +346,42 @@ test('pending cancellation blocks recovery and a lost DELETE can be retried', as
     assert.notEqual(phone.read().registrationId, setupId);
 });
 
+test('Disable stays pending during this visit if neither storage system can save it', async () => {
+    const setupId = '1f9e817c-8883-46ca-ad8b-a3ea20868152';
+    const setupFingerprint = require('node:crypto').createHash('sha256')
+        .update(JSON.stringify(['https://example.invalid/phone', 'key', 'auth'])).digest('hex');
+    let offline = true;
+    const phone = fixture({owner: '12', registrationId: null, setupId, setupFingerprint}, {
+        writeFails: true, storageFails: true, respond(request) {
+            assert.equal(request.method, 'DELETE', 'background recovery must not restore the staged registration');
+            if (offline) throw new TypeError('offline');
+            return new Response(null, {status: 204});
+        }
+    });
+
+    await assert.rejects(phone.disable(), /Could not confirm Disable or save it on this browser/);
+    assert.equal(await phone.recover(), null);
+    assert.equal(phone.requests.length, 1);
+    offline = false;
+    await phone.retryCancellation();
+    await phone.retryCancellation();
+    assert.equal(phone.requests.length, 2, 'confirmed revocation drops the in-memory cancellation');
+});
+
+test('background recovery replaces a staged alias with the canonical registration', async () => {
+    let setupAttempts = 0;
+    const phone = fixture({owner: '12', registrationId: null}, {respond(request, deviceId) {
+        if (request.body.setupId && ++setupAttempts <= 2) throw new TypeError('POST response lost');
+        assert.ok(request.body.registrationId);
+        return Response.json({id: deviceId});
+    }});
+    await assert.rejects(phone.enable(), /POST response lost/);
+    assert.notEqual(phone.read().setupId, phone.deviceId);
+    assert.equal(await phone.recover(), phone.deviceId);
+    assert.deepEqual(phone.read(), {owner: '12', registrationId: phone.deviceId});
+    assert.equal(phone.saved.get(phone.key), phone.deviceId);
+});
+
 for (const restoreStatus of [404, 410]) {
     test(`explicit Enable replaces a server-cancelled staged ID after restore returns ${restoreStatus}`, async () => {
         let cancelledId;

@@ -124,18 +124,28 @@ public class StaffPushSubscriptions {
                             Long.class,
                             staffId)
                     .isEmpty()) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
-            UUID requestedId = input.registrationId() == null ? input.setupId() : input.registrationId();
-            if (requestedId != null && Boolean.TRUE.equals(jdbc.queryForObject(
-                    """
+            UUID requestedId =
+                    input.registrationId() == null ? input.setupId() : input.registrationId();
+            UUID reusedId =
+                    requestedId == null ? null : findSetupRegistration(staffId, requestedId);
+            UUID registrationId = reusedId == null ? input.registrationId() : reusedId;
+            if (requestedId != null
+                    && Boolean.TRUE.equals(
+                            jdbc.queryForObject(
+                                    """
 SELECT EXISTS (SELECT 1 FROM staff_push_cancellations
                WHERE environment=? AND staff_id=? AND registration_id=?
                UNION ALL
                SELECT 1 FROM staff_push_subscriptions
                WHERE environment=? AND staff_id=? AND id=? AND revoked_at IS NOT NULL)
 """,
-                    Boolean.class,
-                    alerts.scope(), staffId, requestedId,
-                    alerts.scope(), staffId, requestedId))) {
+                                    Boolean.class,
+                                    alerts.scope(),
+                                    staffId,
+                                    requestedId,
+                                    alerts.scope(),
+                                    staffId,
+                                    reusedId == null ? requestedId : reusedId))) {
                 throw new ResponseStatusException(HttpStatus.GONE);
             }
             String session = StaffSessionService.hash(cookie),
@@ -201,7 +211,7 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.environment = ? AND s.staff_id =
             if (count != null && count >= 5)
                 throw new ResponseStatusException(
                         HttpStatus.CONFLICT, "Maximum five live staff browsers.");
-            if (input.registrationId() != null) {
+            if (registrationId != null) {
                 // Existing-device restoration must never recreate a removed subscription.
                 var restored =
                         jdbc.query(
@@ -217,7 +227,7 @@ RETURNING s.id
 """,
                                 (rs, row) -> rs.getObject(1, UUID.class),
                                 session,
-                                input.registrationId(),
+                                registrationId,
                                 alerts.scope(),
                                 staffId,
                                 hash,
@@ -237,8 +247,20 @@ RETURNING s.id
                         && old.staffId() == staffId
                         && old.session().equals(session)
                         && old.publicKey().equals(input.publicKey())
-                        && old.auth().equals(input.authSecret()))
+                        && old.auth().equals(input.authSecret())) {
+                    if (input.setupId() != null && !input.setupId().equals(old.id())) {
+                        jdbc.update(
+                                """
+INSERT INTO staff_push_setup_aliases(environment, staff_id, setup_id, registration_id)
+VALUES (?, ?, ?, ?)
+""",
+                                alerts.scope(),
+                                staffId,
+                                input.setupId(),
+                                old.id());
+                    }
                     return new Result(old.id(), old.id().equals(input.setupId()));
+                }
                 jdbc.update(
                         "UPDATE staff_push_subscriptions SET revoked_at = CURRENT_TIMESTAMP,"
                                 + " endpoint_hash = ? WHERE id = ?",
@@ -308,6 +330,22 @@ WHERE d.state IN ('QUEUED','SENDING','SKIPPED')
         }
     }
 
+    private UUID findSetupRegistration(long staffId, UUID setupId) {
+        return jdbc
+                .queryForList(
+                        """
+SELECT registration_id FROM staff_push_setup_aliases
+WHERE environment=? AND staff_id=? AND setup_id=?
+""",
+                        UUID.class,
+                        alerts.scope(),
+                        staffId,
+                        setupId)
+                .stream()
+                .findFirst()
+                .orElse(null);
+    }
+
     /**
      * Revokes staff push subscriptions data.
      *
@@ -321,13 +359,16 @@ WHERE d.state IN ('QUEUED','SENDING','SKIPPED')
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(StaffPushSubscriptions.class, "revoke(long,UUID)");
         try {
-            // Share setup's staff-row lock so an absent registration cannot commit after cancellation.
-            jdbc.queryForObject("SELECT id FROM staff_users WHERE id = ? FOR UPDATE", Long.class, staffId);
+            // Share setup's staff-row lock so an absent registration cannot commit after
+            // cancellation.
+            jdbc.queryForObject(
+                    "SELECT id FROM staff_users WHERE id = ? FOR UPDATE", Long.class, staffId);
+            UUID reusedId = findSetupRegistration(staffId, id);
             if (jdbc.update(
                             "UPDATE staff_push_subscriptions SET revoked_at = COALESCE(revoked_at,"
                                     + " CURRENT_TIMESTAMP) WHERE id = ? AND environment = ? AND"
                                     + " staff_id = ?",
-                            id,
+                            reusedId == null ? id : reusedId,
                             alerts.scope(),
                             staffId)
                     == 0) {
@@ -336,7 +377,9 @@ WHERE d.state IN ('QUEUED','SENDING','SKIPPED')
 INSERT INTO staff_push_cancellations(environment, staff_id, registration_id)
 VALUES (?, ?, ?) ON CONFLICT DO NOTHING
 """,
-                        alerts.scope(), staffId, id);
+                        alerts.scope(),
+                        staffId,
+                        id);
             }
         } finally {
             MethodTiming.finish(

@@ -458,13 +458,22 @@ WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ? AND u.activ
                         "signOutDevices(long,java.util.List<java.util.UUID>,String)");
         try {
             if (!deviceIds.isEmpty()) {
+                var first = deviceIds.getFirst();
+                var second = deviceIds.size() > 1 ? deviceIds.get(1) : first;
                 jdbc.update(
-                        "UPDATE staff_push_subscriptions SET"
-                            + " paused_at=COALESCE(paused_at,CURRENT_TIMESTAMP) WHERE id IN (?,?)"
-                            + " AND staff_id=?",
-                        deviceIds.getFirst(),
-                        deviceIds.size() > 1 ? deviceIds.get(1) : deviceIds.getFirst(),
-                        staffId);
+                        """
+UPDATE staff_push_subscriptions s SET paused_at=COALESCE(s.paused_at,CURRENT_TIMESTAMP)
+WHERE s.staff_id=? AND (s.id IN (?,?) OR EXISTS (
+    SELECT 1 FROM staff_push_setup_aliases a
+    WHERE a.environment=s.environment AND a.staff_id=s.staff_id
+      AND a.registration_id=s.id AND a.setup_id IN (?,?)
+))
+""",
+                        staffId,
+                        first,
+                        second,
+                        first,
+                        second);
             }
             revoke(token);
         } finally {
