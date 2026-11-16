@@ -458,6 +458,9 @@ WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ? AND u.activ
                         "signOutDevices(long,java.util.List<java.util.UUID>,String)");
         try {
             if (!deviceIds.isEmpty()) {
+                // A timed-out setup may still be recording the alias for this browser.
+                jdbc.queryForList(
+                        "SELECT id FROM staff_users WHERE id=? FOR UPDATE", Long.class, staffId);
                 var first = deviceIds.getFirst();
                 var second = deviceIds.size() > 1 ? deviceIds.get(1) : first;
                 jdbc.update(
