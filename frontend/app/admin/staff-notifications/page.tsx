@@ -7,7 +7,7 @@ import {usePwaInstall} from "@/hooks/usePwaInstall";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
 import {formatBusinessTimestamp} from "@/lib/businessTime";
 import NotificationIcon from "@/components/customer/NotificationIcon";
-import {STAFF_ALERT_DEVICE_RESTORED, disableStaffDeviceAlerts, enableStaffDeviceAlerts, readStaffAlertDevice, staffAlertsRequest, supportsStaffPush, type StaffAlertSettings, type StaffInbox} from "@/services/staffAlertsApi";
+import {STAFF_ALERT_DEVICE_RESTORED, disableStaffDeviceAlerts, enableStaffDeviceAlerts, readStaffAlertDevice, resolveStaffAlertDevice, staffAlertsRequest, supportsStaffPush, type StaffAlertSettings, type StaffInbox} from "@/services/staffAlertsApi";
 
 export default function StaffNotificationsPage() {
     const {profile, hasPermission} = useAdminAuth();
@@ -25,7 +25,7 @@ export default function StaffNotificationsPage() {
     const [permission, setPermission] = useState<NotificationPermission>("default");
     const [supported, setSupported] = useState(false);
     const load = useCallback(async (signal?: AbortSignal) => {
-        const device = profile ? readStaffAlertDevice(profile.staffId) : null;
+        const device = profile ? await resolveStaffAlertDevice(profile.staffId) : null;
         const next = await staffAlertsRequest<StaffAlertSettings>(`/settings${device ? `?deviceId=${encodeURIComponent(device)}` : ""}`, {signal});
         if (signal?.aborted) return;
         setSettings(next); setDeviceId(device); setPermission("Notification" in window ? Notification.permission : "default");

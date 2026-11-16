@@ -234,6 +234,23 @@ test('a staff catch-up push can ring before the restore response confirms the bi
     assert.equal(runtime.shown[1].data.url, '/admin/orders/GS-901');
 });
 
+test('only the matching setup and current IDs can ring while fresh setup is pending', async () => {
+    const runtime = worker();
+    const key = 'https://dev.gokulsweets.in/.__gokul-order-push/staff';
+    runtime.entries.set(key, JSON.stringify({owner: 'staff', registrationId: 'current', setupId: 'fresh'}));
+    const send = (id, registrationId) => new Promise(resolve => runtime.listeners.push({
+        data: {json: () => ({eventId: `staff:${id}`, registrationId, title: 'Prepare order', url: '/admin/orders/GS-901'})},
+        waitUntil: resolve
+    }));
+    await send(950, 'previous-account');
+    await send(951, 'current');
+    await send(952, 'fresh');
+    assert.deepEqual(runtime.shown.map(notice => [notice.data.registrationId, notice.data.url, notice.silent]), [
+        ['current', '/admin/orders/GS-901', false],
+        ['fresh', '/admin/staff-notifications', false]
+    ]);
+});
+
 test('staff push deduplication and ordering follow the registration on a shared phone', async () => {
     const runtime = worker();
     const key = 'https://dev.gokulsweets.in/.__gokul-order-push/staff';

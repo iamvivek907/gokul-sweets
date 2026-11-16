@@ -1,5 +1,5 @@
 type Audience = "staff" | "customer";
-type Binding = {owner: string; registrationId: string | null; pending?: true};
+type Binding = {owner: string; registrationId: string | null; pending?: true; setupId?: string; setupFingerprint?: string};
 const cacheName = "gokul-order-push-binding-v1";
 const bindingKey = (audience: Audience) => `/.__gokul-order-push/${audience}`;
 
@@ -21,7 +21,8 @@ async function updateBinding(audience: Audience, update: (previous: Binding | nu
         signal?.throwIfAborted();
         const next = update(previous);
         if (!next || (previous?.owner === next.owner && previous.registrationId === next.registrationId
-            && previous.pending === next.pending)) return;
+            && previous.pending === next.pending && previous.setupId === next.setupId
+            && previous.setupFingerprint === next.setupFingerprint)) return;
         try {
             await cache.put(key, new Response(JSON.stringify(next)));
         } catch (error) {
@@ -88,6 +89,39 @@ export async function switchOrderPushOwner(audience: Audience, owner: string, si
 export async function clearFailedStaffOrderPushBinding(owner: string, registrationId: string) {
     await updateBinding("staff", previous =>
         previous?.owner === owner && previous.registrationId === registrationId ? {owner, registrationId: null} : null);
+}
+
+/** Allow the new setup ID to ring generically while preserving this account's current binding. */
+export async function stageStaffOrderPushSetup(owner: string, setupId: string, fingerprint: string, expectedOwner: string | null, signal: AbortSignal) {
+    let matched = true;
+    let readableMarker = false;
+    let changedOwner = false;
+    try {
+        await updateBinding("staff", previous => {
+            readableMarker = previous !== null;
+            if (previous?.owner !== owner && (previous?.owner ?? null) !== expectedOwner) {
+                matched = false;
+                return null;
+            }
+            changedOwner = !!previous?.owner && previous.owner !== owner;
+            const setup = {setupId, setupFingerprint: fingerprint};
+            return previous?.owner === owner ? {...previous, ...setup} : {owner, registrationId: null, ...setup};
+        }, signal, async () => {if (changedOwner) await closeOrderNotifications("staff").catch(() => {});});
+    } catch (error) {
+        signal.throwIfAborted();
+        // An unavailable cache can use the worker's generic fallback. A readable old
+        // marker can block the push, so leave the server registration untouched.
+        if (readableMarker) throw error;
+    }
+    return matched;
+}
+
+export async function clearStaffOrderPushSetup(owner: string, setupId: string) {
+    await updateBinding("staff", previous => {
+        if (previous?.owner !== owner || previous.setupId !== setupId) return null;
+        const {registrationId, pending} = previous;
+        return {owner, registrationId, ...(pending ? {pending} : {})};
+    }, AbortSignal.timeout(8000));
 }
 
 /** Stop displaying this account’s queued notifications after confirmed logout. */

@@ -1,6 +1,6 @@
 import {ADMIN_API_BASE_URL} from "@/lib/constants";
 import {applicationServerKey} from "@/lib/notificationAlerts";
-import {bindStaffOrderPush, clearFailedStaffOrderPushBinding, clearOrderPushBinding, readOrderPushBinding, switchOrderPushOwner} from "@/lib/orderPushBinding";
+import {bindStaffOrderPush, clearFailedStaffOrderPushBinding, clearOrderPushBinding, clearStaffOrderPushSetup, readOrderPushBinding, stageStaffOrderPushSetup, switchOrderPushOwner} from "@/lib/orderPushBinding";
 import {adminFetch, logoutAdmin} from "@/services/adminApi";
 
 export const STAFF_ALERT_DEVICE_RESTORED = "gokul-staff-alert-device-restored";
@@ -13,6 +13,14 @@ export function readStaffAlertDevice(staffId: number) {
         const id = localStorage.getItem(staffAlertDeviceKey(staffId));
         return id && /^[0-9a-f-]{36}$/i.test(id) ? id : null;
     } catch {return null;}
+}
+
+export async function resolveStaffAlertDevice(staffId: number) {
+    const remembered = readStaffAlertDevice(staffId);
+    if (remembered) return remembered;
+    const binding = await readOrderPushBinding("staff");
+    const id = binding?.owner === String(staffId) ? binding.registrationId : null;
+    return id && /^[0-9a-f-]{36}$/i.test(id) ? id : null;
 }
 
 export function supportsStaffPush() {
@@ -84,8 +92,8 @@ export function confirmStaffAlertDevice(staffId: number, registrationId: string,
 
 export function disableStaffDeviceAlerts(staffId: number) {
     return withStaffAlertDevice(async () => {
-        const id = readStaffAlertDevice(staffId);
-        if (!id) return;
+        const id = await resolveStaffAlertDevice(staffId);
+        if (!id) throw new Error("Could not identify this phone’s alert registration. Push disable could not be confirmed.");
         await staffAlertsRequest(`/push-subscriptions/${encodeURIComponent(id)}`, {
             method: "DELETE", signal: AbortSignal.timeout(8000)
         }, staffId);
@@ -136,6 +144,7 @@ async function enrollStaffDevice(settings: StaffAlertSettings, applicationKey: s
     let newRegistration = false;
     let savedDevice = false;
     let registrationUncertain = false;
+    let setupId: string | undefined;
     scope?.throwIfAborted();
     let expire: () => void = () => {};
     const deadline = new Promise<never>((_, reject) => {
@@ -144,7 +153,8 @@ async function enrollStaffDevice(settings: StaffAlertSettings, applicationKey: s
     });
     try {
         signal.throwIfAborted();
-        const previousOwner = (await Promise.race([readOrderPushBinding("staff"), deadline]))?.owner ?? null;
+        const previousBinding = await Promise.race([readOrderPushBinding("staff"), deadline]);
+        const previousOwner = previousBinding?.owner ?? null;
         const registration = await Promise.race([navigator.serviceWorker.register("/sw.js"), deadline]);
         if (!registration.active) await Promise.race([navigator.serviceWorker.ready, deadline]);
         let subscription = await Promise.race([registration.pushManager.getSubscription(), deadline]);
@@ -157,7 +167,18 @@ async function enrollStaffDevice(settings: StaffAlertSettings, applicationKey: s
         }
         signal.throwIfAborted();
         const keys = subscription.toJSON().keys;
-        const body = JSON.stringify({expectedStaffId: settings.staffId, setupId: crypto.randomUUID(),
+        if (previousOwner !== owner) {
+            const current = await staffAlertsRequest<StaffAlertSettings>("/settings", {signal}, settings.staffId);
+            if (current.staffId !== settings.staffId) throw new Error("The active staff account changed. Reopen this page and try again.");
+        }
+        const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify([subscription.endpoint, keys?.p256dh, keys?.auth])));
+        const fingerprint = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+        setupId = previousBinding?.owner === owner && previousBinding.setupFingerprint === fingerprint && previousBinding.setupId
+            ? previousBinding.setupId : crypto.randomUUID();
+        if (!await stageStaffOrderPushSetup(owner, setupId, fingerprint, previousOwner, signal)) {
+            throw new Error("The active staff account changed. Reopen this page and try again.");
+        }
+        const body = JSON.stringify({expectedStaffId: settings.staffId, setupId,
             endpoint: subscription.endpoint, publicKey: keys?.p256dh, authSecret: keys?.auth});
         const register = (requestSignal: AbortSignal) =>
             staffAlertsRequest<{id: string; created?: boolean}>("/push-subscriptions",
@@ -187,6 +208,9 @@ async function enrollStaffDevice(settings: StaffAlertSettings, applicationKey: s
         dismissStaffAlertSetup(settings.staffId);
         window.dispatchEvent(new Event(STAFF_ALERT_DEVICE_RESTORED));
     } catch (error) {
+        if (setupId && (!registrationUncertain || registrationId)) {
+            await clearStaffOrderPushSetup(owner, setupId).catch(() => {});
+        }
         if (registrationId && newRegistration && (savedDevice || readStaffAlertDevice(settings.staffId) !== registrationId)) {
             if (savedDevice && readStaffAlertDevice(settings.staffId) === registrationId) {
                 try {localStorage.removeItem(staffAlertDeviceKey(settings.staffId));} catch { /* Server cleanup still runs. */ }

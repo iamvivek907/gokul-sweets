@@ -803,6 +803,7 @@ async function orderPushDisplay(payload, staff) {
         const response = await cache.match(key);
         const binding = response ? await response.json() : null;
         if (!binding) return payload.registrationId ? "generic" : "details";
+        if (staff && payload.registrationId && binding.setupId === payload.registrationId) return "generic";
         if (!payload.registrationId || binding.registrationId !== payload.registrationId) return "blocked";
         return binding.pending ? "generic" : "details";
     } catch {

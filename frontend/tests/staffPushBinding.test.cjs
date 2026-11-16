@@ -10,11 +10,11 @@ function load(file, globals) {
     const source = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
     const code = ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022}}).outputText;
     const exports = {};
-    vm.runInNewContext(code, {exports, Response, Headers, AbortSignal, DOMException, TypeError, SyntaxError, Event, crypto: webcrypto, ...globals});
+    vm.runInNewContext(code, {exports, Response, Headers, AbortSignal, DOMException, TypeError, SyntaxError, Event, TextEncoder, crypto: webcrypto, ...globals});
     return exports;
 }
 
-function fixture(binding, {readFails = false, writeFails = false, createdRegistration = true, storageFails = false, locks, respond} = {}) {
+function fixture(binding, {readFails = false, writeFails = false, createdRegistration = true, storageFails = false, readLocalFails = false, locks, respond} = {}) {
     const store = {
         async match() { return binding ? new Response(JSON.stringify(binding)) : undefined; },
         async put(key, value) {
@@ -40,7 +40,10 @@ function fixture(binding, {readFails = false, writeFails = false, createdRegistr
             async subscribe() {subscribed = true; return subscription;}
         }};
     }}};
-    const localStorage = {getItem: key => saved.get(key) ?? null, removeItem: key => saved.delete(key),
+    const localStorage = {getItem: key => {
+        if (readLocalFails) throw new Error('Storage blocked');
+        return saved.get(key) ?? null;
+    }, removeItem: key => saved.delete(key),
         setItem(key, value) {
             if ((typeof storageFails === 'function' ? storageFails() : storageFails)) throw new Error('Storage blocked');
             saved.set(key, value);
@@ -55,6 +58,7 @@ function fixture(binding, {readFails = false, writeFails = false, createdRegistr
             const request = {url, method: init.method, authorization, body: init.body && JSON.parse(init.body), binding};
             requests.push(request);
             if (respond) return respond(request, deviceId);
+            if (!init.method) return new Response('{"staffId":12}');
             return init.method === 'DELETE' ? new Response(null, {status: 204})
                 : new Response(JSON.stringify({id: deviceId, created: createdRegistration}));
         }};
@@ -109,13 +113,11 @@ test('a stale staff tab cannot stage, confirm, or switch across a newer handoff'
     assert.deepEqual(phone.read(), {owner: '13', registrationId: 'current-phone'});
 });
 
-test('failed setup revokes the new registration and unsubscribes without saving its ID', async () => {
+test('fresh setup leaves the server untouched if a blocking cache marker cannot be staged', async () => {
     const owner = {owner: '13', registrationId: 'another-phone'};
     const phone = fixture(owner, {writeFails: true});
-    await assert.rejects(phone.enable(), /active staff account changed/);
-    assert.deepEqual(phone.requests.map(request => request.method), ['POST', 'DELETE']);
-    assert.ok(phone.requests[1].url.endsWith(phone.deviceId));
-    assert.equal(phone.requests[1].authorization, 'staff-session:12');
+    await assert.rejects(phone.enable(), /Storage quota exceeded/);
+    assert.deepEqual(phone.requests.map(request => request.method ?? 'GET'), ['GET']);
     assert.equal(phone.unsubscribes(), 1);
     assert.equal(phone.saved.size, 0);
     assert.deepEqual(phone.read(), owner);
@@ -201,6 +203,34 @@ test('repeated lost responses leave the endpoint available for a later setup', a
     assert.equal(phone.unsubscribes(), 0);
     assert.equal(await phone.enable(), 'granted');
     assert.equal(phone.requests[2].body.endpoint, phone.requests[0].body.endpoint);
+    assert.equal(phone.requests[2].body.setupId, phone.requests[0].body.setupId);
+});
+
+test('fresh setup stages its ID after verifying the current account and before posting', async () => {
+    const phone = fixture({owner: '', registrationId: null}, {
+        respond(request) {
+            if (request.method !== 'POST') return new Response('{"staffId":12}');
+            return new Response(JSON.stringify({id: request.body.setupId, created: true}));
+        }
+    });
+    await phone.enable();
+    const request = phone.requests[1];
+    assert.equal(request.method, 'POST');
+    assert.equal(request.binding.owner, '12');
+    assert.equal(request.binding.setupId, request.body.setupId);
+    assert.deepEqual(phone.read(), {owner: '12', registrationId: request.body.setupId});
+});
+
+test('disable finds a matching cached registration if device storage is unreadable', async () => {
+    const id = 'd1779266-3814-48cf-8f6d-8c23b832c1c3';
+    const phone = fixture({owner: '12', registrationId: id}, {readLocalFails: true});
+    await phone.disable();
+    assert.ok(phone.requests[0].url.endsWith(id));
+    assert.deepEqual(phone.read(), {owner: '', registrationId: null});
+
+    const different = fixture({owner: '13', registrationId: id}, {readLocalFails: true});
+    await assert.rejects(different.disable(), /disable could not be confirmed/);
+    assert.equal(different.requests.length, 0);
 });
 
 for (const operation of ['disable', 'signOut']) {
