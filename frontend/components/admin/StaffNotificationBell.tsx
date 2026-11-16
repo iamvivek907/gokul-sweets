@@ -9,7 +9,7 @@ import {usePwaInstall} from "@/hooks/usePwaInstall";
 import {T} from "@/lib/language";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
 import NotificationIcon from "@/components/customer/NotificationIcon";
-import {STAFF_ALERT_DEVICE_RESTORED, confirmStaffAlertDevice, dismissStaffAlertSetup, enableStaffDeviceAlerts, readStaffAlertDevice, staffAlertPromptKey, staffAlertsRequest, supportsStaffPush, syncStaffAlertDevice, StaffAlertRequestError, type StaffAlertSettings, type StaffInbox} from "@/services/staffAlertsApi";
+import {STAFF_ALERT_DEVICE_RESTORED, confirmStaffAlertDevice, dismissStaffAlertSetup, enableStaffDeviceAlerts, readStaffAlertDevice, recoverStaffAlertSetup, resolveConfirmedStaffAlertDevice, staffAlertPromptKey, staffAlertsRequest, supportsStaffPush, syncStaffAlertDevice, StaffAlertRequestError, type StaffAlertSettings, type StaffInbox} from "@/services/staffAlertsApi";
 
 export default function StaffNotificationBell() {
     const {profile, hasPermission, verificationFailed} = useAdminAuth();
@@ -37,10 +37,12 @@ export default function StaffNotificationBell() {
                 const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]);
                 const staffId = profile.staffId;
                 const owner = String(staffId);
-                const previousOwner = !localHandoffChecked ? (await readOrderPushBinding("staff"))?.owner ?? null : null;
-                const stored = readStaffAlertDevice(staffId);
+                const binding = await readOrderPushBinding("staff");
+                const previousOwner = binding?.owner ?? null;
+                const staged = previousOwner === owner && !!binding?.setupId;
+                const stored = await resolveConfirmedStaffAlertDevice(staffId);
                 const permitted = supportsStaffPush() && Notification.permission === "granted";
-                const device = permitted ? stored : null;
+                let device = permitted ? stored : null;
                 if (!canViewOrders) {
                     if ((!serverHandoffChecked || !localHandoffChecked) && permitted && Date.now() >= retryAt) {
                         try {
@@ -70,16 +72,21 @@ export default function StaffNotificationBell() {
 
                 let deviceActive = settings.deviceActive;
                 let restored = false;
-                if (settings.pushConfigured && permitted && (!serverHandoffChecked || (device && !deviceActive)) && Date.now() >= retryAt) {
+                if (settings.pushConfigured && permitted && (!serverHandoffChecked || staged || (device && !deviceActive)) && Date.now() >= retryAt) {
                     try {
                         const registration = await navigator.serviceWorker.getRegistration();
                         const push = await registration?.pushManager.getSubscription();
                         signal.throwIfAborted();
-                        if (push && readStaffAlertDevice(staffId) === stored) {
+                        if (push && await resolveConfirmedStaffAlertDevice(staffId) === stored) {
                             // Pause an earlier owner's verified endpoint before reusing this browser.
                             if (!serverHandoffChecked) await syncStaffAlertDevice(push, staffId, signal);
                             serverHandoffChecked = true;
-                            if (device && !deviceActive) {
+                            const recovered = staged ? await recoverStaffAlertSetup(push, staffId, signal) : null;
+                            if (recovered) {
+                                device = recovered;
+                                deviceActive = true;
+                                restored = true;
+                            } else if (device && !deviceActive) {
                                 await syncStaffAlertDevice(push, staffId, signal, device);
                                 deviceActive = true;
                                 restored = true;
@@ -121,7 +128,9 @@ export default function StaffNotificationBell() {
         const deviceChanged = () => {
             if (!active) return;
             retryAt = 0;
-            if (readStaffAlertDevice(profile.staffId)) {setSetup(null); setNeedsRepair(false);}
+            void resolveConfirmedStaffAlertDevice(profile.staffId).then(id => {
+                if (active && id) {setSetup(null); setNeedsRepair(false);}
+            });
         };
         window.addEventListener(STAFF_ALERT_DEVICE_RESTORED, deviceChanged);
         window.addEventListener("online", refresh); document.addEventListener("visibilitychange", refresh);

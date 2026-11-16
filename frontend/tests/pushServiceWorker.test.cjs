@@ -249,6 +249,10 @@ test('only the matching setup and current IDs can ring while fresh setup is pend
         ['current', '/admin/orders/GS-901', false],
         ['fresh', '/admin/staff-notifications', false]
     ]);
+    runtime.entries.set(key, JSON.stringify({owner: 'staff', registrationId: 'current', setupId: 'fresh', signedOut: true}));
+    await send(953, 'current');
+    await send(954, 'fresh');
+    assert.equal(runtime.shown.length, 2, 'neither known registration can sound while signed out');
 });
 
 test('staff push deduplication and ordering follow the registration on a shared phone', async () => {

@@ -432,18 +432,46 @@ WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ? AND u.activ
                 MethodTiming.start(
                         StaffSessionService.class, "signOut(long,java.util.UUID,String)");
         try {
-            if (deviceId != null) {
+            signOutDevices(
+                    staffId,
+                    deviceId == null ? java.util.List.of() : java.util.List.of(deviceId),
+                    token);
+        } finally {
+            MethodTiming.finish(
+                    started, StaffSessionService.class, "signOut(long,java.util.UUID,String)");
+        }
+    }
+
+    /**
+     * Pauses both possible registrations before revoking this browser's session.
+     *
+     * @param staffId the authenticated staff account
+     * @param deviceIds the saved and staged push registration IDs for this browser
+     * @param token the current session token
+     */
+    @Transactional
+    public void signOutDevices(
+            long staffId, java.util.List<java.util.UUID> deviceIds, String token) {
+        final long started =
+                MethodTiming.start(
+                        StaffSessionService.class,
+                        "signOutDevices(long,java.util.List<java.util.UUID>,String)");
+        try {
+            if (!deviceIds.isEmpty()) {
                 jdbc.update(
                         "UPDATE staff_push_subscriptions SET"
-                                + " paused_at=COALESCE(paused_at,CURRENT_TIMESTAMP) WHERE id=? AND"
-                                + " staff_id=?",
-                        deviceId,
+                            + " paused_at=COALESCE(paused_at,CURRENT_TIMESTAMP) WHERE id IN (?,?)"
+                            + " AND staff_id=?",
+                        deviceIds.getFirst(),
+                        deviceIds.size() > 1 ? deviceIds.get(1) : deviceIds.getFirst(),
                         staffId);
             }
             revoke(token);
         } finally {
             MethodTiming.finish(
-                    started, StaffSessionService.class, "signOut(long,java.util.UUID,String)");
+                    started,
+                    StaffSessionService.class,
+                    "signOutDevices(long,java.util.List<java.util.UUID>,String)");
         }
     }
 

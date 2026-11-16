@@ -1,5 +1,5 @@
 type Audience = "staff" | "customer";
-type Binding = {owner: string; registrationId: string | null; pending?: true; setupId?: string; setupFingerprint?: string};
+type Binding = {owner: string; registrationId: string | null; pending?: true; setupId?: string; setupFingerprint?: string; signedOut?: true};
 const cacheName = "gokul-order-push-binding-v1";
 const bindingKey = (audience: Audience) => `/.__gokul-order-push/${audience}`;
 
@@ -22,7 +22,7 @@ async function updateBinding(audience: Audience, update: (previous: Binding | nu
         const next = update(previous);
         if (!next || (previous?.owner === next.owner && previous.registrationId === next.registrationId
             && previous.pending === next.pending && previous.setupId === next.setupId
-            && previous.setupFingerprint === next.setupFingerprint)) return;
+            && previous.setupFingerprint === next.setupFingerprint && previous.signedOut === next.signedOut)) return;
         try {
             await cache.put(key, new Response(JSON.stringify(next)));
         } catch (error) {
@@ -46,7 +46,7 @@ export async function setOrderPushBinding(audience: Audience, owner: string, reg
 }
 
 /** Returns false for a known account mismatch. Storage errors still permit a server-verified restore. */
-export async function bindStaffOrderPush(owner: string, registrationId: string, signal?: AbortSignal, pending = false) {
+export async function bindStaffOrderPush(owner: string, registrationId: string, signal?: AbortSignal, pending = false, completedSetupId?: string) {
     let matches = true;
     try {
         await updateBinding("staff", previous => {
@@ -54,8 +54,10 @@ export async function bindStaffOrderPush(owner: string, registrationId: string, 
                 matches = false;
                 return null;
             }
-            if (pending && previous?.registrationId === registrationId && !previous.pending) return null;
-            return {owner, registrationId, ...(pending ? {pending: true} : {})};
+            if (pending && previous?.registrationId === registrationId && !previous.pending && !previous.signedOut) return null;
+            const setup = previous?.setupId && previous.setupId !== completedSetupId
+                ? {setupId: previous.setupId, setupFingerprint: previous.setupFingerprint} : {};
+            return {owner, registrationId, ...(pending ? {pending: true} : {}), ...setup};
         }, signal);
     } catch {
         signal?.throwIfAborted();
@@ -105,7 +107,7 @@ export async function stageStaffOrderPushSetup(owner: string, setupId: string, f
             }
             changedOwner = !!previous?.owner && previous.owner !== owner;
             const setup = {setupId, setupFingerprint: fingerprint};
-            return previous?.owner === owner ? {...previous, ...setup} : {owner, registrationId: null, ...setup};
+            return previous?.owner === owner ? {...previous, ...setup, signedOut: undefined} : {owner, registrationId: null, ...setup};
         }, signal, async () => {if (changedOwner) await closeOrderNotifications("staff").catch(() => {});});
     } catch (error) {
         signal.throwIfAborted();
@@ -119,9 +121,20 @@ export async function stageStaffOrderPushSetup(owner: string, setupId: string, f
 export async function clearStaffOrderPushSetup(owner: string, setupId: string) {
     await updateBinding("staff", previous => {
         if (previous?.owner !== owner || previous.setupId !== setupId) return null;
-        const {registrationId, pending} = previous;
-        return {owner, registrationId, ...(pending ? {pending} : {})};
+        return {owner, registrationId: previous.registrationId,
+            ...(previous.pending ? {pending: true} : {}), ...(previous.signedOut ? {signedOut: true} : {})};
     }, AbortSignal.timeout(8000));
+}
+
+/** Retain incomplete setup so the same account can restore it after a verified sign-in. */
+export async function signOutStaffOrderPushBinding(owner?: string) {
+    try {
+        await updateBinding("staff", previous => {
+            if (owner && previous && previous.owner !== owner) return null;
+            if (!previous?.setupId) return {owner: "", registrationId: null};
+            return {...previous, signedOut: true};
+        }, undefined, () => closeOrderNotifications("staff"));
+    } catch { /* The server has already stopped delivery. */ }
 }
 
 /** Stop displaying this account’s queued notifications after confirmed logout. */

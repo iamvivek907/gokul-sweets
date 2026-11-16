@@ -51,8 +51,8 @@ function fixture(binding, {readFails = false, writeFails = false, createdRegistr
     const api = load('services/staffAlertsApi.ts', {navigator, localStorage, window: {dispatchEvent() {}}, Notification: {permission: 'granted'}, require: module => {
         if (module.endsWith('/orderPushBinding')) return cached;
         if (module.endsWith('/notificationAlerts')) return {applicationServerKey: () => new Uint8Array(65)};
-        if (module.endsWith('/adminApi')) return {async logoutAdmin(signal, device, staffId) {
-            requests.push({method: 'LOGOUT', device, staffId});
+        if (module.endsWith('/adminApi')) return {async logoutAdmin(signal, device, staffId, staged) {
+            requests.push({method: 'LOGOUT', device, staffId, ...(staged ? {staged} : {})});
             return null;
         }, async adminFetch(url, authorization, init) {
             const request = {url, method: init.method, authorization, body: init.body && JSON.parse(init.body), binding};
@@ -71,6 +71,7 @@ function fixture(binding, {readFails = false, writeFails = false, createdRegistr
         enable: () => api.enableStaffDeviceAlerts({staffId: 12, applicationServerKey: 'test'}),
         disable: () => api.disableStaffDeviceAlerts(12),
         signOut: () => api.logoutStaffAlertDevice(12, new AbortController().signal),
+        recover: () => api.recoverStaffAlertSetup(subscription, 12, new AbortController().signal),
         confirm: id => api.confirmStaffAlertDevice(12, id, new AbortController().signal),
         deviceId, key, saved, unsubscribes: () => unsubscribes, subscribed: () => subscribed};
 }
@@ -281,4 +282,39 @@ test('a failed revoke preserves the registration and local binding for retry', a
     await assert.rejects(phone.disable(), /Could not confirm/);
     assert.equal(phone.saved.get(phone.key), deviceId);
     assert.deepEqual(phone.read(), binding);
+});
+
+test('polling retains the staged ID and disable revokes both possible registrations', async () => {
+    const confirmed = '3cf811c5-ba24-40db-ad09-f105fa46c49e';
+    const staged = '1f9e817c-8883-46ca-ad8b-a3ea20868152';
+    const binding = {owner: '12', registrationId: confirmed, setupId: staged, setupFingerprint: 'test'};
+    const phone = fixture(binding);
+    phone.saved.set(phone.key, confirmed);
+    assert.equal(await phone.confirm(confirmed), true);
+    assert.deepEqual(phone.read(), binding);
+    await phone.disable();
+    assert.deepEqual(phone.requests.map(request => request.url.split('/').at(-1)), [staged, confirmed]);
+    assert.deepEqual(phone.read(), {owner: '', registrationId: null});
+});
+
+test('sign-out retains a lost setup response for same-device recovery', async () => {
+    let attempts = 0;
+    const phone = fixture({owner: '12', registrationId: null}, {
+        respond(request) {
+            if (!request.method) return new Response('{"staffId":12}');
+            if (++attempts <= 2) throw new TypeError('Response lost');
+            return new Response(JSON.stringify({id: request.body.registrationId}));
+        }
+    });
+    await assert.rejects(phone.enable(), /Response lost/);
+    const staged = phone.requests[0].body.setupId;
+    await phone.signOut();
+    assert.equal(phone.requests[2].staged, staged);
+    assert.equal(phone.read().signedOut, true);
+    assert.equal(phone.read().setupId, staged);
+    assert.equal(await phone.recover(), staged);
+    assert.equal(phone.requests[3].binding.signedOut, true, 'recovery verifies sign-in before opening the binding');
+    assert.equal(phone.requests[4].binding.signedOut, undefined);
+    assert.deepEqual(phone.read(), {owner: '12', registrationId: staged});
+    assert.equal(phone.saved.get(phone.key), staged);
 });

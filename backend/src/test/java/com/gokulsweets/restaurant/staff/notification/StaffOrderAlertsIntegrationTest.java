@@ -480,6 +480,29 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
     }
 
     @Test
+    void signingOutPausesSavedAndStagedRegistrationsButLeavesOtherPhonesActive() {
+        var remembered =
+                subscriptions.subscribe(staff, cookie, input("saved-" + UUID.randomUUID()));
+        var staged = subscriptions.subscribe(staff, cookie, input("staged-" + UUID.randomUUID()));
+        var otherCookie = issueFor(staff);
+        var other =
+                subscriptions.subscribe(staff, otherCookie, input("other-" + UUID.randomUUID()));
+
+        sessions.signOutDevices(staff, java.util.List.of(remembered.id(), staged.id()), cookie);
+
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM staff_push_subscriptions WHERE id IN (?,?)"
+                                        + " AND paused_at IS NOT NULL",
+                                Long.class,
+                                remembered.id(),
+                                staged.id()))
+                .isEqualTo(2);
+        assertThat(sessions.verify(cookie)).isNull();
+        assertThat(subscriptions.live(staff, other.id(), otherCookie)).isTrue();
+    }
+
+    @Test
     void signingOutPausesTheOlderRegistrationWithoutRevokingAnotherPhone() {
         var browser = input("old-device-" + UUID.randomUUID());
         var old = subscriptions.subscribe(staff, cookie, browser);

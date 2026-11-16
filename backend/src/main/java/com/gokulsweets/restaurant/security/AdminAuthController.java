@@ -152,20 +152,25 @@ public class AdminAuthController {
      * <p>Delegates to {@code StaffSessionService.cookie(...)}.
      *
      * @param request the request supplied to this method
-     * @param deviceId the optional push registration for this browser
+     * @param deviceIds the saved and staged push registrations for this browser
      * @return the {@code ResponseEntity<Void>} result
      */
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
-            HttpServletRequest request, @RequestParam(required = false) java.util.UUID deviceId) {
+            HttpServletRequest request,
+            @RequestParam(name = "deviceId", required = false)
+                    java.util.List<java.util.UUID> deviceIds) {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(
-                        AdminAuthController.class, "logout(HttpServletRequest,java.util.UUID)");
+                        AdminAuthController.class,
+                        "logout(HttpServletRequest,java.util.List<java.util.UUID>)");
         try {
             if (!flags.isSecureStaffSessions()) return ResponseEntity.notFound().build();
-            sessions.signOut(
+            if (deviceIds != null && deviceIds.size() > 2)
+                return ResponseEntity.badRequest().build();
+            sessions.signOutDevices(
                     staffAuthorizationService.getCurrentStaff().getId(),
-                    deviceId,
+                    deviceIds == null ? java.util.List.of() : deviceIds,
                     StaffSessionService.cookie(request));
             return ResponseEntity.noContent()
                     .header(HttpHeaders.SET_COOKIE, cookie("", Duration.ZERO).toString())
@@ -174,7 +179,7 @@ public class AdminAuthController {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
                     AdminAuthController.class,
-                    "logout(HttpServletRequest,java.util.UUID)");
+                    "logout(HttpServletRequest,java.util.List<java.util.UUID>)");
         }
     }
 
