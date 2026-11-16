@@ -113,6 +113,22 @@ test('a failed cache write removes only a matching empty marker before server re
     assert.deepEqual(other.read(), {owner: '13', registrationId: 'another-phone'});
 });
 
+test('a saved registration waits when a staged marker blocks delivery and cannot be updated', async () => {
+    const setupId = '1f9e817c-8883-46ca-ad8b-a3ea20868152';
+    const marker = {owner: '12', registrationId: null, setupId, setupFingerprint: 'stored'};
+    let writeFails = true;
+    const phone = fixture(marker, {writeFails: () => writeFails});
+    await assert.rejects(phone.restore(), /could not save its alert registration/);
+    assert.equal(phone.requests.length, 0);
+    assert.deepEqual(phone.read(), marker);
+
+    writeFails = false;
+    assert.equal((await phone.restoreAs(phone.deviceId)).id, phone.deviceId);
+    assert.equal(phone.requests[0].binding.registrationId, phone.deviceId);
+    assert.equal(phone.requests[0].binding.pending, true);
+    assert.equal(phone.requests[0].binding.setupId, setupId);
+});
+
 test('a stale staff tab cannot stage, confirm, or switch across a newer handoff', async () => {
     const phone = fixture({owner: '12', registrationId: null});
     const signal = new AbortController().signal;

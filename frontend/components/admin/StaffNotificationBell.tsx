@@ -34,10 +34,12 @@ export default function StaffNotificationBell() {
             if (busy || !navigator.onLine || document.visibilityState !== "visible") return;
             busy = true;
             try {
-                const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]);
                 const staffId = profile.staffId;
                 const owner = String(staffId);
-                await retryStaffAlertCancellation(staffId, signal).catch(() => {});
+                const cancellationSignal = AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]);
+                await retryStaffAlertCancellation(staffId, cancellationSignal).catch(() => {});
+                if (controller.signal.aborted) return;
+                const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]);
                 const binding = await readOrderPushBinding("staff");
                 const previousOwner = binding?.owner ?? null;
                 const staged = previousOwner === owner && !!binding?.setupId;

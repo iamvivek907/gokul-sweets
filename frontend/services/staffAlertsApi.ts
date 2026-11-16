@@ -106,10 +106,7 @@ export function syncStaffAlertDevice(subscription: PushSubscription, staffId: nu
         if (registrationId) {
             if (await resolveConfirmedStaffAlertDevice(staffId) !== registrationId) throw new Error("This phone’s alert registration changed.");
             await verifyStaffOrderPushSignIn(staffId, signal);
-            // A restore may release queued pushes before the response confirms the binding.
-            if (!await bindStaffOrderPush(String(staffId), registrationId, signal, true)) {
-                throw new Error("The active staff account changed. Reopen this page and try again.");
-            }
+            await prepareStaffPushRestore(staffId, registrationId, signal);
         }
         return syncStaffPushRequest(subscription, staffId, signal, registrationId);
     }, signal);
@@ -134,15 +131,24 @@ function syncStaffPushRequest(subscription: PushSubscription, staffId: number, s
     }, staffId);
 }
 
-/** Bind the actual ID before sending the request that can release catch-up messages. */
+/** Check that the service worker can accept the registration before a restore releases queued alerts. */
+async function prepareStaffPushRestore(staffId: number, id: string, signal: AbortSignal, requireStoredBinding = false) {
+    const owner = String(staffId);
+    if (!await bindStaffOrderPush(owner, id, signal, true)) {
+        throw new Error("The active staff account changed. Reopen this page and try again.");
+    }
+    const binding = await readOrderPushBinding("staff");
+    signal.throwIfAborted();
+    // Saved registrations can still ring generically when the worker has no readable binding.
+    if (!binding && !requireStoredBinding) return;
+    if (binding?.owner === owner && !binding.signedOut
+        && (binding.registrationId === id || (!requireStoredBinding && binding.setupId === id))) return;
+    throw new Error("This device could not save its alert registration. Try again from Staff notifications.");
+}
+
 async function activateReusedStaffPush(subscription: PushSubscription, staffId: number, id: string, signal: AbortSignal) {
     if ((await pendingStaffAlertCancellation(staffId)).includes(id)) throw new StaffAlertRequestError(410);
-    const owner = String(staffId);
-    const matches = await bindStaffOrderPush(owner, id, signal, true);
-    const binding = matches ? await readOrderPushBinding("staff") : null;
-    if (binding?.owner !== owner || binding.registrationId !== id || binding.signedOut) {
-        throw new Error("This device could not save its alert registration. Try again from Staff notifications.");
-    }
+    await prepareStaffPushRestore(staffId, id, signal, true);
     const restored = await syncStaffPushRequest(subscription, staffId, signal, id);
     if (restored.id !== id || restored.bindingRequired) throw new Error("Could not activate this device’s staff alerts.");
 }
