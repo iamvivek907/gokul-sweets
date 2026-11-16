@@ -54,7 +54,9 @@ export async function resolveStaffAlertDevice(staffId: number) {
 
 export async function resolveConfirmedStaffAlertDevice(staffId: number) {
     const cancelled = await pendingStaffAlertCancellation(staffId);
-    const {remembered, bound} = await staffAlertDeviceIds(staffId);
+    const {remembered, bound, staged} = await staffAlertDeviceIds(staffId);
+    // A staged ID can be an alias for the saved registration. Wait for its cancellation to finish.
+    if (staged && cancelled.includes(staged)) return null;
     return [bound, remembered].find(id => id && !cancelled.includes(id)) ?? null;
 }
 
@@ -106,9 +108,9 @@ export function syncStaffAlertDevice(subscription: PushSubscription, staffId: nu
         if (registrationId) {
             if (await resolveConfirmedStaffAlertDevice(staffId) !== registrationId) throw new Error("This phone’s alert registration changed.");
             await verifyStaffOrderPushSignIn(staffId, signal);
-            await prepareStaffPushRestore(staffId, registrationId, signal);
+            return restoreStaffPushRegistration(subscription, staffId, registrationId, signal);
         }
-        return syncStaffPushRequest(subscription, staffId, signal, registrationId);
+        return syncStaffPushRequest(subscription, staffId, signal);
     }, signal);
 }
 
@@ -146,11 +148,16 @@ async function prepareStaffPushRestore(staffId: number, id: string, signal: Abor
     throw new Error("This device could not save its alert registration. Try again from Staff notifications.");
 }
 
-async function activateReusedStaffPush(subscription: PushSubscription, staffId: number, id: string, signal: AbortSignal) {
-    if ((await pendingStaffAlertCancellation(staffId)).includes(id)) throw new StaffAlertRequestError(410);
-    await prepareStaffPushRestore(staffId, id, signal, true);
+async function restoreStaffPushRegistration(subscription: PushSubscription, staffId: number, id: string, signal: AbortSignal, requireStoredBinding = false) {
+    await prepareStaffPushRestore(staffId, id, signal, requireStoredBinding);
     const restored = await syncStaffPushRequest(subscription, staffId, signal, id);
     if (restored.id !== id || restored.bindingRequired) throw new Error("Could not activate this device’s staff alerts.");
+    return {id, created: false};
+}
+
+async function activateReusedStaffPush(subscription: PushSubscription, staffId: number, id: string, signal: AbortSignal) {
+    if ((await pendingStaffAlertCancellation(staffId)).includes(id)) throw new StaffAlertRequestError(410);
+    await restoreStaffPushRegistration(subscription, staffId, id, signal, true);
 }
 
 async function staffSetupFingerprint(subscription: PushSubscription) {
@@ -347,12 +354,23 @@ async function enrollStaffDevice(settings: StaffAlertSettings, applicationKey: s
             if (result.bindingRequired) await activateReusedStaffPush(subscription, settings.staffId, result.id, signal);
             return result;
         };
-        let result;
-        try {
-            result = await finish(existingSetupId ?? crypto.randomUUID(), Boolean(existingSetupId));
-        } catch (error) {
-            if (!existingSetupId || !(error instanceof StaffAlertRequestError && error.status === 410)) throw error;
-            result = await finish(crypto.randomUUID(), false);
+        let result: StaffPushSetupResult | undefined;
+        const savedId = !existingSetupId && !created ? await resolveConfirmedStaffAlertDevice(settings.staffId) : null;
+        if (savedId) {
+            if (previousOwner !== owner) await switchOrderPushOwner("staff", owner, signal, true, previousOwner);
+            try {
+                result = await restoreStaffPushRegistration(subscription, settings.staffId, savedId, signal);
+            } catch (error) {
+                if (!(error instanceof StaffAlertRequestError && [404, 410].includes(error.status))) throw error;
+            }
+        }
+        if (!result) {
+            try {
+                result = await finish(existingSetupId ?? crypto.randomUUID(), Boolean(existingSetupId));
+            } catch (error) {
+                if (!existingSetupId || !(error instanceof StaffAlertRequestError && error.status === 410)) throw error;
+                result = await finish(crypto.randomUUID(), false);
+            }
         }
         registrationId = result.id;
         newRegistration = result.created ?? result.id !== previousDevice;

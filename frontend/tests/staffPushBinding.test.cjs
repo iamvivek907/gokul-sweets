@@ -52,7 +52,7 @@ function fixture(binding, {readFails = false, writeFails = false, cancellationDe
         }};
     }}};
     const localStorage = {getItem: key => {
-        if (readLocalFails) throw new Error('Storage blocked');
+        if (typeof readLocalFails === 'function' ? readLocalFails() : readLocalFails) throw new Error('Storage blocked');
         return saved.get(key) ?? null;
     }, removeItem: key => saved.delete(key),
         setItem(key, value) {
@@ -264,6 +264,29 @@ test('disable finds a matching cached registration if device storage is unreadab
     assert.equal(different.requests.length, 0);
 });
 
+test('a pending cancellation of a staged alias also blocks fallback to the saved registration', async () => {
+    const setupId = '1f9e817c-8883-46ca-ad8b-a3ea20868152';
+    const setupFingerprint = require('node:crypto').createHash('sha256')
+        .update(JSON.stringify(['https://example.invalid/phone', 'key', 'auth'])).digest('hex');
+    let storageBlocked = true;
+    const phone = fixture({owner: '12', registrationId: null, setupId, setupFingerprint}, {
+        readLocalFails: () => storageBlocked,
+        respond(request) {
+            assert.equal(request.method, 'DELETE');
+            assert.ok(request.url.endsWith(setupId));
+            return new Response(null, {status: 503});
+        }
+    });
+    phone.saved.set(phone.key, phone.deviceId);
+    await assert.rejects(phone.disable(), {status: 503});
+    storageBlocked = false;
+
+    assert.equal(await phone.recover(), null);
+    assert.equal(await phone.confirm(phone.deviceId), false);
+    await assert.rejects(phone.restoreAs(phone.deviceId), /alert registration changed/);
+    assert.equal(phone.requests.length, 1);
+});
+
 for (const operation of ['disable', 'signOut']) {
     test(`${operation} waits for setup and acts on the newly enrolled device`, async () => {
         let finishSetup;
@@ -427,6 +450,37 @@ test('manual Enable resumes an existing alias only after saving the canonical ID
     assert.equal(phone.requests.length, 4);
     assert.deepEqual(phone.read(), {owner: '12', registrationId: phone.deviceId});
 });
+
+for (const status of [200, 404, 410, 503]) {
+    test(`manual Enable first restores the saved device after sign-out (restore status ${status})`, async () => {
+        const savedId = '3cf811c5-ba24-40db-ad09-f105fa46c49e';
+        const phone = fixture({owner: '12', registrationId: savedId}, {
+            createdRegistration: false,
+            respond(request) {
+                if (!request.method) return Response.json({staffId: 12});
+                if (request.body.registrationId) {
+                    assert.equal(request.body.registrationId, savedId);
+                    assert.equal(request.binding.registrationId, savedId);
+                    assert.equal(request.binding.pending, true);
+                    return status === 200 ? Response.json({id: savedId}) : new Response(null, {status});
+                }
+                assert.ok(request.body.setupId);
+                return Response.json({id: request.body.setupId, created: true});
+            }
+        });
+        phone.saved.set(phone.key, savedId);
+        await phone.signOut();
+
+        if (status === 503) {
+            await assert.rejects(phone.enable(), {status: 503});
+        } else {
+            assert.equal(await phone.enable(), 'granted');
+        }
+        const newSetups = phone.requests.filter(request => request.body?.setupId);
+        assert.equal(newSetups.length, [404, 410].includes(status) ? 1 : 0);
+        assert.equal(phone.saved.get(phone.key), newSetups[0]?.body.setupId ?? savedId);
+    });
+}
 
 test('a stale cancellation marker does not block a replacement registration or its recovery', async () => {
     const old = '3cf811c5-ba24-40db-ad09-f105fa46c49e';
