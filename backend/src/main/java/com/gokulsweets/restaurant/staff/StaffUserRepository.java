@@ -37,6 +37,17 @@ public interface StaffUserRepository extends JpaRepository<StaffUser, Long> {
     Optional<StaffUser> findDetailedById(Long id);
 
     /**
+     * Locks the staff row and reads its current revision before editing its details.
+     *
+     * @param id the staff account ID
+     * @return the current revision, if the account exists
+     */
+    @Query(
+            value = "SELECT updated_at FROM staff_users WHERE id = :id FOR UPDATE",
+            nativeQuery = true)
+    Optional<java.time.LocalDateTime> lockRevision(Long id);
+
+    /**
      * Finds all with role and branches.
      *
      * @return the find all with role and branches result

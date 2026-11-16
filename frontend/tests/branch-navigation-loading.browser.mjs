@@ -7,6 +7,7 @@ const product={id:1,name:'Fresh sweet',categoryId:1,categoryName:'Sweets',price:
 try{for(const mode of ['shared','branch-timeout','menu-timeout','menu-transient','inbox-timeout']){
  const context=await browser.newContext({viewport:{width:390,height:900},serviceWorkers:'block'}),page=await context.newPage();page.setDefaultTimeout(15000);
  let holdBranch=!['menu-timeout','menu-transient'].includes(mode),holdMenu=mode==='menu-timeout',holdInbox=mode==='inbox-timeout',releaseBranch,releaseMenu,releaseInbox,branchReads=0,menuFailures=0;
+ const menuResponse = new Promise(resolve => {releaseMenu = resolve;});
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await context.addInitScript(branch=>localStorage.setItem('gokul-selected-branch',JSON.stringify(branch)),branch);
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,OPTIONS','Access-Control-Allow-Headers':'content-type'};
@@ -23,7 +24,7 @@ try{for(const mode of ['shared','branch-timeout','menu-timeout','menu-transient'
   }
   else if(path==='/api/branches')json=[branch];
   else if(path==='/api/branches/1'){branchReads++;if(holdBranch)await new Promise(resolve=>releaseBranch=resolve);json=branch;}
-  else if(path==='/api/menu'){if(mode==='menu-transient'&&menuFailures<2){menuFailures++;return route.fulfill({status:503,headers,json:{message:'Temporary outage'}});}if(holdMenu)await new Promise(resolve=>releaseMenu=resolve);json=[{id:1,name:'Sweets',products:[product]}];}
+  else if(path==='/api/menu'){if(mode==='menu-transient'&&menuFailures<2){menuFailures++;return route.fulfill({status:503,headers,json:{message:'Temporary outage'}});}if(holdMenu)await menuResponse;json=[{id:1,name:'Sweets',products:[product]}];}
   else if(path==='/api/menu/portion-groups')json={groups:[]};
   try{return await route.fulfill({headers,json});}catch{/* Timed-out reads are cancelled. */}
  });
@@ -60,7 +61,8 @@ try{for(const mode of ['shared','branch-timeout','menu-timeout','menu-transient'
    holdBranch=false;releaseBranch();await page.getByRole('button',{name:'Try again',exact:true}).click();
    await page.getByText('Fresh sweet',{exact:true}).first().waitFor();
   }else{
-   await page.getByRole('heading',{name:'Unable to load menu',exact:true}).waitFor();
+   // Allow the full 17-second menu retry budget plus time for the error to render.
+   await page.getByRole('heading',{name:'Unable to load menu',exact:true}).waitFor({timeout:22000});
    holdMenu=false;releaseMenu();await page.getByRole('button',{name:'Try again',exact:true}).click();
    await page.getByText('Fresh sweet',{exact:true}).first().waitFor();
   }

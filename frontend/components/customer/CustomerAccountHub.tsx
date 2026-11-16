@@ -1,4 +1,5 @@
 "use client";
+import {logoutCustomerWithAlerts} from "@/lib/customerPushRegistration";
 import BrandLoading from "@/components/common/BrandLoading";
 import {notifyCustomerIdentityChanged} from "@/lib/customerIdentityEvents";
 import dynamic from "next/dynamic";
@@ -116,7 +117,7 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
     async function signOut() {
         setBusy(true); setMessage("");
         try {
-            await apiClient<void>("/api/customer/identity/logout", {method: "POST", credentials: "include"});
+            await logoutCustomerWithAlerts();
             onSessionChange({authenticated: false});
             notifyCustomerIdentityChanged();
             return true;

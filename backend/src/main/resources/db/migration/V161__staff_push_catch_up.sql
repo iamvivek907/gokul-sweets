@@ -1,0 +1,1 @@
+ALTER TABLE staff_alert_deliveries ADD COLUMN catch_up BOOLEAN NOT NULL DEFAULT FALSE;

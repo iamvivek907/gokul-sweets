@@ -139,6 +139,7 @@ public class WebPushTransport {
      * @param title the title supplied to this method
      * @param body the body supplied to this method
      * @param url the url supplied to this method
+     * @param registrationId the device registration ID
      * @return the value of {@code transmit(endpoint, publicKey, auth, String.valueOf(eventId),
      *     title, body, url)}
      * @throws Exception if the underlying operation fails
@@ -150,19 +151,28 @@ public class WebPushTransport {
             long eventId,
             String title,
             String body,
-            String url)
+            String url,
+            java.util.UUID registrationId)
             throws Exception {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(
                         WebPushTransport.class,
-                        "send(String,String,String,long,String,String,String)");
+                        "send(String,String,String,long,String,String,String,java.util.UUID)");
         try {
-            return transmit(endpoint, publicKey, auth, String.valueOf(eventId), title, body, url);
+            return transmit(
+                    endpoint,
+                    publicKey,
+                    auth,
+                    String.valueOf(eventId),
+                    title,
+                    body,
+                    url,
+                    registrationId);
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
                     WebPushTransport.class,
-                    "send(String,String,String,long,String,String,String)");
+                    "send(String,String,String,long,String,String,String,java.util.UUID)");
         }
     }
 
@@ -181,7 +191,8 @@ public class WebPushTransport {
                         WebPushTransport.class,
                         "sendMarketing(String,String,String,long,String,String,String)");
         try {
-            return transmit(endpoint, publicKey, auth, "marketing:" + eventId, title, body, url);
+            return transmit(
+                    endpoint, publicKey, auth, "marketing:" + eventId, title, body, url, null);
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
@@ -200,6 +211,7 @@ public class WebPushTransport {
      * @param title the title
      * @param body the body
      * @param url the url
+     * @param registrationId the device registration ID
      * @return the send staff result
      * @throws Exception if the operation cannot complete
      */
@@ -210,19 +222,28 @@ public class WebPushTransport {
             long eventId,
             String title,
             String body,
-            String url)
+            String url,
+            java.util.UUID registrationId)
             throws Exception {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(
                         WebPushTransport.class,
-                        "sendStaff(String,String,String,long,String,String,String)");
+                        "sendStaff(String,String,String,long,String,String,String,java.util.UUID)");
         try {
-            return transmit(endpoint, publicKey, auth, "staff:" + eventId, title, body, url);
+            return transmit(
+                    endpoint,
+                    publicKey,
+                    auth,
+                    "staff:" + eventId,
+                    title,
+                    body,
+                    url,
+                    registrationId);
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
                     WebPushTransport.class,
-                    "sendStaff(String,String,String,long,String,String,String)");
+                    "sendStaff(String,String,String,long,String,String,String,java.util.UUID)");
         }
     }
 
@@ -238,6 +259,7 @@ public class WebPushTransport {
      * @param title the title supplied to this method
      * @param body the body supplied to this method
      * @param url the url supplied to this method
+     * @param registrationId the device registration ID
      * @return the value of {@code
      *     client.send(request.POST(HttpRequest.BodyPublishers.ofByteArray(encrypted.getBody())).build(),
      *     HttpResponse.BodyHandlers.discarding()).statusCode()}
@@ -250,14 +272,16 @@ public class WebPushTransport {
             String eventId,
             String title,
             String body,
-            String url)
+            String url,
+            java.util.UUID registrationId)
             throws Exception {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(
                         WebPushTransport.class,
-                        "transmit(String,String,String,String,String,String,String)");
+                        "transmit(String,String,String,String,String,String,String,java.util.UUID)");
         try {
-            var encrypted = prepare(endpoint, publicKey, auth, eventId, title, body, url);
+            var encrypted =
+                    prepare(endpoint, publicKey, auth, eventId, title, body, url, registrationId);
             var request =
                     HttpRequest.newBuilder(URI.create(endpoint)).timeout(Duration.ofSeconds(10));
             encrypted.getHeaders().forEach(request::header);
@@ -272,7 +296,7 @@ public class WebPushTransport {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
                     WebPushTransport.class,
-                    "transmit(String,String,String,String,String,String,String)");
+                    "transmit(String,String,String,String,String,String,String,java.util.UUID)");
         }
     }
 
@@ -378,23 +402,57 @@ public class WebPushTransport {
                         WebPushTransport.class,
                         "prepare(String,String,String,String,String,String,String)");
         try {
+            return prepare(endpoint, publicKey, auth, eventId, title, body, url, null);
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    WebPushTransport.class,
+                    "prepare(String,String,String,String,String,String,String)");
+        }
+    }
+
+    /**
+     * Encrypts an alert scoped to a device registration.
+     *
+     * @param endpoint the push endpoint
+     * @param publicKey the device key
+     * @param auth the device authentication secret
+     * @param eventId the alert ID
+     * @param title the notification title
+     * @param body the notification body
+     * @param url the notification destination
+     * @param registrationId the recipient registration, when applicable
+     * @return the encrypted request
+     * @throws Exception when encryption fails
+     */
+    nl.martijndwars.webpush.HttpRequest prepare(
+            String endpoint,
+            String publicKey,
+            String auth,
+            String eventId,
+            String title,
+            String body,
+            String url,
+            java.util.UUID registrationId)
+            throws Exception {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        WebPushTransport.class,
+                        "prepare(String,String,String,String,String,String,String,java.util.UUID)");
+        try {
             if (!validEndpoint(endpoint) || !configured())
                 throw new IllegalStateException("Push delivery unavailable");
             // Trusted event copy only: never customer phone, address, item contents or payment
             // amounts.
+            var fields =
+                    new java.util.HashMap<String, String>(
+                            java.util.Map.of(
+                                    "title", title, "body", body, "eventId", eventId, "url", url));
+            if (registrationId != null) fields.put("registrationId", registrationId.toString());
             String payload =
                     tools.jackson.databind.json.JsonMapper.builder()
                             .build()
-                            .writeValueAsString(
-                                    java.util.Map.of(
-                                            "title",
-                                            title,
-                                            "body",
-                                            body,
-                                            "eventId",
-                                            String.valueOf(eventId),
-                                            "url",
-                                            url));
+                            .writeValueAsString(fields);
             var service =
                     new RequestBuilder(
                             properties.getPublicKey(),
@@ -419,7 +477,7 @@ public class WebPushTransport {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
                     WebPushTransport.class,
-                    "prepare(String,String,String,String,String,String,String)");
+                    "prepare(String,String,String,String,String,String,String,java.util.UUID)");
         }
     }
 

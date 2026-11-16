@@ -18,6 +18,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class StaffAlertDispatcher {
 
+    private static final int BATCH_SIZE = 10;
+
     @org.springframework.beans.factory.annotation.Value("${gokul.jobs.worker-enabled:false}")
     private boolean dedicatedImportWorker;
 
@@ -71,10 +73,11 @@ INSERT INTO staff_alert_deliveries(event_id, staff_id, channel, subscription_id)
 SELECT e.id, u.id, 'PUSH', s.id FROM staff_order_alerts e
 JOIN staff_push_subscriptions s ON s.environment = e.environment
 JOIN staff_users u ON u.id = s.staff_id JOIN staff_sessions v ON v.token_hash = s.session_hash
-WHERE e.environment = ? AND s.revoked_at IS NULL AND v.revoked_at IS NULL
-  AND v.expires_at > CURRENT_TIMESTAMP AND v.staff_updated_at = u.updated_at
+WHERE e.environment = ? AND s.revoked_at IS NULL AND s.paused_at IS NULL AND v.revoked_at IS NULL
+  AND v.expires_at > CURRENT_TIMESTAMP
   AND e.created_at >= s.subscribed_at AND e.created_at > CURRENT_TIMESTAMP - INTERVAL '5 minutes'
-  AND NOT EXISTS (SELECT 1 FROM staff_order_alert_reads r WHERE r.event_id = e.id AND r.staff_id = u.id)
+  AND (e.kind IN ('PREPARATION_DUE','PREPARATION_OVERDUE','READY_OVERDUE')
+    OR NOT EXISTS (SELECT 1 FROM staff_order_alert_reads r WHERE r.event_id = e.id AND r.staff_id = u.id))
   AND
 """
                                             + StaffOrderAlerts.ELIGIBLE
@@ -110,8 +113,16 @@ WHERE e.environment = ? AND e.kind IN ('PREPARATION_OVERDUE','READY_OVERDUE')
                         }
                     });
             // Each HTTP request is bounded to ten seconds; each claimed task has its own lease.
-            for (int i = 0; i < 10; i++) {
-                Task task = transactions.execute(status -> claim());
+            for (int i = 0; i < BATCH_SIZE; i++) {
+                boolean catchUpSlot = i == BATCH_SIZE - 1;
+                Task task =
+                        transactions.execute(
+                                status -> {
+                                    // Reserve the last slot for catch-up and lend it to live work
+                                    // when there is no due catch-up.
+                                    Task catchUp = catchUpSlot ? claim(true) : null;
+                                    return catchUp != null ? catchUp : claim(false);
+                                });
                 if (task == null) return;
                 if (!alerts.enabled()
                         || !alerts.eligible(task.event().id(), task.staffId())
@@ -120,28 +131,7 @@ WHERE e.environment = ? AND e.kind IN ('PREPARATION_OVERDUE','READY_OVERDUE')
                     continue;
                 }
                 if (task.channel().equals("PUSH")) {
-                    Boolean live =
-                            jdbc.queryForObject(
-                                    """
-SELECT EXISTS (SELECT 1 FROM staff_push_subscriptions s JOIN staff_sessions v ON v.token_hash = s.session_hash
-JOIN staff_users u ON u.id = s.staff_id WHERE s.id = ? AND s.staff_id = ? AND s.environment = ?
-  AND s.revoked_at IS NULL AND v.revoked_at IS NULL AND v.expires_at > CURRENT_TIMESTAMP
-  AND v.staff_updated_at = u.updated_at AND u.active
-  AND NOT EXISTS (SELECT 1 FROM staff_order_alert_reads r WHERE r.event_id = ? AND r.staff_id = u.id))
-""",
-                                    Boolean.class,
-                                    task.subscriptionId(),
-                                    task.staffId(),
-                                    alerts.scope(),
-                                    task.event().id());
-                    if (!push.configured()
-                            || !Boolean.TRUE.equals(live)
-                            || task.event()
-                                    .createdAt()
-                                    .isBefore(java.time.Instant.now().minusSeconds(300))) {
-                        finish(task, "SKIPPED", null);
-                        continue;
-                    }
+                    if (!canSendPush(task)) continue;
                 } else if (email.recipient(task.staffId()) == null
                         || task.event().scheduledAt() == null
                         || alerts.now()
@@ -163,7 +153,8 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.id = ? AND s.staff_id = ? AND s.
                                             task.event().id(),
                                             task.event().title(),
                                             task.event().message(),
-                                            path)
+                                            path,
+                                            task.subscriptionId())
                                     : email.send(
                                             task.staffId(),
                                             task.event().title(),
@@ -198,6 +189,58 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.id = ? AND s.staff_id = ? AND s.
     }
 
     /**
+     * Checks the current device and serializes a skip with reconnect's delivery update.
+     *
+     * @param task the leased push delivery
+     * @return whether the delivery is still eligible for transport
+     */
+    private boolean canSendPush(Task task) {
+        final long started = MethodTiming.start(StaffAlertDispatcher.class, "canSendPush(Task)");
+        try {
+            return Boolean.TRUE.equals(
+                    transactions.execute(
+                            status -> {
+                                var claimed =
+                                        jdbc.query(
+                                                """
+SELECT catch_up FROM staff_alert_deliveries WHERE id=? AND state='SENDING' AND lease_token=? FOR UPDATE
+""",
+                                                (rs, row) -> rs.getBoolean(1),
+                                                task.id(),
+                                                task.lease());
+                                if (claimed.isEmpty()) return false;
+                                boolean catchUp = claimed.getFirst();
+                                boolean live =
+                                        push.configured()
+                                                && Boolean.TRUE.equals(
+                                                        jdbc.queryForObject(
+                                                                """
+SELECT EXISTS (SELECT 1 FROM staff_push_subscriptions s
+JOIN staff_sessions v ON v.token_hash=s.session_hash
+JOIN staff_users u ON u.id=s.staff_id
+JOIN staff_order_alerts e ON e.id=?
+WHERE s.id=? AND s.staff_id=? AND s.environment=?
+  AND s.revoked_at IS NULL AND s.paused_at IS NULL AND v.revoked_at IS NULL
+  AND v.expires_at > CURRENT_TIMESTAMP AND u.active
+  AND (? OR (s.subscribed_at <= e.created_at AND e.created_at > CURRENT_TIMESTAMP - INTERVAL '5 minutes'
+    AND (e.kind IN ('PREPARATION_DUE','PREPARATION_OVERDUE','READY_OVERDUE')
+      OR NOT EXISTS (SELECT 1 FROM staff_order_alert_reads r WHERE r.event_id=e.id AND r.staff_id=u.id)))))
+""",
+                                                                Boolean.class,
+                                                                task.event().id(),
+                                                                task.subscriptionId(),
+                                                                task.staffId(),
+                                                                alerts.scope(),
+                                                                catchUp));
+                                if (!live) finish(task, "SKIPPED", null);
+                                return live;
+                            }));
+        } finally {
+            MethodTiming.finish(started, StaffAlertDispatcher.class, "canSendPush(Task)");
+        }
+    }
+
+    /**
      * Claims staff alert dispatcher data and returns the {@code Task} result.
      *
      * <p>Reads {@code orders}, {@code staff_alert_deliveries}, {@code staff_order_alerts}, {@code
@@ -208,11 +251,12 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.id = ? AND s.staff_id = ? AND s.
      *
      * <p>Writes {@code staff_alert_deliveries}.
      *
+     * @param catchUpOnly whether to claim only a catch-up delivery
      * @return the {@code Task} result
      */
-    private Task claim() {
+    private Task claim(boolean catchUpOnly) {
         final long __gokulMethodStartedNanos =
-                MethodTiming.start(StaffAlertDispatcher.class, "claim()");
+                MethodTiming.start(StaffAlertDispatcher.class, "claim(boolean)");
         try {
             var tasks =
                     jdbc.query(
@@ -222,7 +266,8 @@ SELECT e.*, COALESCE(o.order_number,'Request '||LEFT(e.enquiry_id::text,8)) orde
 JOIN staff_order_alerts e ON e.id = d.event_id LEFT JOIN orders o ON o.id = e.order_id
 LEFT JOIN staff_push_subscriptions s ON s.id = d.subscription_id
 WHERE e.environment = ? AND d.state = 'QUEUED' AND d.next_attempt_at <= CURRENT_TIMESTAMP
-ORDER BY d.id LIMIT 1 FOR UPDATE OF d SKIP LOCKED
+  AND (NOT ? OR d.catch_up)
+ORDER BY d.catch_up, d.id LIMIT 1 FOR UPDATE OF d SKIP LOCKED
 """,
                             (rs, row) ->
                                     new Task(
@@ -236,7 +281,8 @@ ORDER BY d.id LIMIT 1 FOR UPDATE OF d SKIP LOCKED
                                             rs.getString("endpoint"),
                                             rs.getString("public_key"),
                                             rs.getString("auth_secret")),
-                            alerts.scope());
+                            alerts.scope(),
+                            catchUpOnly);
             if (tasks.isEmpty()) return null;
             var task = tasks.getFirst();
             jdbc.update(
@@ -248,7 +294,8 @@ ORDER BY d.id LIMIT 1 FOR UPDATE OF d SKIP LOCKED
                     task.id());
             return task;
         } finally {
-            MethodTiming.finish(__gokulMethodStartedNanos, StaffAlertDispatcher.class, "claim()");
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos, StaffAlertDispatcher.class, "claim(boolean)");
         }
     }
 
@@ -267,10 +314,15 @@ ORDER BY d.id LIMIT 1 FOR UPDATE OF d SKIP LOCKED
         try {
             jdbc.update(
                     """
-UPDATE staff_alert_deliveries SET state = ?, last_http_status = ?, accepted_at = CASE WHEN ? = 'ACCEPTED' THEN CURRENT_TIMESTAMP ELSE NULL END,
+UPDATE staff_alert_deliveries SET state = ?,
+  attempts = CASE WHEN ? THEN GREATEST(0, attempts - 1) ELSE attempts END,
+  last_http_status = CASE WHEN ? THEN last_http_status ELSE ? END,
+  accepted_at = CASE WHEN ? = 'ACCEPTED' THEN CURRENT_TIMESTAMP ELSE NULL END,
   lease_token = NULL, lease_until = NULL WHERE id = ? AND state = 'SENDING' AND lease_token = ?
 """,
                     state,
+                    "SKIPPED".equals(state),
+                    "SKIPPED".equals(state),
                     code,
                     state,
                     task.id(),

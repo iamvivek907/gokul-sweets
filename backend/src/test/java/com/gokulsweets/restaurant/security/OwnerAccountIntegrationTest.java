@@ -487,7 +487,14 @@ class OwnerAccountIntegrationTest {
             com.gokulsweets.restaurant.staff.StaffUserRepository users,
             org.springframework.security.authentication.AuthenticationManager manager) {
         return new StaffSessionService(
-                flags, jdbc, Clock.systemUTC(), mfa(), users, manager, passwords);
+                flags,
+                jdbc,
+                Clock.systemUTC(),
+                mfa(),
+                users,
+                manager,
+                passwords,
+                new TransactionTemplate(new DataSourceTransactionManager(dataSource)));
     }
 
     @Test

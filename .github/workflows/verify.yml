@@ -393,7 +393,9 @@ jobs:
           exit 1
       - name: Deployment container logs
         if: always()
-        run: docker logs gokul-render-smoke 2>&1 || true
+        run: |
+          docker inspect --format 'status={{.State.Status}} exit={{.State.ExitCode}} oom_killed={{.State.OOMKilled}}' gokul-render-smoke || true
+          docker logs gokul-render-smoke 2>&1 || true
       - name: Remove smoke-test container
         if: always()
         run: docker rm --force gokul-render-smoke || true

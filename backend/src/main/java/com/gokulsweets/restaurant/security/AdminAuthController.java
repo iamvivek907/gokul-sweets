@@ -152,15 +152,26 @@ public class AdminAuthController {
      * <p>Delegates to {@code StaffSessionService.cookie(...)}.
      *
      * @param request the request supplied to this method
+     * @param deviceIds the saved and staged push registrations for this browser
      * @return the {@code ResponseEntity<Void>} result
      */
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(HttpServletRequest request) {
+    public ResponseEntity<Void> logout(
+            HttpServletRequest request,
+            @RequestParam(name = "deviceId", required = false)
+                    java.util.List<java.util.UUID> deviceIds) {
         final long __gokulMethodStartedNanos =
-                MethodTiming.start(AdminAuthController.class, "logout(HttpServletRequest)");
+                MethodTiming.start(
+                        AdminAuthController.class,
+                        "logout(HttpServletRequest,java.util.List<java.util.UUID>)");
         try {
             if (!flags.isSecureStaffSessions()) return ResponseEntity.notFound().build();
-            sessions.revoke(StaffSessionService.cookie(request));
+            if (deviceIds != null && deviceIds.size() > 2)
+                return ResponseEntity.badRequest().build();
+            sessions.signOutDevices(
+                    staffAuthorizationService.getCurrentStaff().getId(),
+                    deviceIds == null ? java.util.List.of() : deviceIds,
+                    StaffSessionService.cookie(request));
             return ResponseEntity.noContent()
                     .header(HttpHeaders.SET_COOKIE, cookie("", Duration.ZERO).toString())
                     .build();
@@ -168,7 +179,7 @@ public class AdminAuthController {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
                     AdminAuthController.class,
-                    "logout(HttpServletRequest)");
+                    "logout(HttpServletRequest,java.util.List<java.util.UUID>)");
         }
     }
 
@@ -190,9 +201,7 @@ public class AdminAuthController {
                     .cacheControl(CacheControl.noStore())
                     .header(
                             HttpHeaders.SET_COOKIE,
-                            cookie(
-                                            session.token(),
-                                            StaffSessionService.sessionLifetime(session.user()))
+                            cookie(session.token(), StaffSessionService.SESSION_COOKIE_AGE)
                                     .toString())
                     .header("X-Staff-CSRF", session.csrf())
                     .body(new LoginResponse(AdminAuthResponse.from(session.user()), recovery));

@@ -27,6 +27,7 @@ import java.util.*;
         classMode = org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 class StaffSessionLifetimeIntegrationTest {
     @Autowired StaffSessionService sessions;
+    @Autowired StaffUserRepository staffUsers;
     @Autowired JdbcTemplate jdbc;
     @Autowired MutableClock clock;
 
@@ -104,61 +105,63 @@ class StaffSessionLifetimeIntegrationTest {
     }
 
     @Test
-    void staffSurvivesRefreshAndRenewsWithoutChangingPushSessionIdentity() {
-        var user = user("KITCHEN_STAFF");
-        var signIn = sessions.issue(user);
-        var hash = StaffSessionService.hash(signIn.token());
-        Instant expires =
-                jdbc.queryForObject(
-                        "SELECT expires_at FROM staff_sessions WHERE token_hash=?",
-                        (r, n) -> r.getTimestamp(1).toInstant(),
-                        hash);
-        assertThat(expires).isEqualTo(clock.instant().plus(Duration.ofDays(365)));
-        time(clock.instant().plus(Duration.ofDays(364)));
-        var verified = sessions.verify(signIn.token());
-        assertThat(verified).isNotNull();
-        assertThat(sessions.renewStaff(verified, signIn.token(), user)).isTrue();
-        time(clock.instant().plus(Duration.ofDays(2)));
-        assertThat(sessions.verify(signIn.token())).isNotNull();
-        assertThat(
-                        jdbc.queryForObject(
-                                "SELECT count(*) FROM staff_sessions WHERE token_hash=?",
-                                Long.class,
-                                hash))
-                .isEqualTo(1);
-        sessions.revoke(signIn.token());
-        assertThat(sessions.renewStaff(verified, signIn.token(), user)).isFalse();
-        assertThat(sessions.verify(signIn.token())).isNull();
-    }
-
-    @Test
-    void administratorHasAnAbsoluteFifteenHourExpiry() {
-        var user = user("OWNER_ADMIN");
-        var signIn = sessions.issue(user);
-        var start = clock.instant();
-        time(start.plus(Duration.ofHours(14)));
-        var verified = sessions.verify(signIn.token());
-        assertThat(verified).isNotNull();
-        assertThat(sessions.renewStaff(verified, signIn.token(), user)).isFalse();
-        time(start.plus(Duration.ofHours(15)));
-        assertThat(sessions.verify(signIn.token())).isNull();
-    }
-
-    @Test
-    void disabledChangedAndExpiredStaffSessionsCannotBeResurrected() {
+    @org.springframework.transaction.annotation.Transactional
+    void staffRevisionLockSeesChangesMadeByAnotherWriter() {
         var user = user("COUNTER_STAFF");
-        var signIn = sessions.issue(user);
-        var verified = sessions.verify(signIn.token());
-        jdbc.update("UPDATE staff_users SET active=false WHERE id=?", user.getId());
-        assertThat(sessions.verify(signIn.token())).isNull();
-        assertThat(sessions.renewStaff(verified, signIn.token(), user)).isFalse();
+        var initial = staffUsers.lockRevision(user.getId()).orElseThrow();
         jdbc.update(
-                "UPDATE staff_users SET active=true,updated_at=updated_at+INTERVAL '1 second' WHERE"
-                        + " id=?",
+                "UPDATE staff_users SET updated_at=updated_at+INTERVAL '1 second' WHERE id=?",
                 user.getId());
-        assertThat(sessions.verify(signIn.token())).isNull();
-        assertThat(sessions.renewStaff(verified, signIn.token(), user)).isFalse();
-        time(clock.instant().plus(Duration.ofDays(366)));
-        assertThat(sessions.renewStaff(verified, signIn.token(), user)).isFalse();
+        assertThat(staffUsers.lockRevision(user.getId())).contains(initial.plusSeconds(1));
+    }
+
+    @Test
+    void staffAndAdminRemainSignedInAndRefreshCookiesAtMostDaily() {
+        for (String role : java.util.List.of("KITCHEN_STAFF", "OWNER_ADMIN")) {
+            var user = user(role);
+            var login = sessions.issue(user);
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT expires_at = TIMESTAMPTZ 'infinity' FROM staff_sessions"
+                                            + " WHERE token_hash=?",
+                                    Boolean.class,
+                                    StaffSessionService.hash(login.token())))
+                    .isTrue();
+            time(clock.instant().plus(Duration.ofDays(500)));
+            var verified = sessions.verify(login.token());
+            assertThat(verified).isNotNull();
+            assertThat(sessions.refreshCookie(verified, login.token())).isTrue();
+            assertThat(sessions.refreshCookie(verified, login.token())).isFalse();
+            sessions.revoke(login.token());
+            assertThat(sessions.refreshCookie(verified, login.token())).isFalse();
+            assertThat(sessions.verify(login.token())).isNull();
+        }
+    }
+
+    @Test
+    void profileChangesKeepAllDevicesSignedInButPasswordResetAndDeactivationRevokeThem() {
+        var user = user("COUNTER_STAFF");
+        var first = sessions.issue(user);
+        var second = sessions.issue(user);
+        jdbc.update(
+                "UPDATE staff_users SET full_name='Updated',updated_at=updated_at+INTERVAL '1"
+                        + " second' WHERE id=?",
+                user.getId());
+        assertThat(sessions.verify(first.token())).isNotNull();
+        assertThat(sessions.verify(second.token())).isNotNull();
+        sessions.revoke(first.token());
+        assertThat(sessions.verify(first.token())).isNull();
+        assertThat(sessions.verify(second.token())).isNotNull();
+        jdbc.update("UPDATE staff_users SET password_hash='updated' WHERE id=?", user.getId());
+        assertThat(sessions.verify(second.token())).isNull();
+        user.setUpdatedAt(
+                jdbc.queryForObject(
+                        "SELECT updated_at FROM staff_users WHERE id=?",
+                        java.time.LocalDateTime.class,
+                        user.getId()));
+        var third = sessions.issue(user);
+        jdbc.update("UPDATE staff_users SET active=false WHERE id=?", user.getId());
+        jdbc.update("UPDATE staff_users SET active=true WHERE id=?", user.getId());
+        assertThat(sessions.verify(third.token())).isNull();
     }
 }

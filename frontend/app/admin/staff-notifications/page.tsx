@@ -1,18 +1,18 @@
 "use client";
 import AdminHelp from "@/components/admin/AdminHelp";
-import {T} from "@/lib/language";
 
 import {useCallback, useEffect, useState} from "react";
 import Link from "next/link";
+import {usePwaInstall} from "@/hooks/usePwaInstall";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
-import {ADMIN_API_BASE_URL} from "@/lib/constants";
-import {applicationServerKey} from "@/lib/notificationAlerts";
 import {formatBusinessTimestamp} from "@/lib/businessTime";
 import NotificationIcon from "@/components/customer/NotificationIcon";
-import {staffAlertsRequest, type StaffAlertSettings, type StaffInbox} from "@/services/staffAlertsApi";
+import {STAFF_ALERT_DEVICE_RESTORED, disableStaffDeviceAlerts, enableStaffDeviceAlerts, readStaffAlertDevice, resolveStaffAlertDevice, staffAlertsRequest, supportsStaffPush, type StaffAlertSettings, type StaffInbox} from "@/services/staffAlertsApi";
 
 export default function StaffNotificationsPage() {
     const {profile, hasPermission} = useAdminAuth();
+    const phone = usePwaInstall();
+    const needsHomeScreen = phone.isIOS && !phone.isStandalone;
     const [search, setSearch] = useState("");
     const [unreadOnly, setUnreadOnly] = useState(false);
     const query = new URLSearchParams({search, unreadOnly: String(unreadOnly)}).toString();
@@ -24,27 +24,42 @@ export default function StaffNotificationsPage() {
     const [busy, setBusy] = useState(false);
     const [permission, setPermission] = useState<NotificationPermission>("default");
     const [supported, setSupported] = useState(false);
-    const key = `gokul-staff-push:${ADMIN_API_BASE_URL}:${profile?.staffId}`;
     const load = useCallback(async (signal?: AbortSignal) => {
-        let device: string | null = null;
-        try {device = localStorage.getItem(key); if (device && !/^[0-9a-f-]{36}$/i.test(device)) device = null;} catch { /* inbox works without storage */ }
+        const device = profile ? await resolveStaffAlertDevice(profile.staffId) : null;
         const next = await staffAlertsRequest<StaffAlertSettings>(`/settings${device ? `?deviceId=${encodeURIComponent(device)}` : ""}`, {signal});
         if (signal?.aborted) return;
         setSettings(next); setDeviceId(device); setPermission("Notification" in window ? Notification.permission : "default");
-        setSupported(window.isSecureContext && "Notification" in window && "PushManager" in window && "serviceWorker" in navigator);
+        setSupported(supportsStaffPush());
         if (next.enabled) {
             const result = await staffAlertsRequest<StaffInbox>(`?${query}`, {signal});
             if (!signal?.aborted) {setInbox(result);}
         }
-    }, [key, query]);
+    }, [profile, query]);
     useEffect(() => {
         if (!profile || !hasPermission("ORDER_VIEW")) return;
         const controller = new AbortController();
-        void Promise.resolve().then(() => load(controller.signal)).catch(() => {if (!controller.signal.aborted) setError("Staff alerts could not load. Use the preparation queue, or refresh when connected.");});
-        const timer = window.setInterval(() => {
-            if (navigator.onLine && document.visibilityState === "visible") void Promise.resolve().then(() => load(controller.signal)).catch(() => {});
-        }, 30000);
-        return () => {controller.abort(); window.clearInterval(timer);};
+        let pending = false;
+        async function refresh(showError = false) {
+            if (controller.signal.aborted || pending) return;
+            pending = true;
+            try {await load(controller.signal);}
+            catch {
+                if (showError && !controller.signal.aborted) setError("Staff alerts could not load. Use the preparation queue, or refresh when connected.");
+            } finally {pending = false;}
+        }
+        const resume = () => {
+            if (navigator.onLine && document.visibilityState === "visible") void refresh();
+        };
+        void refresh(true);
+        const timer = window.setInterval(resume, 30000);
+        window.addEventListener("focus", resume);
+        window.addEventListener(STAFF_ALERT_DEVICE_RESTORED, resume);
+        return () => {
+            controller.abort();
+            window.clearInterval(timer);
+            window.removeEventListener("focus", resume);
+            window.removeEventListener(STAFF_ALERT_DEVICE_RESTORED, resume);
+        };
     }, [load, profile, hasPermission]);
     async function perform(action: () => Promise<void>) {
         setBusy(true); setError(""); setMessage("");
@@ -53,25 +68,13 @@ export default function StaffNotificationsPage() {
     }
     async function enablePush() {
         if (!settings?.applicationServerKey || !supported) return;
-        let created: PushSubscription | null = null;
-        // Permission request must be invoked directly from the click, before any await.
-        const requested = Notification.requestPermission();
         await perform(async () => {
-            const choice = await requested; setPermission(choice);
+            const choice = await enableStaffDeviceAlerts(settings);
+            setPermission(choice);
             if (choice !== "granted") {setMessage("Push permission was not granted. Staff alerts remain in this inbox and the preparation queue."); return;}
-            try {
-                const registration = await navigator.serviceWorker.register("/sw.js"); await navigator.serviceWorker.ready;
-                let subscription = await registration.pushManager.getSubscription();
-                if (!subscription) {subscription = await registration.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: applicationServerKey(settings.applicationServerKey!)}); created = subscription;}
-                const keys = subscription.toJSON().keys;
-                const result = await staffAlertsRequest<{id: string}>("/push-subscriptions", {method: "POST", body: JSON.stringify({endpoint: subscription.endpoint, publicKey: keys?.p256dh, authSecret: keys?.auth})});
-                setDeviceId(result.id);
-                try {localStorage.setItem(key, result.id);} catch {
-                    await staffAlertsRequest(`/push-subscriptions/${result.id}`, {method: "DELETE"});
-                    setDeviceId(null); throw new Error("This browser cannot remember its registration. Staff push was disabled; use the queue.");
-                }
-                await load(); setMessage("Staff push is registered for this signed-in browser. Delivery depends on device settings and a live staff session.");
-            } catch (reason) {if (created) await created.unsubscribe().catch(() => false); throw reason;}
+            setDeviceId(readStaffAlertDevice(settings.staffId));
+            await load();
+            setMessage("This phone stays registered through normal sign-in expiry.");
         });
     }
     async function testDeviceSound() {
@@ -80,7 +83,7 @@ export default function StaffNotificationsPage() {
             const registration = await navigator.serviceWorker.getRegistration();
             if(!registration)throw new Error("Register staff push in this browser before testing notification sound.");
             const options: NotificationOptions & {vibrate:number[];renotify:boolean} = {
-                body: "If this is silent, long-press this notification and enable Alerting and Sound in Android settings.",
+                body: "If this is silent, check Sounds, notification volume and Focus or Do Not Disturb on this device.",
                 icon: "/icon-192.png", badge: "/notification-badge.svg", silent: false,
                 vibrate: [300,120,300], tag: "gokul-staff-sound-test", renotify: true,
                 requireInteraction: true, data: {staff:true,url:"/admin/staff-notifications"}
@@ -102,19 +105,31 @@ export default function StaffNotificationsPage() {
         {settings?.enabled && <>
             <details open className="mt-6 rounded-3xl border border-[#eadfd6] bg-white p-5 sm:p-6" aria-label="Staff push settings">
                 <summary className="cursor-pointer text-lg font-bold">Notification delivery settings</summary>
-                <div className="mt-3 flex items-center justify-between gap-2"><h2 className="font-bold">Get alerts when the portal is closed</h2><AdminHelp title="Staff push and session duration" description="Push sends branch alerts to this registered browser, including when the portal is closed. Sound and delivery depend on browser permission and phone settings. Logout, expired sessions and revoked access stop alerts. Staff sessions renew during use with a 365-day inactivity limit; admins must sign in again after 15 hours." guidance="Enable staff push separately on each device and allow browser notifications. On iPhone, use the installed Home Screen app and allow Notifications, Banners and Sounds. Refresh keeps registration; Check staff registration verifies it. Disable staff push affects this browser only."/></div>
-                <p className="mt-3 rounded-xl bg-[#e7f0e9] p-4 text-sm"><T text="For iPhone banners: open the installed app, enable staff push here, then allow Notifications, Banners and Sounds in iPhone Settings. Focus or Silent mode can suppress alerts."/></p>
-                <p className="mt-2 text-sm leading-6">Register each staff browser separately. Alerts stop after logout or session expiry (staff sessions renew for up to a year of inactivity; administrator sessions last 15 hours). Browser permission, device mute and OS settings control delivery and sound. On iOS/iPadOS 16.4+, use the installed Home Screen app.</p>
-                <section aria-label="Android notification sound setup" className="mt-3 rounded-xl border p-4 text-sm leading-6"><h3 className="font-semibold">Android: check alert sound on this device</h3><ol className="mt-2 list-decimal pl-5"><li>Enable staff push here, then test the device notification below.</li><li>Long-press that notification → Settings. Choose Alerting and turn on Sound for this app or Chrome website notification channel.</li><li>Raise notification volume and disable Do Not Disturb or Silent mode. Allow background activity if your phone restricts the app.</li><li>Test a DEV preparation reminder with the app in the background, then closed. Do not force-stop the app or browser.</li></ol><p className="mt-2">Open tabs can repeat the kitchen alarm. Closed apps use the system notification sound. A PWA cannot guarantee a repeating alarm when closed or override your phone settings. Keep an enabled kitchen screen available for continuous alarms.</p><button type="button" disabled={busy||!settings.deviceActive||permission!=="granted"} onClick={()=>void testDeviceSound()} className="mt-3 min-h-11 rounded-xl border px-4 font-semibold">Test device notification sound</button></section>
+                <div className="mt-3 flex items-center justify-between gap-2">
+                    <h2 className="font-bold">Kitchen alerts on this phone</h2>
+                    <AdminHelp title="Staff push access" description="Alerts are scoped to the branches and permissions for your signed-in staff account. Your registration survives normal sign-in expiry. Signing out, turning off device notifications or losing staff access stops alerts." guidance="Register and test each phone separately. Order references and branch timing may appear on the lock screen."/>
+                </div>
+                <div className="mt-3 rounded-xl bg-[#e7f0e9] p-4 text-sm leading-6">
+                    <p className="font-semibold">
+                        {needsHomeScreen ? "Add Gokul Sweets to your Home Screen" : settings.deviceActive && permission === "granted" ? "This device is registered" : "Set up alerts on this device"}
+                    </p>
+                    {needsHomeScreen ? <p>In Safari, tap Share → Add to Home Screen. Open Gokul Sweets from its new icon, sign in to Admin and return to Staff notifications. Requires iOS 16.4 or later.</p>
+                    : <p>{phone.isMobile && !phone.isStandalone ? "On Android, open the browser menu and choose Install app or Add to Home screen. Sign in through the saved app. " : ""}Enable staff push once, allow notifications, then test the sound.</p>}
+                </div>
+                <p className="mt-3 text-sm leading-6">A paid advance order sends an alert when it arrives. When preparation opens, reminders can repeat while action is due. Keep the kitchen alarm enabled in the open app for repeating sound. When the app is closed, the phone plays its notification sound for each reminder according to its settings.</p>
+                <section aria-label="Phone notification sound setup" className="mt-3 rounded-xl border p-4 text-sm leading-6">
+                    <h3 className="font-semibold">Check the sound on your phone</h3>
+                    <p>iPhone: In Settings → Notifications → Gokul Sweets, allow notifications, Sounds and Banners. Android: long-press the test notification and set its channel to Alerting with sound. Check volume and Focus or Do Not Disturb on either device.</p>
+                    <button type="button" disabled={busy || needsHomeScreen || !settings.deviceActive || permission !== "granted"} onClick={() => void testDeviceSound()} className="mt-3 min-h-11 rounded-xl border px-4 font-semibold">Test device notification sound</button>
+                </section>
                 <p className="mt-2 text-sm">Order references and branch timing may appear on your lock screen.</p>
                 {!supported && <p className="mt-3 text-sm">Push is unsupported here. This inbox and the preparation queue remain available.</p>}
                 {!settings.pushConfigured && <p className="mt-3 text-sm">Push sender configuration is missing. Contact your administrator; no registration is available yet.</p>}
                 {permission === "denied" && <p className="mt-3 text-sm">Permission is denied. Change it in browser settings to enable push later.</p>}
                 <div className="mt-4 flex flex-wrap gap-3">
-                    <button type="button" disabled={busy || !supported || !settings.pushConfigured || permission === "denied"} onClick={() => void enablePush()} className="min-h-11 rounded-xl bg-[#173c39] px-4 text-sm font-semibold text-white disabled:opacity-50">{settings.deviceActive ? "Check staff registration" : "Enable staff push for this browser"}</button>
+                    <button type="button" disabled={busy || needsHomeScreen || !supported || !settings.pushConfigured || permission === "denied"} onClick={() => void enablePush()} className="min-h-11 rounded-xl bg-[#173c39] px-4 text-sm font-semibold text-white disabled:opacity-50">{settings.deviceActive ? "Check staff registration" : "Enable staff push for this browser"}</button>
                     {deviceId && <button type="button" disabled={busy} onClick={() => void perform(async () => {
-                        await staffAlertsRequest(`/push-subscriptions/${deviceId}`, {method: "DELETE"});
-                        setDeviceId(null); try {localStorage.removeItem(key);} catch { /* server revocation succeeded */ }
+                        await disableStaffDeviceAlerts(settings.staffId);
                         await load(); setMessage("Staff push disabled for this browser. An already accepted notification may still arrive.");
                     })} className="min-h-11 rounded-xl border px-4 text-sm">Disable staff push</button>}
                 </div>

@@ -15,3 +15,19 @@ test('fallback IDs preserve an existing close trigger, including clear-cart canc
 test('a fallback ID is used when clearing the cart removes its original trigger',()=>{const f=fixture({prefer:false,connected:false});assert.equal(f.document.activeElement,f.target);});
 
 test('layout cleanup resolves fallback after React removes the clear-cart trigger',()=>{const f=fixture({prefer:false});f.previous.isConnected=false;while(f.frames.length)f.frames.shift()();assert.equal(f.document.activeElement,f.target);});
+
+test('a delayed restore preserves focus the customer moved to another control',()=>{
+ const f=fixture({defer:true});
+ const search={isConnected:true};
+ f.document.activeElement=search;
+ while(f.frames.length)f.frames.shift()();
+ assert.equal(f.document.activeElement,search);
+});
+
+test('a completed restore never refocuses the same connected trigger on a later frame',()=>{
+ const f=fixture();
+ f.document.activeElement=f.document.body;
+ while(f.frames.length)f.frames.shift()();
+ assert.equal(f.document.activeElement,f.document.body);
+ assert.deepEqual(f.calls,['target']);
+});

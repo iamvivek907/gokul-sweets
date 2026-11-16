@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.UUID;
 
 /** Backend staff push subscriptions contract and implementation. */
@@ -33,15 +34,83 @@ public class StaffPushSubscriptions {
      * @param endpoint the endpoint
      * @param publicKey the public key
      * @param authSecret the auth secret
+     * @param registrationId the existing device id when restoring an opt-in
+     * @param expectedStaffId the account that started this request
+     * @param pausePrevious whether to deactivate another account on this device without opting in;
+     *     defaults to false when omitted
+     * @param setupId the id reserved by a new setup attempt, also sent on retries
+     * @param pendingCancellationIds registration or setup IDs this browser is still disabling
      */
-    public record Input(String endpoint, String publicKey, String authSecret) {}
+    public record Input(
+            String endpoint,
+            String publicKey,
+            String authSecret,
+            UUID registrationId,
+            Long expectedStaffId,
+            Boolean pausePrevious,
+            UUID setupId,
+            List<UUID> pendingCancellationIds) {
+        public Input {
+            pausePrevious = Boolean.TRUE.equals(pausePrevious);
+        }
+
+        public Input(
+                String endpoint,
+                String publicKey,
+                String authSecret,
+                UUID registrationId,
+                Long expectedStaffId,
+                boolean pausePrevious,
+                UUID setupId) {
+            this(
+                    endpoint,
+                    publicKey,
+                    authSecret,
+                    registrationId,
+                    expectedStaffId,
+                    pausePrevious,
+                    setupId,
+                    null);
+        }
+
+        public Input(
+                String endpoint,
+                String publicKey,
+                String authSecret,
+                UUID registrationId,
+                Long expectedStaffId,
+                boolean pausePrevious) {
+            this(
+                    endpoint,
+                    publicKey,
+                    authSecret,
+                    registrationId,
+                    expectedStaffId,
+                    pausePrevious,
+                    null);
+        }
+
+        public Input(String endpoint, String publicKey, String authSecret) {
+            this(endpoint, publicKey, authSecret, null);
+        }
+
+        public Input(String endpoint, String publicKey, String authSecret, UUID registrationId) {
+            this(endpoint, publicKey, authSecret, registrationId, null, false);
+        }
+    }
 
     /**
      * Immutable result data contract.
      *
      * @param id the id
+     * @param created whether the registration belongs to this setup attempt
+     * @param bindingRequired whether the browser must bind this ID before resuming delivery
      */
-    public record Result(UUID id) {}
+    public record Result(UUID id, boolean created, boolean bindingRequired) {
+        public Result(UUID id, boolean created) {
+            this(id, created, false);
+        }
+    }
 
     /**
      * Subscribes to staff push subscriptions data and returns the {@code Result} result.
@@ -76,20 +145,62 @@ public class StaffPushSubscriptions {
                     || !WebPushTransport.validEndpoint(input.endpoint())
                     || !WebPushTransport.validRecipientKeys(input.publicKey(), input.authSecret()))
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+            if (input.expectedStaffId() != null && input.expectedStaffId() != staffId)
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT, "The active account changed.");
             var verified = sessions.verify(cookie);
             if (verified == null || verified.staffId() != staffId)
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
-            jdbc.queryForObject(
-                    "SELECT id FROM staff_users WHERE id = ? AND active FOR UPDATE",
-                    Long.class,
-                    staffId);
+            if (jdbc.queryForList(
+                            "SELECT id FROM staff_users WHERE id = ? AND active FOR UPDATE",
+                            Long.class,
+                            staffId)
+                    .isEmpty()) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+            UUID requestedId =
+                    input.registrationId() == null ? input.setupId() : input.registrationId();
+            UUID reusedId =
+                    requestedId == null ? null : findSetupRegistration(staffId, requestedId);
+            if (input.registrationId() != null && input.pendingCancellationIds() != null) {
+                var pending = input.pendingCancellationIds();
+                if (pending.size() > 8) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+                UUID canonicalId = reusedId == null ? requestedId : reusedId;
+                if (pending.contains(requestedId)
+                        || pending.contains(canonicalId)
+                        || pending.stream()
+                                .filter(id -> id != null)
+                                .anyMatch(
+                                        id ->
+                                                canonicalId.equals(
+                                                        findSetupRegistration(staffId, id)))) {
+                    throw new ResponseStatusException(HttpStatus.GONE);
+                }
+            }
+            if (requestedId != null
+                    && Boolean.TRUE.equals(
+                            jdbc.queryForObject(
+                                    """
+SELECT EXISTS (SELECT 1 FROM staff_push_cancellations
+               WHERE environment=? AND staff_id=? AND registration_id=?
+               UNION ALL
+               SELECT 1 FROM staff_push_subscriptions
+               WHERE environment=? AND staff_id=? AND id=? AND revoked_at IS NOT NULL)
+""",
+                                    Boolean.class,
+                                    alerts.scope(),
+                                    staffId,
+                                    requestedId,
+                                    alerts.scope(),
+                                    staffId,
+                                    reusedId == null ? requestedId : reusedId))) {
+                throw new ResponseStatusException(HttpStatus.GONE);
+            }
             String session = StaffSessionService.hash(cookie),
                     hash = StaffSessionService.hash(input.endpoint());
             var existing =
                     jdbc.query(
                             """
 SELECT s.id, s.staff_id, s.session_hash, s.public_key, s.auth_secret,
-  s.revoked_at IS NOT NULL OR v.revoked_at IS NOT NULL OR v.expires_at <= CURRENT_TIMESTAMP OR v.staff_updated_at <> u.updated_at OR NOT u.active inactive
+  s.revoked_at IS NOT NULL OR v.revoked_at IS NOT NULL OR NOT u.active inactive, s.paused_at IS NOT NULL
 FROM staff_push_subscriptions s JOIN staff_sessions v ON v.token_hash = s.session_hash
 JOIN staff_users u ON u.id = s.staff_id WHERE s.environment = ? AND s.endpoint_hash = ? FOR UPDATE OF s
 """,
@@ -100,22 +211,51 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.environment = ? AND s.endpoint_h
                                             rs.getString(3),
                                             rs.getString(4),
                                             rs.getString(5),
-                                            rs.getBoolean(6)),
+                                            rs.getBoolean(6),
+                                            rs.getBoolean(7)),
                             alerts.scope(),
                             hash);
-            if (!existing.isEmpty()
-                    && !existing.getFirst().inactive()
-                    && existing.getFirst().staffId() != staffId)
-                throw new ResponseStatusException(
-                        HttpStatus.CONFLICT,
-                        "This browser belongs to another staff session. Disable its old"
-                                + " registration first.");
+            // Match sign-out's lock order: device first, then session. The initial verification
+            // may have completed before sign-out or reauthentication revoked this cookie.
+            var activeSession =
+                    jdbc.query(
+                            """
+SELECT token_hash FROM staff_sessions WHERE token_hash=? AND staff_id=?
+  AND revoked_at IS NULL AND expires_at>clock_timestamp() FOR SHARE
+""",
+                            (rs, row) -> rs.getString(1),
+                            session,
+                            staffId);
+            if (activeSession.isEmpty()) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+            var old = existing.isEmpty() ? null : existing.getFirst();
+            boolean differentOwner = old != null && !(old.staffId() == staffId);
+            boolean sameDevice =
+                    old != null
+                            && old.publicKey().equals(input.publicKey())
+                            && old.auth().equals(input.authSecret());
+            if (input.pausePrevious()) {
+                if (differentOwner && sameDevice && !old.inactive()) {
+                    jdbc.update(
+                            "UPDATE staff_push_subscriptions SET revoked_at=CURRENT_TIMESTAMP WHERE"
+                                    + " id=?",
+                            old.id());
+                }
+                return new Result(null, false);
+            }
+            // An alias alone cannot receive pushes addressed to the canonical ID.
+            if (reusedId != null) {
+                if (differentOwner || !sameDevice || !reusedId.equals(old.id())) {
+                    throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+                }
+                return new Result(reusedId, false, true);
+            }
             Long count =
                     jdbc.queryForObject(
                             """
 SELECT COUNT(*) FROM staff_push_subscriptions s JOIN staff_sessions v ON v.token_hash = s.session_hash
 JOIN staff_users u ON u.id = s.staff_id WHERE s.environment = ? AND s.staff_id = ? AND s.endpoint_hash <> ?
-  AND s.revoked_at IS NULL AND v.revoked_at IS NULL AND v.expires_at > CURRENT_TIMESTAMP AND v.staff_updated_at = u.updated_at AND u.active
+  AND s.revoked_at IS NULL AND s.paused_at IS NULL AND v.revoked_at IS NULL
+  AND v.expires_at > CURRENT_TIMESTAMP AND u.active
 """,
                             Long.class,
                             alerts.scope(),
@@ -124,20 +264,63 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.environment = ? AND s.staff_id =
             if (count != null && count >= 5)
                 throw new ResponseStatusException(
                         HttpStatus.CONFLICT, "Maximum five live staff browsers.");
-            if (!existing.isEmpty()) {
-                var old = existing.getFirst();
+            if (input.registrationId() != null) {
+                // Existing-device restoration must never recreate a removed subscription.
+                var restored =
+                        jdbc.query(
+                                """
+UPDATE staff_push_subscriptions s SET session_hash=?,
+    subscribed_at=CASE WHEN s.paused_at IS NULL THEN s.subscribed_at ELSE CURRENT_TIMESTAMP END,
+    paused_at=NULL
+FROM staff_sessions old, staff_users u
+WHERE s.id=? AND s.environment=? AND s.staff_id=? AND s.endpoint_hash=?
+  AND s.public_key=? AND s.auth_secret=? AND s.revoked_at IS NULL
+  AND old.token_hash=s.session_hash AND u.id=s.staff_id AND u.active
+RETURNING s.id
+""",
+                                (rs, row) -> rs.getObject(1, UUID.class),
+                                session,
+                                input.registrationId(),
+                                alerts.scope(),
+                                staffId,
+                                hash,
+                                input.publicKey(),
+                                input.authSecret());
+                if (restored.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+                if (old != null && old.paused()) queuePendingOrders(staffId, restored.getFirst());
+                return new Result(restored.getFirst(), false);
+            }
+            if (differentOwner && !old.inactive() && !sameDevice)
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "This browser belongs to another staff session. Disable its old"
+                                + " registration first.");
+            if (old != null) {
                 if (!old.inactive()
                         && old.staffId() == staffId
                         && old.session().equals(session)
                         && old.publicKey().equals(input.publicKey())
-                        && old.auth().equals(input.authSecret())) return new Result(old.id());
+                        && old.auth().equals(input.authSecret())) {
+                    if (input.setupId() != null && !input.setupId().equals(old.id())) {
+                        jdbc.update(
+                                """
+INSERT INTO staff_push_setup_aliases(environment, staff_id, setup_id, registration_id)
+VALUES (?, ?, ?, ?)
+""",
+                                alerts.scope(),
+                                staffId,
+                                input.setupId(),
+                                old.id());
+                    }
+                    return new Result(old.id(), old.id().equals(input.setupId()));
+                }
                 jdbc.update(
                         "UPDATE staff_push_subscriptions SET revoked_at = CURRENT_TIMESTAMP,"
                                 + " endpoint_hash = ? WHERE id = ?",
                         "retired:" + old.id(),
                         old.id());
             }
-            UUID id = UUID.randomUUID();
+            UUID id = input.setupId() == null ? UUID.randomUUID() : input.setupId();
             jdbc.update(
                     """
 INSERT INTO staff_push_subscriptions(id, environment, staff_id, session_hash, endpoint, endpoint_hash, public_key, auth_secret)
@@ -151,12 +334,83 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     hash,
                     input.publicKey(),
                     input.authSecret());
-            return new Result(id);
+            return new Result(id, true);
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
                     StaffPushSubscriptions.class,
                     "subscribe(long,String,Input)");
+        }
+    }
+
+    /**
+     * Queues never-delivered new-order alerts for orders still waiting for staff action.
+     *
+     * @param staffId the authenticated staff account
+     * @param deviceId the resumed registration
+     */
+    private void queuePendingOrders(long staffId, UUID deviceId) {
+        final long started =
+                MethodTiming.start(StaffPushSubscriptions.class, "queuePendingOrders(long,UUID)");
+        try {
+            jdbc.update(
+                    """
+INSERT INTO staff_alert_deliveries AS d(event_id, staff_id, channel, subscription_id, catch_up)
+SELECT e.id, u.id, 'PUSH', ?, TRUE
+FROM orders o JOIN staff_order_alerts e ON e.order_id=o.id AND e.branch_id=o.branch_id
+JOIN staff_users u ON u.id=?
+WHERE o.order_status='CONFIRMED' AND e.environment=? AND e.kind='NEW_ORDER' AND
+"""
+                            + StaffOrderAlerts.ELIGIBLE
+                            + """
+ON CONFLICT (event_id, subscription_id) WHERE channel='PUSH' DO UPDATE
+SET catch_up=TRUE,
+    state=CASE WHEN d.state IN ('SKIPPED','FAILED') THEN 'QUEUED' ELSE d.state END,
+    attempts=CASE WHEN d.state='FAILED' THEN 2
+                  WHEN d.state='SKIPPED' THEN LEAST(d.attempts, 2) ELSE d.attempts END,
+    next_attempt_at=CASE WHEN d.state IN ('SKIPPED','FAILED') THEN CURRENT_TIMESTAMP ELSE d.next_attempt_at END,
+    reconnect_retry_used=d.reconnect_retry_used OR d.state='FAILED'
+WHERE d.state IN ('QUEUED','SENDING','SKIPPED')
+   OR (d.state='FAILED' AND d.attempts=3 AND NOT d.reconnect_retry_used
+       AND (d.last_http_status IS NULL OR d.last_http_status=429 OR d.last_http_status>=500))
+""",
+                    deviceId,
+                    staffId,
+                    alerts.scope());
+        } finally {
+            MethodTiming.finish(
+                    started, StaffPushSubscriptions.class, "queuePendingOrders(long,UUID)");
+        }
+    }
+
+    /**
+     * Resolves a staged setup that reused a registration in this staff account and environment.
+     *
+     * @param staffId the staff account that owns the setup
+     * @param setupId the UUID saved before the setup request
+     * @return the reused registration UUID, or null if the setup has no mapping
+     */
+    private UUID findSetupRegistration(long staffId, UUID setupId) {
+        final long started =
+                MethodTiming.start(
+                        StaffPushSubscriptions.class, "findSetupRegistration(long,UUID)");
+        try {
+            return jdbc
+                    .queryForList(
+                            """
+SELECT registration_id FROM staff_push_setup_aliases
+WHERE environment=? AND staff_id=? AND setup_id=?
+""",
+                            UUID.class,
+                            alerts.scope(),
+                            staffId,
+                            setupId)
+                    .stream()
+                    .findFirst()
+                    .orElse(null);
+        } finally {
+            MethodTiming.finish(
+                    started, StaffPushSubscriptions.class, "findSetupRegistration(long,UUID)");
         }
     }
 
@@ -173,14 +427,28 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(StaffPushSubscriptions.class, "revoke(long,UUID)");
         try {
+            // Share setup's staff-row lock so an absent registration cannot commit after
+            // cancellation.
+            jdbc.queryForObject(
+                    "SELECT id FROM staff_users WHERE id = ? FOR UPDATE", Long.class, staffId);
+            UUID reusedId = findSetupRegistration(staffId, id);
             if (jdbc.update(
                             "UPDATE staff_push_subscriptions SET revoked_at = COALESCE(revoked_at,"
                                     + " CURRENT_TIMESTAMP) WHERE id = ? AND environment = ? AND"
                                     + " staff_id = ?",
-                            id,
+                            reusedId == null ? id : reusedId,
                             alerts.scope(),
                             staffId)
-                    == 0) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+                    == 0) {
+                jdbc.update(
+                        """
+INSERT INTO staff_push_cancellations(environment, staff_id, registration_id)
+VALUES (?, ?, ?) ON CONFLICT DO NOTHING
+""",
+                        alerts.scope(),
+                        staffId,
+                        id);
+            }
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos, StaffPushSubscriptions.class, "revoke(long,UUID)");
@@ -210,7 +478,8 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                                     """
 SELECT EXISTS (SELECT 1 FROM staff_push_subscriptions s JOIN staff_sessions v ON v.token_hash = s.session_hash
 JOIN staff_users u ON u.id = s.staff_id WHERE s.id = ? AND s.environment = ? AND s.staff_id = ? AND s.session_hash = ?
-  AND s.revoked_at IS NULL AND v.revoked_at IS NULL AND v.expires_at > CURRENT_TIMESTAMP AND v.staff_updated_at = u.updated_at AND u.active)
+  AND s.revoked_at IS NULL AND s.paused_at IS NULL AND v.revoked_at IS NULL AND v.expires_at > CURRENT_TIMESTAMP
+  AND u.active)
 """,
                                     Boolean.class,
                                     id,
@@ -234,6 +503,7 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.id = ? AND s.environment = ? AND
      * @param publicKey the public key
      * @param auth the auth
      * @param inactive the inactive
+     * @param paused whether the device was paused on sign-out
      */
     private record Existing(
             UUID id,
@@ -241,5 +511,6 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.id = ? AND s.environment = ? AND
             String session,
             String publicKey,
             String auth,
-            boolean inactive) {}
+            boolean inactive,
+            boolean paused) {}
 }

@@ -112,6 +112,35 @@ WHERE environment = ? AND token_digest = ? AND expires_at > ? AND revoked_at IS 
     }
 
     /**
+     * Pauses the current browser’s registration even if it belongs to an older login.
+     *
+     * @param environment the active environment
+     * @param subject the verified customer
+     * @param id the browser registration
+     */
+    @Transactional
+    public void pausePushDevice(ConsentEnvironment environment, UUID subject, UUID id) {
+        final long started =
+                MethodTiming.start(
+                        VerifiedCustomerSessionStore.class,
+                        "pausePushDevice(ConsentEnvironment,UUID,UUID)");
+        try {
+            jdbc.update(
+                    "UPDATE customer_push_subscriptions SET"
+                            + " paused_at=COALESCE(paused_at,CURRENT_TIMESTAMP) WHERE environment=?"
+                            + " AND subject_id=? AND id=?",
+                    environment.name(),
+                    subject,
+                    id);
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    VerifiedCustomerSessionStore.class,
+                    "pausePushDevice(ConsentEnvironment,UUID,UUID)");
+        }
+    }
+
+    /**
      * Revokes verified customer session store data.
      *
      * <p>Writes {@code verified_customer_sessions}.
