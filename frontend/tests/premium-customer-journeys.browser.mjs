@@ -378,9 +378,15 @@ try {
       );
     }
     await search.fill("pnaeer");
+    await page
+      .getByRole("listbox", { name: "Menu suggestions", exact: true })
+      .getByRole("option", { name: "Paneer Samosa", exact: true })
+      .waitFor();
     await search.press("ArrowDown");
     await search.press("Enter");
     assert.equal(await search.inputValue(), "Paneer Samosa");
+    // Selecting a suggestion moves focus to the dish on the next animation frame.
+    await page.locator("#gokul-product-1:focus").waitFor();
     await search.fill("");
     await search.focus();
     await page
