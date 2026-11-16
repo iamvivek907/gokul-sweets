@@ -54,7 +54,8 @@ class StaffOrderAlertsIntegrationTest {
     @MockitoSpyBean StaffOrderAlerts alerts;
     @Autowired StaffAlertDispatcher dispatcher;
     @Autowired StaffPushSubscriptions subscriptions;
-    @Autowired StaffSessionService sessions;
+    @MockitoSpyBean StaffSessionService sessions;
+    @Autowired org.springframework.security.crypto.password.PasswordEncoder passwords;
     @Autowired PlatformTransactionManager manager;
     @MockitoBean WebPushTransport push;
     @MockitoBean StaffAlertEmail email;
@@ -110,18 +111,7 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                                 + " (?, 'PHONEPE', 100, 'PAID') RETURNING id",
                         Long.class,
                         order);
-        StaffUser user = new StaffUser();
-        user.setId(staff);
-        var staffRole = new com.gokulsweets.restaurant.staff.Role();
-        staffRole.setName(
-                jdbc.queryForObject("SELECT name FROM roles WHERE id = ?", String.class, role));
-        user.setRole(staffRole);
-        user.setUpdatedAt(
-                jdbc.queryForObject(
-                        "SELECT updated_at FROM staff_users WHERE id = ?",
-                        LocalDateTime.class,
-                        staff));
-        cookie = sessions.issue(user).token();
+        cookie = issueFor(staff);
         when(push.configured()).thenReturn(true);
         when(email.configured()).thenReturn(true);
         when(email.recipient(staff)).thenReturn("staff-test@example.invalid");
@@ -140,6 +130,21 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                                                 generator.generateKeyPair().getPublic())
                                         .getQ()
                                         .getEncoded(false));
+    }
+
+    private String issueFor(long staffId) {
+        StaffUser user = new StaffUser();
+        user.setId(staffId);
+        var staffRole = new com.gokulsweets.restaurant.staff.Role();
+        staffRole.setName(
+                jdbc.queryForObject("SELECT name FROM roles WHERE id = ?", String.class, role));
+        user.setRole(staffRole);
+        user.setUpdatedAt(
+                jdbc.queryForObject(
+                        "SELECT updated_at FROM staff_users WHERE id = ?",
+                        LocalDateTime.class,
+                        staff));
+        return sessions.issue(user).token();
     }
 
     private long staff(long branch) {
@@ -214,7 +219,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                         eq(event.id()),
                         anyString(),
                         anyString(),
-                        eq(event.targetUrl())))
+                        eq(event.targetUrl()),
+                        any(UUID.class)))
                 .thenReturn(201);
         dispatcher.dispatchBatch();
         verify(push)
@@ -225,7 +231,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                         eq(event.id()),
                         anyString(),
                         anyString(),
-                        eq(event.targetUrl()));
+                        eq(event.targetUrl()),
+                        any(UUID.class));
         jdbc.update("UPDATE occasion_enquiries SET status='QUOTED' WHERE id=?", request);
         alerts.occasionReviewed(request);
         assertThat(alerts.page(staff, null).unreadCount()).isZero();
@@ -318,7 +325,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                         anyLong(),
                         anyString(),
                         anyString(),
-                        anyString());
+                        anyString(),
+                        any(UUID.class));
     }
 
     @Test
@@ -346,9 +354,680 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                         anyLong(),
                         anyString(),
                         anyString(),
-                        anyString());
+                        anyString(),
+                        any(UUID.class));
         assertThat(alerts.page(staff, null).messages())
                 .allMatch(message -> !message.actionRequired());
+    }
+
+    @Test
+    void sharedPhonePausesPreviousStaffAndRequiresNewOptIn() {
+        var browser = input("shared-" + UUID.randomUUID());
+        var first = subscriptions.subscribe(staff, cookie, browser);
+        var nextCookie = issueFor(otherStaff);
+        jdbc.update(
+                "UPDATE staff_sessions SET expires_at=CURRENT_TIMESTAMP - INTERVAL '1 minute'"
+                        + " WHERE token_hash=?",
+                StaffSessionService.hash(cookie));
+        var pause =
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(),
+                        browser.publicKey(),
+                        browser.authSecret(),
+                        null,
+                        otherStaff,
+                        true);
+        assertThatThrownBy(
+                        () ->
+                                subscriptions.subscribe(
+                                        otherStaff,
+                                        nextCookie,
+                                        new StaffPushSubscriptions.Input(
+                                                browser.endpoint(),
+                                                browser.publicKey(),
+                                                browser.authSecret(),
+                                                null,
+                                                staff,
+                                                true)))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThat(subscriptions.subscribe(otherStaff, nextCookie, pause).id()).isNull();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT revoked_at IS NOT NULL FROM staff_push_subscriptions WHERE"
+                                        + " id=?",
+                                Boolean.class,
+                                first.id()))
+                .isTrue();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM staff_push_subscriptions WHERE staff_id=?",
+                                Long.class,
+                                otherStaff))
+                .isZero();
+        var second = subscriptions.subscribe(otherStaff, nextCookie, browser);
+        assertThat(second.id()).isNotEqualTo(first.id());
+        assertThat(subscriptions.live(otherStaff, second.id(), nextCookie)).isTrue();
+    }
+
+    @Test
+    void retryingTheSameSetupKeepsItsRegistrationAndRollbackOwnership() {
+        var browser = input("setup-retry-" + UUID.randomUUID());
+        var setupId = UUID.randomUUID();
+        var request =
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(),
+                        browser.publicKey(),
+                        browser.authSecret(),
+                        null,
+                        staff,
+                        false,
+                        setupId);
+
+        var initial = subscriptions.subscribe(staff, cookie, request);
+        var retry = subscriptions.subscribe(staff, cookie, request);
+        var anotherSetup = subscriptions.subscribe(staff, cookie, browser);
+
+        assertThat(initial.id()).isEqualTo(setupId);
+        assertThat(retry).isEqualTo(initial);
+        assertThat(retry.created()).isTrue();
+        assertThat(anotherSetup.id()).isEqualTo(setupId);
+        assertThat(anotherSetup.created()).isFalse();
+    }
+
+    @Test
+    void cancellingAReusedSetupRevokesItsCanonicalRegistration() {
+        var browser = input("reused-setup-" + UUID.randomUUID());
+        var existing = subscriptions.subscribe(staff, cookie, browser);
+        var alias = UUID.randomUUID();
+        var setup =
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(),
+                        browser.publicKey(),
+                        browser.authSecret(),
+                        null,
+                        staff,
+                        false,
+                        alias);
+        var restore =
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(), browser.publicKey(), browser.authSecret(), alias);
+
+        assertThat(subscriptions.subscribe(staff, cookie, setup))
+                .isEqualTo(new StaffPushSubscriptions.Result(existing.id(), false));
+        assertThat(subscriptions.subscribe(staff, cookie, setup).id()).isEqualTo(existing.id());
+
+        sessions.signOutDevices(staff, java.util.List.of(alias), cookie);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT paused_at IS NOT NULL FROM staff_push_subscriptions WHERE"
+                                        + " id=?",
+                                Boolean.class,
+                                existing.id()))
+                .isTrue();
+        var nextCookie = issueFor(staff);
+        alerts.paymentConfirmed(payment);
+        long event = latest();
+        assertThat(subscriptions.subscribe(staff, nextCookie, restore))
+                .isEqualTo(new StaffPushSubscriptions.Result(existing.id(), false, true));
+        assertThat(subscriptions.live(staff, existing.id(), nextCookie)).isFalse();
+        String catchUpCount =
+                "SELECT COUNT(*) FROM staff_alert_deliveries WHERE event_id=?"
+                        + " AND subscription_id=? AND catch_up";
+        assertThat(jdbc.queryForObject(catchUpCount, Long.class, event, existing.id())).isZero();
+
+        var blocked =
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(),
+                        browser.publicKey(),
+                        browser.authSecret(),
+                        existing.id(),
+                        staff,
+                        false,
+                        null,
+                        java.util.List.of(alias));
+        assertThatThrownBy(() -> subscriptions.subscribe(staff, nextCookie, blocked))
+                .isInstanceOfSatisfying(
+                        org.springframework.web.server.ResponseStatusException.class,
+                        error -> assertThat(error.getStatusCode().value()).isEqualTo(410));
+        assertThat(subscriptions.live(staff, existing.id(), nextCookie)).isFalse();
+        assertThat(jdbc.queryForObject(catchUpCount, Long.class, event, existing.id())).isZero();
+        var ready =
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(),
+                        browser.publicKey(),
+                        browser.authSecret(),
+                        existing.id(),
+                        staff,
+                        false,
+                        null,
+                        java.util.List.of(UUID.randomUUID()));
+        assertThat(subscriptions.subscribe(staff, nextCookie, ready))
+                .isEqualTo(new StaffPushSubscriptions.Result(existing.id(), false));
+        assertThat(subscriptions.live(staff, existing.id(), nextCookie)).isTrue();
+        assertThat(jdbc.queryForObject(catchUpCount, Long.class, event, existing.id()))
+                .isEqualTo(1L);
+        subscriptions.revoke(staff, alias);
+        assertThat(subscriptions.live(staff, existing.id(), nextCookie)).isFalse();
+
+        var replacement = subscriptions.subscribe(staff, nextCookie, browser);
+        subscriptions.revoke(staff, alias);
+        assertThat(subscriptions.live(staff, replacement.id(), nextCookie)).isTrue();
+
+        for (var request : java.util.List.of(setup, restore)) {
+            assertThatThrownBy(() -> subscriptions.subscribe(staff, nextCookie, request))
+                    .isInstanceOfSatisfying(
+                            org.springframework.web.server.ResponseStatusException.class,
+                            error -> assertThat(error.getStatusCode().value()).isEqualTo(410));
+        }
+    }
+
+    @Test
+    void disableBeforeSetupCommitsRemainsIdempotentAndBlocksTheOldId() {
+        var browser = input("cancelled-setup-" + UUID.randomUUID());
+        var cancelledId = UUID.randomUUID();
+        var late =
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(),
+                        browser.publicKey(),
+                        browser.authSecret(),
+                        null,
+                        staff,
+                        false,
+                        cancelledId);
+
+        subscriptions.revoke(staff, cancelledId);
+        subscriptions.revoke(staff, cancelledId);
+
+        assertThatThrownBy(() -> subscriptions.subscribe(staff, cookie, late))
+                .isInstanceOfSatisfying(
+                        org.springframework.web.server.ResponseStatusException.class,
+                        error -> assertThat(error.getStatusCode().value()).isEqualTo(410));
+        assertThat(subscriptions.live(staff, cancelledId, cookie)).isFalse();
+
+        var fresh = subscriptions.subscribe(staff, cookie, browser);
+        assertThat(fresh.id()).isNotEqualTo(cancelledId);
+        assertThat(subscriptions.live(staff, fresh.id(), cookie)).isTrue();
+    }
+
+    @Test
+    void revokedRegistrationCannotBeRestoredOrReusedAsASetupId() {
+        var browser = input("revoked-setup-" + UUID.randomUUID());
+        var registration = subscriptions.subscribe(staff, cookie, browser);
+        var restore =
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(),
+                        browser.publicKey(),
+                        browser.authSecret(),
+                        registration.id());
+        var replay =
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(),
+                        browser.publicKey(),
+                        browser.authSecret(),
+                        null,
+                        staff,
+                        false,
+                        registration.id());
+
+        subscriptions.revoke(staff, registration.id());
+
+        for (var request : java.util.List.of(restore, replay)) {
+            assertThatThrownBy(() -> subscriptions.subscribe(staff, cookie, request))
+                    .isInstanceOfSatisfying(
+                            org.springframework.web.server.ResponseStatusException.class,
+                            error -> assertThat(error.getStatusCode().value()).isEqualTo(410));
+        }
+        assertThat(subscriptions.live(staff, registration.id(), cookie)).isFalse();
+        assertThat(subscriptions.subscribe(staff, cookie, browser).id())
+                .isNotEqualTo(registration.id());
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void setupVerifiedBeforeSignOutCannotReplaceTheNewSessionsRegistration() throws Exception {
+        var checked = new CountDownLatch(1);
+        var resume = new CountDownLatch(1);
+        var browser = input("delayed-setup-" + UUID.randomUUID());
+        doAnswer(
+                        invocation -> {
+                            var verified = invocation.callRealMethod();
+                            checked.countDown();
+                            if (!resume.await(10, TimeUnit.SECONDS))
+                                throw new IllegalStateException("Setup did not resume");
+                            return verified;
+                        })
+                .when(sessions)
+                .verify(cookie);
+
+        var worker = Executors.newSingleThreadExecutor();
+        try {
+            var delayed =
+                    worker.submit(
+                            () -> {
+                                try {
+                                    subscriptions.subscribe(staff, cookie, browser);
+                                    return 200;
+                                } catch (
+                                        org.springframework.web.server.ResponseStatusException
+                                                error) {
+                                    return error.getStatusCode().value();
+                                }
+                            });
+            assertThat(checked.await(10, TimeUnit.SECONDS)).isTrue();
+            sessions.signOut(staff, null, cookie);
+            var current = issueFor(staff);
+            var registration = subscriptions.subscribe(staff, current, browser);
+            resume.countDown();
+
+            assertThat(delayed.get(10, TimeUnit.SECONDS)).isEqualTo(401);
+            assertThat(subscriptions.live(staff, registration.id(), current)).isTrue();
+        } finally {
+            resume.countDown();
+            worker.shutdownNow();
+        }
+    }
+
+    @Test
+    void signingOutPausesSavedAndStagedRegistrationsButLeavesOtherPhonesActive() {
+        var remembered =
+                subscriptions.subscribe(staff, cookie, input("saved-" + UUID.randomUUID()));
+        var staged = subscriptions.subscribe(staff, cookie, input("staged-" + UUID.randomUUID()));
+        var otherCookie = issueFor(staff);
+        var other =
+                subscriptions.subscribe(staff, otherCookie, input("other-" + UUID.randomUUID()));
+
+        sessions.signOutDevices(staff, java.util.List.of(remembered.id(), staged.id()), cookie);
+
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM staff_push_subscriptions WHERE id IN (?,?)"
+                                        + " AND paused_at IS NOT NULL",
+                                Long.class,
+                                remembered.id(),
+                                staged.id()))
+                .isEqualTo(2);
+        assertThat(sessions.verify(cookie)).isNull();
+        assertThat(subscriptions.live(staff, other.id(), otherCookie)).isTrue();
+    }
+
+    @Test
+    void signingOutPausesTheOlderRegistrationWithoutRevokingAnotherPhone() {
+        var browser = input("old-device-" + UUID.randomUUID());
+        var old = subscriptions.subscribe(staff, cookie, browser);
+        var otherCookie = issueFor(staff);
+        var other =
+                subscriptions.subscribe(
+                        staff, otherCookie, input("other-device-" + UUID.randomUUID()));
+        var newCookie = issueFor(staff);
+
+        sessions.signOut(staff, old.id(), newCookie);
+
+        assertThat(sessions.verify(newCookie)).isNull();
+        assertThat(subscriptions.live(staff, old.id(), cookie)).isFalse();
+        assertThat(subscriptions.live(staff, other.id(), otherCookie)).isTrue();
+        var nextLogin = issueFor(staff);
+        var restoration =
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(), browser.publicKey(), browser.authSecret(), old.id());
+        assertThat(subscriptions.subscribe(staff, nextLogin, restoration).id()).isEqualTo(old.id());
+        assertThat(subscriptions.live(staff, old.id(), nextLogin)).isTrue();
+        subscriptions.revoke(staff, old.id());
+        assertThatThrownBy(() -> subscriptions.subscribe(staff, nextLogin, restoration))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+    }
+
+    @Test
+    void expiredStaffSessionCannotQueueOrSendPhoneAlerts() throws Exception {
+        var device =
+                subscriptions.subscribe(staff, cookie, input("expired-phone-" + UUID.randomUUID()));
+        jdbc.update(
+                "UPDATE staff_sessions SET expires_at=CURRENT_TIMESTAMP - INTERVAL '1 minute'"
+                        + " WHERE token_hash=?",
+                StaffSessionService.hash(cookie));
+        assertThat(sessions.verify(cookie)).isNull();
+        alerts.paymentConfirmed(payment);
+        long paid = latest();
+        dispatcher.dispatchBatch();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM staff_alert_deliveries WHERE event_id=? AND"
+                                        + " subscription_id=?",
+                                Long.class,
+                                paid,
+                                device.id()))
+                .isZero();
+
+        jdbc.update(
+                "INSERT INTO staff_alert_deliveries(event_id, staff_id, channel, subscription_id)"
+                        + " VALUES (?, ?, 'PUSH', ?)",
+                paid,
+                staff,
+                device.id());
+        dispatcher.dispatchBatch();
+        verify(push, never())
+                .sendStaff(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(paid),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        any(UUID.class));
+    }
+
+    @Test
+    void sameAccountSignInTransfersPhoneBeforeOldSessionIsRevoked() throws Exception {
+        String username =
+                jdbc.queryForObject(
+                        "SELECT username FROM staff_users WHERE id=?", String.class, staff);
+        String password = "Staff-password-2026";
+        jdbc.update(
+                "UPDATE staff_users SET password_hash=? WHERE id=?",
+                passwords.encode(password),
+                staff);
+        String oldCookie = issueFor(staff);
+        var device =
+                subscriptions.subscribe(
+                        staff, oldCookie, input("rotated-phone-" + UUID.randomUUID()));
+        var otherCookie = issueFor(staff);
+        var otherDevice =
+                subscriptions.subscribe(
+                        staff, otherCookie, input("other-phone-" + UUID.randomUUID()));
+        alerts.paymentConfirmed(payment);
+
+        var next = sessions.login(username, password, null, "127.0.0.1", oldCookie);
+
+        assertThat(sessions.verify(oldCookie)).isNull();
+        assertThat(subscriptions.live(staff, device.id(), next.token())).isTrue();
+        assertThat(subscriptions.live(staff, otherDevice.id(), otherCookie)).isTrue();
+        dispatcher.dispatchBatch();
+        long event = latest();
+        verify(push)
+                .sendStaff(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(event),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(device.id()));
+    }
+
+    @Test
+    void restoredPhoneAlertsOnceForAnOlderOrderThatStillNeedsAction() throws Exception {
+        var browser = input("catch-up-phone-" + UUID.randomUUID());
+        var device = subscriptions.subscribe(staff, cookie, browser);
+        var restoration =
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(), browser.publicKey(), browser.authSecret(), device.id());
+        when(push.sendStaff(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        anyLong(),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(device.id())))
+                .thenReturn(201);
+        sessions.signOut(staff, device.id(), cookie);
+        alerts.paymentConfirmed(payment);
+        long event = latest();
+        jdbc.update(
+                "UPDATE staff_order_alerts SET created_at=CURRENT_TIMESTAMP - INTERVAL '1 hour'"
+                        + " WHERE id=?",
+                event);
+        dispatcher.dispatchBatch();
+        verify(push, never())
+                .sendStaff(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(event),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(device.id()));
+
+        var next = issueFor(staff);
+        subscriptions.subscribe(staff, next, restoration);
+        dispatcher.dispatchBatch();
+        sessions.signOut(staff, device.id(), next);
+        subscriptions.subscribe(staff, issueFor(staff), restoration);
+        dispatcher.dispatchBatch();
+
+        verify(push, times(1))
+                .sendStaff(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(event),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(device.id()));
+    }
+
+    @Test
+    void restoredPhoneSkipsCatchUpWhenAnotherDeviceStartsTheOrder() throws Exception {
+        var browser = input("handled-order-" + UUID.randomUUID());
+        var device = subscriptions.subscribe(staff, cookie, browser);
+        sessions.signOut(staff, device.id(), cookie);
+        alerts.paymentConfirmed(payment);
+        var restoration =
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(), browser.publicKey(), browser.authSecret(), device.id());
+        subscriptions.subscribe(staff, issueFor(staff), restoration);
+
+        status("PREPARING");
+        dispatcher.dispatchBatch();
+        long event = latest();
+        verify(push, never())
+                .sendStaff(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(event),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(device.id()));
+    }
+
+    @Test
+    void reservesOneCatchUpSlotAfterLivePreparationAlertsFillTheBatch() throws Exception {
+        var browser = input("priority-phone-" + UUID.randomUUID());
+        var device = subscriptions.subscribe(staff, cookie, browser);
+        sessions.signOut(staff, device.id(), cookie);
+        alerts.paymentConfirmed(payment);
+        long paid = latest();
+        subscriptions.subscribe(
+                staff,
+                issueFor(staff),
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(),
+                        browser.publicKey(),
+                        browser.authSecret(),
+                        device.id()));
+        now(17, 0);
+        alerts.generateReminders();
+        long due = latest();
+        jdbc.update(
+                """
+INSERT INTO staff_order_alerts(environment, event_key, order_id, branch_id, kind, required_permission, title, message, scheduled_at)
+SELECT e.environment, e.event_key || ':test:' || i, e.order_id, e.branch_id, e.kind, e.required_permission, e.title, e.message, e.scheduled_at
+FROM staff_order_alerts e CROSS JOIN generate_series(1, 9) AS slot(i) WHERE e.id=?
+""",
+                due);
+
+        dispatcher.dispatchBatch();
+
+        assertThat(due).isNotEqualTo(paid);
+        var order = inOrder(push);
+        order.verify(push, times(9))
+                .sendStaff(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        longThat(id -> id != paid),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(device.id()));
+        order.verify(push)
+                .sendStaff(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(paid),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(device.id()));
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM staff_alert_deliveries WHERE"
+                                        + " subscription_id=? AND state='QUEUED' AND NOT catch_up",
+                                Long.class,
+                                device.id()))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void skippingAPausedPhonePreservesAttemptsAndLastFailure() throws Exception {
+        var browser = input("paused-retry-" + UUID.randomUUID());
+        var device = subscriptions.subscribe(staff, cookie, browser);
+        alerts.paymentConfirmed(payment);
+        long event = latest();
+        jdbc.update(
+                """
+INSERT INTO staff_alert_deliveries(event_id, staff_id, channel, subscription_id, attempts, last_http_status)
+VALUES (?, ?, 'PUSH', ?, 2, 503)
+""",
+                event,
+                staff,
+                device.id());
+        sessions.signOut(staff, device.id(), cookie);
+
+        dispatcher.dispatchBatch();
+        assertThat(
+                        jdbc.queryForMap(
+                                "SELECT state, attempts, last_http_status FROM"
+                                        + " staff_alert_deliveries WHERE event_id=? AND"
+                                        + " subscription_id=?",
+                                event,
+                                device.id()))
+                .containsEntry("state", "SKIPPED")
+                .containsEntry("attempts", 2)
+                .containsEntry("last_http_status", 503);
+        subscriptions.subscribe(
+                staff,
+                issueFor(staff),
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(),
+                        browser.publicKey(),
+                        browser.authSecret(),
+                        device.id()));
+
+        assertThat(
+                        jdbc.queryForMap(
+                                "SELECT state, attempts, last_http_status FROM"
+                                        + " staff_alert_deliveries WHERE event_id=? AND"
+                                        + " subscription_id=?",
+                                event,
+                                device.id()))
+                .containsEntry("state", "QUEUED")
+                .containsEntry("attempts", 2)
+                .containsEntry("last_http_status", 503);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"503, 1", "429, 1", "400, 0"})
+    void reconnectGrantsOnlyOneExtraAttemptForAnExhaustedTransientFailure(
+            int previousStatus, int extraAttempts) throws Exception {
+        var browser = input("retry-phone-" + UUID.randomUUID());
+        var device = subscriptions.subscribe(staff, cookie, browser);
+        var restoration =
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(), browser.publicKey(), browser.authSecret(), device.id());
+        alerts.paymentConfirmed(payment);
+        long event = latest();
+        jdbc.update(
+                """
+INSERT INTO staff_alert_deliveries(event_id, staff_id, channel, subscription_id, state, attempts, last_http_status)
+VALUES (?, ?, 'PUSH', ?, 'FAILED', 3, ?)
+""",
+                event,
+                staff,
+                device.id(),
+                previousStatus);
+        when(push.sendStaff(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(event),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(device.id())))
+                .thenReturn(503);
+
+        sessions.signOut(staff, device.id(), cookie);
+        String next = issueFor(staff);
+        subscriptions.subscribe(staff, next, restoration);
+        dispatcher.dispatchBatch();
+        sessions.signOut(staff, device.id(), next);
+        subscriptions.subscribe(staff, issueFor(staff), restoration);
+        dispatcher.dispatchBatch();
+
+        verify(push, times(extraAttempts))
+                .sendStaff(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(event),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(device.id()));
+    }
+
+    @Test
+    void readingADueReminderStillSendsItsPhoneAlertUntilPreparationStarts() throws Exception {
+        subscriptions.subscribe(staff, cookie, input("read-due-" + UUID.randomUUID()));
+        now(17, 0);
+        alerts.generateReminders();
+        long due = latest();
+        alerts.markRead(staff, due);
+
+        dispatcher.dispatchBatch();
+
+        verify(push)
+                .sendStaff(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq(due),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        any(UUID.class));
+        now(17, 2);
+        alerts.generateReminders();
+        status("PREPARING");
+        dispatcher.dispatchBatch();
+        verify(push, times(1))
+                .sendStaff(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        anyLong(),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        any(UUID.class));
     }
 
     @Test
@@ -417,7 +1096,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                         anyLong(),
                         anyString(),
                         anyString(),
-                        anyString());
+                        anyString(),
+                        any(UUID.class));
         jdbc.update(
                 "INSERT INTO role_permissions(role_id, permission_id) SELECT ?, id FROM permissions"
                         + " WHERE name = 'ORDER_VIEW'",
@@ -429,7 +1109,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                         eq(event),
                         anyString(),
                         anyString(),
-                        anyString()))
+                        anyString(),
+                        any(UUID.class)))
                 .thenReturn(410);
         dispatcher.dispatchBatch();
         assertThat(subscriptions.live(staff, registered.id(), cookie)).isFalse();
@@ -495,7 +1176,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                         eq(event),
                         anyString(),
                         anyString(),
-                        anyString()))
+                        anyString(),
+                        any(UUID.class)))
                 .thenReturn(201);
         var workers = Executors.newFixedThreadPool(2);
         var gate = new CountDownLatch(1);
@@ -525,7 +1207,8 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                             eq(event),
                             anyString(),
                             anyString(),
-                            eq("/admin/orders/" + number));
+                            eq("/admin/orders/" + number),
+                            any(UUID.class));
         } finally {
             workers.shutdownNow();
         }

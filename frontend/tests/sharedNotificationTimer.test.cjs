@@ -14,3 +14,19 @@ test('bell and sound use one timer across staggered mounts and release it on las
  second();assert.equal(cleared,1);
  const again=exports.subscribeNotificationTick(()=>{});assert.equal(created,2);again();
 });
+
+test('device push wakes current subscribers and releases the shared message listener', () => {
+ const exports = {}, serviceWorker = new EventTarget();
+ let refreshes = 0;
+ vm.runInNewContext(ts.transpileModule(fs.readFileSync('services/customerNotificationPolling.ts','utf8'),{
+  compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}
+ }).outputText,{exports,navigator:{serviceWorker},setInterval:()=>1,clearInterval:()=>{}});
+ const unsubscribe = exports.subscribeNotificationTick(() => refreshes++);
+ serviceWorker.dispatchEvent(new MessageEvent('message',{data:{type:'gokul-staff-alert'}}));
+ assert.equal(refreshes,0);
+ serviceWorker.dispatchEvent(new MessageEvent('message',{data:{type:'gokul-customer-alert'}}));
+ assert.equal(refreshes,1);
+ unsubscribe();
+ serviceWorker.dispatchEvent(new MessageEvent('message',{data:{type:'gokul-customer-alert'}}));
+ assert.equal(refreshes,1);
+});

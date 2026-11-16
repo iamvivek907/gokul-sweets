@@ -419,7 +419,9 @@ class CustomerIdentityControllerTest {
                                         new CustomerIdentityController.NameRequest(" "), request))
                 .isInstanceOf(ResponseStatusException.class);
         verify(subjects, times(1)).updateDisplayName(any(), any(), any());
-        var logout = controller.logout(request);
+        var deviceId = UUID.randomUUID();
+        var logout = controller.logout(request, deviceId);
+        verify(sessions).pausePushDevice(ConsentEnvironment.DEV, subject, deviceId);
         verify(sessions).revoke(eq(ConsentEnvironment.DEV), eq("session-token"), any());
         assertThat(logout.getHeaders().getFirst(HttpHeaders.SET_COOKIE))
                 .contains("Max-Age=0", "Path=/");

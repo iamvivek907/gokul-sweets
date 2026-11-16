@@ -51,6 +51,38 @@ class StaffAlertsControllerTest {
     }
 
     @Test
+    void authenticatedStaffWithoutOrderAccessCanPauseButCannotEnroll() {
+        var authorization = mock(StaffAuthorizationService.class);
+        var alerts = mock(StaffOrderAlerts.class);
+        var subscriptions = mock(StaffPushSubscriptions.class);
+        var staff = new StaffUser();
+        staff.setId(12L);
+        when(authorization.getCurrentStaff()).thenReturn(staff);
+        when(alerts.enabled()).thenReturn(true);
+        doThrow(new org.springframework.security.access.AccessDeniedException("No order access"))
+                .when(authorization)
+                .requirePermission(PermissionName.ORDER_VIEW);
+        var controller =
+                new StaffAlertsController(
+                        authorization,
+                        alerts,
+                        subscriptions,
+                        mock(WebPushTransport.class),
+                        new WebPushProperties(),
+                        mock(StaffAlertEmail.class));
+        var pause = new StaffPushSubscriptions.Input("endpoint", "key", "auth", null, 12L, true);
+
+        controller.subscribe(pause, new MockHttpServletRequest());
+        verify(subscriptions).subscribe(12L, null, pause);
+        assertThatThrownBy(
+                        () ->
+                                controller.subscribe(
+                                        new StaffPushSubscriptions.Input("endpoint", "key", "auth"),
+                                        new MockHttpServletRequest()))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+
+    @Test
     void alertReadCannotBypassOrderViewPermission() {
         var authorization = mock(StaffAuthorizationService.class);
         doThrow(new org.springframework.security.access.AccessDeniedException("No permission"))

@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 import com.gokulsweets.restaurant.config.EnhancementProperties;
 import com.gokulsweets.restaurant.inventory.dto.*;
 import com.gokulsweets.restaurant.inventory.service.CustomerInventoryAvailabilityService;
+import com.gokulsweets.restaurant.menu.MenuCatalogService;
 import com.gokulsweets.restaurant.menu.MenuService;
 import com.gokulsweets.restaurant.menu.dto.*;
 import com.gokulsweets.restaurant.order.enums.PickupType;
@@ -25,6 +26,7 @@ import java.util.*;
 class PickupAddOnBatchTest {
     final JdbcTemplate jdbc = mock(JdbcTemplate.class);
     final MenuService menu = mock(MenuService.class);
+    final MenuCatalogService catalog = mock(MenuCatalogService.class);
     final CustomerInventoryAvailabilityService inventory =
             mock(CustomerInventoryAvailabilityService.class);
     final CartAvailabilityService slots = mock(CartAvailabilityService.class);
@@ -37,6 +39,7 @@ class PickupAddOnBatchTest {
             new PickupAddOnService(
                     jdbc,
                     menu,
+                    catalog,
                     inventory,
                     mock(OrderRepository.class),
                     mock(OrderValidationService.class),
@@ -66,8 +69,9 @@ class PickupAddOnBatchTest {
                                                 null,
                                                 null))
                         .toList();
-        when(menu.getMenu(1L))
-                .thenReturn(List.of(new MenuCategoryResponse(1L, "Meals", null, 0, products)));
+        var categories = List.of(new MenuCategoryResponse(1L, "Meals", null, 0, products));
+        when(menu.getMenu(1L)).thenReturn(categories);
+        when(catalog.get(1L)).thenReturn(new MenuCatalogService.Catalog("revision", categories));
         when(jdbc.queryForObject(anyString(), eq(Boolean.class))).thenReturn(true);
         doAnswer(
                         call -> {
@@ -186,13 +190,48 @@ class PickupAddOnBatchTest {
     }
 
     @Test
-    void verifiesSelectedSlotInOneBatchAndLabelsOnlyVerifiedSuggestions() {
+    void verifiesFutureSlotEvenWhenTheLiveMenuHasNoAvailableProducts() {
+        when(menu.getMenu(1L)).thenReturn(List.of());
         selectedSlot(10, true);
         var result = service.recommend(1, request, null, 7L, PickupType.NORMAL);
         assertThat(result).extracting(s -> s.product().id()).containsExactly(3L, 4L, 5L);
         assertThat(result).allMatch(PickupAddOnService.Suggestion::slotVerified);
         verify(slots, times(1)).check(eq(1L), eq(date), eq(1), argThat(items -> items.size() == 5));
-        verifyNoInteractions(inventory);
+        verifyNoInteractions(inventory, menu);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void cartItemMissingFromSuggestionTaxLookupStillGetsSlotChecked() throws Exception {
+        doAnswer(
+                        call -> {
+                            var handler = (RowCallbackHandler) call.getArgument(1);
+                            for (long id = 2; id <= 4; id++) {
+                                var rs = mock(ResultSet.class);
+                                when(rs.getLong(1)).thenReturn(id);
+                                when(rs.getBigDecimal(2)).thenReturn(BigDecimal.ZERO);
+                                handler.processRow(rs);
+                            }
+                            return null;
+                        })
+                .when(jdbc)
+                .query(anyString(), any(RowCallbackHandler.class));
+        selectedSlot(10, true);
+
+        assertThat(service.recommend(1, request, null, 7L, PickupType.NORMAL))
+                .extracting(suggestion -> suggestion.product().id())
+                .containsExactly(3L, 4L);
+        verify(slots)
+                .check(
+                        eq(1L),
+                        eq(date),
+                        eq(1),
+                        argThat(
+                                items ->
+                                        items.stream()
+                                                .map(item -> item.productId())
+                                                .toList()
+                                                .equals(List.of(1L, 2L, 3L, 4L))));
     }
 
     @Test

@@ -42,20 +42,21 @@ export default function MenuDiscoverySheet({title,children,onClose,onDismissStar
    // This ref is an explicit close-time decision made by the caller.
    // eslint-disable-next-line react-hooks/exhaustive-deps
    if(restoreFocusOnClose?.current===false)return;
-   const resolveTarget=()=>restoreFocus&&returnFocusId?document.getElementById(returnFocusId):previous?.isConnected?previous:returnFocusId?document.getElementById(returnFocusId):null;resolveTarget()?.focus({preventScroll:true});
+   const resolveTarget=()=>restoreFocus&&returnFocusId?document.getElementById(returnFocusId):previous?.isConnected?previous:returnFocusId?document.getElementById(returnFocusId):null;
+   const target=resolveTarget();
+   target?.focus({preventScroll:true});
+   const focusAfterClose=document.activeElement;
    if(preservePageScroll)return;
-   // Header observers can briefly make the trigger inert during scroll unlock.
-   // Resolve it again after the header settles; never move the viewport to focus it.
-   {
-    let attempts=0;
-    const restore=()=>{
-     const current=resolveTarget();
-     if(!current?.isConnected)return;
-     current.focus({preventScroll:true});
-     if(document.activeElement!==current&&attempts++<20)requestAnimationFrame(restore);
-    };
-    requestAnimationFrame(restore);
-   }
+   // A temporarily inert or removed trigger may need another frame. Preserve newer focus.
+   let attempts=0;
+   const restore=()=>{
+    const current=resolveTarget(), focused=document.activeElement;
+    if(!current?.isConnected||focused===current||(current===target&&focusAfterClose===target))return;
+    if(focused&&focused!==focusAfterClose&&focused!==body&&focused!==root)return;
+    current.focus({preventScroll:true});
+    if(document.activeElement!==current&&attempts++<20)requestAnimationFrame(restore);
+   };
+   requestAnimationFrame(restore);
   };
  },[returnFocusId,restoreFocus,initialFocusSelector,restoreFocusOnClose,fitVisualViewport,preservePageScroll]);
  const content=<>

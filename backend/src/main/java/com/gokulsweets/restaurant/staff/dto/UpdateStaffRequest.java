@@ -13,10 +13,12 @@ import java.util.Set;
  * @param roleName the role name
  * @param branchIds the branch ids
  * @param active the active
+ * @param expectedUpdatedAt the revision loaded by the editing device
  */
 public record UpdateStaffRequest(
         @NotBlank @Size(max = 150) String fullName,
         String phone,
         @NotBlank String roleName,
         Set<Long> branchIds,
-        boolean active) {}
+        boolean active,
+        java.time.LocalDateTime expectedUpdatedAt) {}

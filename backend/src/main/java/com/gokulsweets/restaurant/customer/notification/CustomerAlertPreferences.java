@@ -73,8 +73,26 @@ public class CustomerAlertPreferences {
      * @param endpoint the endpoint
      * @param publicKey the public key
      * @param authSecret the auth secret
+     * @param registrationId the existing device id when restoring an opt-in
+     * @param expectedSubject the account that started this request
+     * @param pausePrevious whether to deactivate another account on this device without opting in
      */
-    public record SubscriptionInput(String endpoint, String publicKey, String authSecret) {}
+    public record SubscriptionInput(
+            String endpoint,
+            String publicKey,
+            String authSecret,
+            UUID registrationId,
+            UUID expectedSubject,
+            boolean pausePrevious) {
+        public SubscriptionInput(String endpoint, String publicKey, String authSecret) {
+            this(endpoint, publicKey, authSecret, null);
+        }
+
+        public SubscriptionInput(
+                String endpoint, String publicKey, String authSecret, UUID registrationId) {
+            this(endpoint, publicKey, authSecret, registrationId, null, false);
+        }
+    }
 
     /**
      * Immutable subscription result data contract.
@@ -247,6 +265,9 @@ ON CONFLICT (environment, subject_id) DO UPDATE SET sound_enabled = EXCLUDED.sou
                     || !WebPushTransport.validRecipientKeys(input.publicKey(), input.authSecret()))
                 throw new ResponseStatusException(
                         HttpStatus.BAD_REQUEST, "Invalid browser subscription.");
+            if (input.expectedSubject() != null && !input.expectedSubject().equals(subject))
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT, "The active account changed.");
             lockSubject(environment, subject);
             Long session =
                     jdbc.query(
@@ -263,7 +284,7 @@ SELECT id FROM verified_customer_sessions WHERE environment = ? AND verified_sub
             var existing =
                     jdbc.query(
                             """
-SELECT s.id, s.subject_id, s.revoked_at IS NOT NULL OR v.revoked_at IS NOT NULL OR v.expires_at <= CURRENT_TIMESTAMP AS inactive, s.session_id, s.public_key, s.auth_secret
+SELECT s.id, s.subject_id, s.revoked_at IS NOT NULL OR v.revoked_at IS NOT NULL AS inactive, s.session_id, s.public_key, s.auth_secret
 FROM customer_push_subscriptions s JOIN verified_customer_sessions v ON v.id = s.session_id
 WHERE s.environment = ? AND s.endpoint_hash = ? FOR UPDATE OF s
 """,
@@ -277,20 +298,28 @@ WHERE s.environment = ? AND s.endpoint_hash = ? FOR UPDATE OF s
                                             rs.getString(6)),
                             environment,
                             endpointHash);
-            if (!existing.isEmpty()
-                    && !existing.getFirst().subject().equals(subject)
-                    && !existing.getFirst().inactive())
-                throw new ResponseStatusException(
-                        HttpStatus.CONFLICT,
-                        "This browser is registered to another account. Disable its old"
-                                + " subscription first.");
+            var old = existing.isEmpty() ? null : existing.getFirst();
+            boolean differentOwner = old != null && !(old.subject().equals(subject));
+            boolean sameDevice =
+                    old != null
+                            && old.publicKey().equals(input.publicKey())
+                            && old.auth().equals(input.authSecret());
+            if (input.pausePrevious()) {
+                if (differentOwner && sameDevice && !old.inactive()) {
+                    jdbc.update(
+                            "UPDATE customer_push_subscriptions SET revoked_at=CURRENT_TIMESTAMP"
+                                    + " WHERE id=?",
+                            old.id());
+                }
+                return new SubscriptionResult(null);
+            }
             Long count =
                     jdbc.queryForObject(
                             "SELECT COUNT(*) FROM customer_push_subscriptions s JOIN"
                                 + " verified_customer_sessions v ON v.id = s.session_id WHERE"
                                 + " s.environment = ? AND s.subject_id = ? AND s.revoked_at IS NULL"
-                                + " AND v.revoked_at IS NULL AND v.expires_at > CURRENT_TIMESTAMP"
-                                + " AND s.endpoint_hash <> ?",
+                                + " AND s.paused_at IS NULL AND v.revoked_at IS NULL AND"
+                                + " s.endpoint_hash <> ?",
                             Long.class,
                             environment,
                             subject,
@@ -298,6 +327,34 @@ WHERE s.environment = ? AND s.endpoint_hash = ? FOR UPDATE OF s
             if (count != null && count >= 5)
                 throw new ResponseStatusException(
                         HttpStatus.CONFLICT, "Maximum five browsers per account.");
+            if (input.registrationId() != null) {
+                // Require the original opt-in and browser subscription proof.
+                var restored =
+                        jdbc.query(
+                                """
+UPDATE customer_push_subscriptions SET session_id=?,
+    subscribed_at=CASE WHEN paused_at IS NULL THEN subscribed_at ELSE CURRENT_TIMESTAMP END,
+    paused_at=NULL
+WHERE id=? AND environment=? AND subject_id=? AND endpoint_hash=?
+  AND public_key=? AND auth_secret=? AND revoked_at IS NULL
+RETURNING id
+""",
+                                (rs, row) -> rs.getObject(1, UUID.class),
+                                session,
+                                input.registrationId(),
+                                environment,
+                                subject,
+                                endpointHash,
+                                input.publicKey(),
+                                input.authSecret());
+                if (restored.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+                return new SubscriptionResult(restored.getFirst());
+            }
+            if (differentOwner && !old.inactive() && !sameDevice)
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "This browser is registered to another account. Disable its old"
+                                + " subscription first.");
             if (!existing.isEmpty()
                     && !existing.getFirst().inactive()
                     && existing.getFirst().subject().equals(subject)
@@ -305,8 +362,8 @@ WHERE s.environment = ? AND s.endpoint_hash = ? FOR UPDATE OF s
                     && existing.getFirst().publicKey().equals(input.publicKey())
                     && existing.getFirst().auth().equals(input.authSecret()))
                 return new SubscriptionResult(existing.getFirst().id());
-            if (!existing.isEmpty()) {
-                var id = existing.getFirst().id();
+            if (old != null) {
+                var id = old.id();
                 // Rotate identity by creating a new subscription ID; old deliveries cannot target a
                 // new owner.
                 jdbc.update(
@@ -385,7 +442,7 @@ INSERT INTO customer_push_subscriptions(id, environment, subject_id, session_id,
                             """
 SELECT s.endpoint,s.public_key,s.auth_secret FROM customer_push_subscriptions s
 JOIN verified_customer_sessions v ON v.id=s.session_id
-WHERE s.id=? AND s.environment=? AND s.subject_id=? AND s.revoked_at IS NULL
+WHERE s.id=? AND s.environment=? AND s.subject_id=? AND s.revoked_at IS NULL AND s.paused_at IS NULL
   AND v.environment=s.environment AND v.verified_subject_id=s.subject_id
   AND v.revoked_at IS NULL AND v.expires_at>CURRENT_TIMESTAMP AND v.token_digest=?
 """,

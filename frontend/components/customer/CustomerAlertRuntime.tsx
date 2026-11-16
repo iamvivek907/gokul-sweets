@@ -6,6 +6,7 @@ import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {subscribeNotificationTick} from "@/services/customerNotificationPolling";
 import {readCustomerInbox} from "@/services/customerInbox";
 import {subscribeCustomerIdentityChanges} from "@/lib/customerIdentityEvents";
+import {pausePreviousCustomerAlerts} from "@/lib/customerPushRegistration";
 import {API_BASE_URL} from "@/lib/constants";
 import {inQuietHours, playChime, type AlertSettings} from "@/lib/notificationAlerts";
 
@@ -15,16 +16,25 @@ export default function CustomerAlertRuntime() {
     useEffect(() => {
         if (!features?.notificationAlerts) return;
         let active = true, paused = false, initial = true, scope = "";
+        let handoffScope = "";
         let pending: AbortController | null = null;
         async function poll() {
             if (!active || pending || paused || document.visibilityState !== "visible" || !navigator.onLine) return;
             const controller = new AbortController();
             pending = controller;
             try {
-                const [settings, inbox] = await Promise.all([
-                    apiClient<AlertSettings>("/api/customer/identity/notification-alerts", {credentials: "include", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(8000)])}),
-                    readCustomerInbox(controller.signal)
-                ]);
+                const settings = await apiClient<AlertSettings>("/api/customer/identity/notification-alerts", {
+                    credentials: "include", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(8000)])
+                });
+                if (!active || pending !== controller || controller.signal.aborted) return;
+                if (settings.pushConfigured && handoffScope !== settings.scopeId) {
+                    try {
+                        await pausePreviousCustomerAlerts(settings.scopeId, AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]));
+                        if (!controller.signal.aborted) handoffScope = settings.scopeId;
+                    } catch { /* Recheck when the next poll or identity change arrives. */ }
+                }
+                if (!active || pending !== controller || controller.signal.aborted) return;
+                const inbox = await readCustomerInbox(controller.signal);
                 if (!active || pending !== controller || controller.signal.aborted) return;
                 const max = Math.max(0, ...inbox.messages.map(message => message.id));
                 const key = `gokul-alert-cursor:${API_BASE_URL}:${settings.scopeId}`;
@@ -45,7 +55,7 @@ export default function CustomerAlertRuntime() {
                 if (pending === controller && reason instanceof ApiError && [401, 403, 404].includes(reason.status)) paused = true;
             } finally {controller.abort(); if (pending === controller) pending = null;}
         }
-        const identityChanged = () => {pending?.abort(); pending = null; paused = false; initial = true; void poll();};
+        const identityChanged = () => {pending?.abort(); pending = null; paused = false; initial = true; handoffScope = ""; void poll();};
         const refresh = () => {void poll();};
         void poll();
         const stopTick = subscribeNotificationTick(refresh);

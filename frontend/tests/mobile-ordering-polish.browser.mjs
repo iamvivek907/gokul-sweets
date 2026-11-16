@@ -34,13 +34,19 @@ try{for(const width of [320,390,640]){
  await context.addInitScript(({branch,slot,date})=>{localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify({date,slot,pickupType:'NORMAL'}));Object.defineProperty(navigator,'standalone',{value:true,configurable:true});},{branch,slot,date});
  await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});const row=page.locator('#gokul-product-12');await row.waitFor();
  await page.evaluate(()=>document.documentElement.style.scrollBehavior="auto");await row.scrollIntoViewIfNeeded();await page.evaluate(()=>scrollBy({top:-100,behavior:"instant"}));await page.waitForTimeout(300);
- const before=await row.evaluate(n=>({top:n.getBoundingClientRect().top,scroll:scrollY,document:window.__testDocument=crypto.randomUUID()}));const node=await row.elementHandle();const reads=menuReads;
+ const before=await row.evaluate(n=>{
+  // Playwright can scroll the Add button into view before it clicks. Measure at the tap.
+  window.__testProductTopAtAdd=undefined;
+  n.addEventListener('click',()=>{window.__testProductTopAtAdd=n.getBoundingClientRect().top;},{capture:true,once:true});
+  return window.__testDocument=crypto.randomUUID();
+ });const node=await row.elementHandle();const reads=menuReads;
  await row.getByRole('button',{name:'Add Test meal 12 to cart',exact:true}).click();
  await page.waitForFunction(()=>JSON.parse(localStorage.getItem('gokul-cart')).items.length===1);
  await page.locator('.mobile-menu-pairings-inline').getByRole('button',{name:'Add Test meal 1 from pairings',exact:true}).waitFor({timeout:1200});
  assert.equal(inventoryReleased,false,'verified branch pairings appear while historical stock is still pending');
- assert.equal(await page.evaluate(()=>window.__testDocument),before.document);assert.equal(await node.evaluate(n=>n.isConnected),true);
- assert.ok(Math.abs(await row.evaluate(n=>n.getBoundingClientRect().top)-before.top)<3,'cold first Add retains the tapped row position');assert.equal(menuReads,reads,'first Add does not reload the menu');
+ assert.equal(await page.evaluate(()=>window.__testDocument),before);assert.equal(await node.evaluate(n=>n.isConnected),true);
+ const movement=await row.evaluate(n=>n.getBoundingClientRect().top-window.__testProductTopAtAdd);
+ assert.ok(Math.abs(movement)<3,`cold first Add retains the tapped row position (moved ${movement}px at ${width}px)`);assert.equal(menuReads,reads,'first Add does not reload the menu');
  const inline=page.locator('.mobile-menu-pairings-inline');await inline.getByRole('button',{name:'Add Test meal 1 from pairings',exact:true}).click();
  await page.getByRole('status').filter({hasText:'This addition no longer fits'}).waitFor();assert.equal(await inline.getByRole('button',{name:'Add Test meal 1 from pairings',exact:true}).isVisible(),true,'failure does not hide retryable inline cards');
  failAdd=false;await inline.getByRole('button',{name:'Add Test meal 1 from pairings',exact:true}).click();await page.waitForFunction(()=>JSON.parse(localStorage.getItem('gokul-cart')).items.length===2);

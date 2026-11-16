@@ -1450,13 +1450,22 @@ public class CustomerIdentityController {
      *     expired.toString()).build()}
      */
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(HttpServletRequest request) {
+    @org.springframework.transaction.annotation.Transactional
+    public ResponseEntity<Void> logout(
+            HttpServletRequest request, @RequestParam(required = false) java.util.UUID deviceId) {
         final long __gokulMethodStartedNanos =
-                MethodTiming.start(CustomerIdentityController.class, "logout(HttpServletRequest)");
+                MethodTiming.start(
+                        CustomerIdentityController.class,
+                        "logout(HttpServletRequest,java.util.UUID)");
         try {
             var environment = enabledEnvironment();
             requireTrustedMutation(request);
-            sessions.revoke(environment, cookie(request), Instant.now());
+            String token = cookie(request);
+            if (deviceId != null) {
+                var subject = sessions.subject(environment, token, Instant.now()).orElse(null);
+                if (subject != null) sessions.pausePushDevice(environment, subject, deviceId);
+            }
+            sessions.revoke(environment, token, Instant.now());
             var expired =
                     ResponseCookie.from(COOKIE, "")
                             .httpOnly(true)
@@ -1473,7 +1482,7 @@ public class CustomerIdentityController {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
                     CustomerIdentityController.class,
-                    "logout(HttpServletRequest)");
+                    "logout(HttpServletRequest,java.util.UUID)");
         }
     }
 
