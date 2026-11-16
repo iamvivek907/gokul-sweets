@@ -69,7 +69,7 @@ async function ensureOk(
     if (response.status === 401) {
 
         throw new Error(
-            "Your admin session is no longer authorized."
+            "The server rejected this request. Check your admin session and try again."
         );
     }
 
@@ -77,7 +77,7 @@ async function ensureOk(
     if (response.status === 403) {
 
         throw new Error(
-            "You do not have permission to manage this staff member."
+            await readErrorMessage(response, "You do not have permission to manage this staff member.")
         );
     }
 
@@ -102,7 +102,9 @@ export async function getAdminStaff(
             authorization,
             {
                 method: "GET",
-                signal
+                signal: signal
+                    ? AbortSignal.any([signal, AbortSignal.timeout(15000)])
+                    : AbortSignal.timeout(15000)
             }
         );
 
@@ -128,7 +130,9 @@ export async function getAdminStaffOptions(
             authorization,
             {
                 method: "GET",
-                signal
+                signal: signal
+                    ? AbortSignal.any([signal, AbortSignal.timeout(15000)])
+                    : AbortSignal.timeout(15000)
             }
         );
 
@@ -145,7 +149,8 @@ export async function getAdminStaffOptions(
 
 export async function createAdminStaff(
     request: CreateAdminStaffRequest,
-    authorization: string
+    authorization: string,
+    signal?: AbortSignal
 ): Promise<AdminStaff> {
 
     const response =
@@ -154,6 +159,9 @@ export async function createAdminStaff(
             authorization,
             {
                 method: "POST",
+                signal: signal
+                    ? AbortSignal.any([signal, AbortSignal.timeout(30000)])
+                    : AbortSignal.timeout(30000),
 
                 headers: {
                     "Content-Type": "application/json"
@@ -179,7 +187,8 @@ export async function createAdminStaff(
 export async function updateAdminStaff(
     staffId: number,
     request: UpdateAdminStaffRequest,
-    authorization: string
+    authorization: string,
+    signal?: AbortSignal
 ): Promise<AdminStaff> {
 
     const response =
@@ -188,6 +197,9 @@ export async function updateAdminStaff(
             authorization,
             {
                 method: "PUT",
+                signal: signal
+                    ? AbortSignal.any([signal, AbortSignal.timeout(30000)])
+                    : AbortSignal.timeout(30000),
 
                 headers: {
                     "Content-Type": "application/json"
@@ -213,7 +225,8 @@ export async function updateAdminStaff(
 export async function resetAdminStaffPassword(
     staffId: number,
     newPassword: string,
-    authorization: string
+    authorization: string,
+    signal?: AbortSignal
 ): Promise<void> {
 
     const response =
@@ -222,6 +235,9 @@ export async function resetAdminStaffPassword(
             authorization,
             {
                 method: "PATCH",
+                signal: signal
+                    ? AbortSignal.any([signal, AbortSignal.timeout(30000)])
+                    : AbortSignal.timeout(30000),
 
                 headers: {
                     "Content-Type": "application/json"

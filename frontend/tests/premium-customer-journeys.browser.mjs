@@ -361,16 +361,16 @@ try {
       await page
         .getByRole("listbox", { name: "Menu suggestions", exact: true })
         .waitFor();
-      await page
-        .getByRole("button", {
-          name: "Browse all item categories",
-          exact: true,
-        })
-        .click();
-      await page
-        .getByRole("dialog", { name: "Filter menu", exact: true })
-        .waitFor();
+      const filters = page.getByRole("button", {
+        name: "Browse all item categories",
+        exact: true,
+      });
+      const filterSheet = page.getByRole("dialog", { name: "Filter menu", exact: true });
+      await filters.click();
+      await filterSheet.waitFor();
       await page.keyboard.press("Escape");
+      await filterSheet.waitFor({ state: "hidden" });
+      await page.waitForFunction(button => button === document.activeElement, await filters.elementHandle());
       assert.equal(
         await search.inputValue(),
         "Paneer",

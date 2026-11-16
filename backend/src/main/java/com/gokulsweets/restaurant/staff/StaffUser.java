@@ -60,7 +60,8 @@ public class StaffUser {
     protected void onCreate() {
         final long __gokulMethodStartedNanos = MethodTiming.start(StaffUser.class, "onCreate()");
         try {
-            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime now =
+                    LocalDateTime.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
             createdAt = now;
             updatedAt = now;
         } finally {
@@ -73,7 +74,7 @@ public class StaffUser {
     protected void onUpdate() {
         final long __gokulMethodStartedNanos = MethodTiming.start(StaffUser.class, "onUpdate()");
         try {
-            updatedAt = LocalDateTime.now();
+            updatedAt = LocalDateTime.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
         } finally {
             MethodTiming.finish(__gokulMethodStartedNanos, StaffUser.class, "onUpdate()");
         }

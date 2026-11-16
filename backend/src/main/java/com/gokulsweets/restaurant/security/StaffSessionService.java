@@ -15,12 +15,14 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.sql.Timestamp;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
@@ -32,6 +34,8 @@ public class StaffSessionService {
 
     /** The cookie name value. */
     public static final String COOKIE_NAME = AppConstant.STAFF_SESSION_SERVICE_COOKIE_NAME;
+
+    public static final Duration SESSION_COOKIE_AGE = Duration.ofDays(400);
 
     private final EnhancementProperties flags;
 
@@ -46,6 +50,8 @@ public class StaffSessionService {
     private final AuthenticationManager authenticationManager;
 
     private final org.springframework.security.crypto.password.PasswordEncoder passwords;
+
+    private final TransactionTemplate transactions;
 
     private final SecureRandom random = new SecureRandom();
 
@@ -169,10 +175,32 @@ public class StaffSessionService {
                     if (!mfa.verify(user.getId(), code))
                         throw new IllegalArgumentException("Invalid authenticator code.");
                 }
-                revoke(previousCookie);
-                jdbc.update("DELETE FROM staff_login_limits WHERE username = ?", limitKey);
-                audit(user.getId(), "SIGN_IN");
-                return issue(user);
+                SignIn result =
+                        transactions.execute(
+                                status -> {
+                                    SignIn next = issue(user);
+                                    if (previousCookie != null
+                                            && previousCookie.matches("[A-Za-z0-9_-]{43}")) {
+                                        jdbc.update(
+                                                """
+UPDATE staff_push_subscriptions s SET session_hash=?
+FROM staff_sessions old
+WHERE s.session_hash=old.token_hash AND old.token_hash=? AND old.staff_id=? AND s.staff_id=old.staff_id
+  AND old.revoked_at IS NULL AND old.expires_at>? AND s.revoked_at IS NULL AND s.paused_at IS NULL
+""",
+                                                hash(next.token()),
+                                                hash(previousCookie),
+                                                user.getId(),
+                                                Timestamp.from(now));
+                                        revoke(previousCookie);
+                                    }
+                                    jdbc.update(
+                                            "DELETE FROM staff_login_limits WHERE username = ?",
+                                            limitKey);
+                                    audit(user.getId(), "SIGN_IN");
+                                    return next;
+                                });
+                return result;
             } catch (AuthenticationException | IllegalArgumentException error) {
                 jdbc.update(
                         """
@@ -279,15 +307,21 @@ WHERE e.token_hash = ? AND e.expires_at > ? AND u.active AND e.staff_updated_at=
         try {
             String token = randomToken(), csrf = derivedCsrf(token);
             Instant issuedAt = Instant.now(inventoryClock);
-            jdbc.update(
-                    "INSERT INTO staff_sessions(token_hash, staff_id, csrf_hash, staff_updated_at,"
-                            + " expires_at,created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                    hash(token),
-                    user.getId(),
-                    hash(csrf),
-                    user.getUpdatedAt(),
-                    Timestamp.from(issuedAt.plus(sessionLifetime(user))),
-                    Timestamp.from(issuedAt));
+            int issued =
+                    jdbc.update(
+                            """
+INSERT INTO staff_sessions(token_hash,staff_id,csrf_hash,staff_updated_at,expires_at,created_at,cookie_refreshed_at)
+SELECT ?,id,?,updated_at,TIMESTAMPTZ 'infinity',?,? FROM staff_users
+WHERE id=? AND updated_at=? AND active FOR SHARE
+""",
+                            hash(token),
+                            hash(csrf),
+                            Timestamp.from(issuedAt),
+                            Timestamp.from(issuedAt),
+                            user.getId(),
+                            user.getUpdatedAt());
+            if (issued != 1)
+                throw new IllegalArgumentException("Staff account changed. Sign in again.");
             return new SignIn(token, csrf, user, false);
         } finally {
             MethodTiming.finish(
@@ -315,66 +349,39 @@ WHERE e.token_hash = ? AND e.expires_at > ? AND u.active AND e.staff_updated_at=
     }
 
     /**
-     * Sessions lifetime.
+     * Claims the daily cookie refresh for this verified session.
      *
-     * @param user the user
-     * @return the session lifetime result
-     */
-    public static java.time.Duration sessionLifetime(StaffUser user) {
-        final long __gokulMethodStartedNanos =
-                MethodTiming.start(StaffSessionService.class, "sessionLifetime(StaffUser)");
-        try {
-            return isAdministrator(user)
-                    ? java.time.Duration.ofHours(15)
-                    : java.time.Duration.ofDays(365);
-        } finally {
-            MethodTiming.finish(
-                    __gokulMethodStartedNanos,
-                    StaffSessionService.class,
-                    "sessionLifetime(StaffUser)");
-        }
-    }
-
-    /**
-     * Renews staff.
-     *
-     * @param verified the verified
-     * @param token the token
-     * @param user the user
-     * @return the renew staff result
+     * @param verified the active verified session
+     * @param token the current session token
+     * @return whether a fresh browser cookie should be issued
      */
     @Transactional
-    public boolean renewStaff(Verified verified, String token, StaffUser user) {
-        final long __gokulMethodStartedNanos =
-                MethodTiming.start(
-                        StaffSessionService.class, "renewStaff(Verified,String,StaffUser)");
+    public boolean refreshCookie(Verified verified, String token) {
+        final long started =
+                MethodTiming.start(StaffSessionService.class, "refreshCookie(Verified,String)");
         try {
-            if (isAdministrator(user)) return false;
-            Instant now = Instant.now(inventoryClock);
+            Instant now = inventoryClock.instant();
             return jdbc.update(
-                            "UPDATE staff_sessions SET expires_at=? WHERE token_hash=? AND"
-                                + " staff_id=? AND revoked_at IS NULL AND expires_at>? AND"
-                                + " staff_updated_at=? AND EXISTS(SELECT 1 FROM staff_users u JOIN"
-                                + " roles r ON r.id=u.role_id WHERE u.id=staff_sessions.staff_id"
-                                + " AND u.active AND u.updated_at=staff_sessions.staff_updated_at"
-                                + " AND UPPER(r.name) NOT LIKE '%ADMIN%')",
-                            Timestamp.from(now.plus(sessionLifetime(user))),
+                            """
+UPDATE staff_sessions SET cookie_refreshed_at=?
+WHERE token_hash=? AND staff_id=? AND revoked_at IS NULL AND expires_at>?
+  AND cookie_refreshed_at<=?
+""",
+                            Timestamp.from(now),
                             hash(token),
                             verified.staffId(),
                             Timestamp.from(now),
-                            user.getUpdatedAt())
+                            Timestamp.from(now.minus(Duration.ofDays(1))))
                     == 1;
         } finally {
             MethodTiming.finish(
-                    __gokulMethodStartedNanos,
-                    StaffSessionService.class,
-                    "renewStaff(Verified,String,StaffUser)");
+                    started, StaffSessionService.class, "refreshCookie(Verified,String)");
         }
     }
 
     /**
      * Returns the active staff session identity or null, rejecting malformed, revoked, expired or
-     * credential-stale tokens and over-age admin sessions.
+     * tokens for inactive accounts.
      *
      * <p>Reads {@code roles}, {@code staff_sessions}, {@code staff_users}.
      *
@@ -387,15 +394,13 @@ WHERE e.token_hash = ? AND e.expires_at > ? AND u.active AND e.staff_updated_at=
                 MethodTiming.start(StaffSessionService.class, "verify(String)");
         try {
             if (token == null || !token.matches("[A-Za-z0-9_-]{43}")) return null;
+            Instant now = Instant.now(inventoryClock);
             return jdbc
                     .query(
                             """
 SELECT u.id, u.username, s.csrf_hash, s.created_at FROM staff_sessions s
 JOIN staff_users u ON u.id = s.staff_id
-JOIN roles r ON r.id = u.role_id
-WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ?
-  AND s.staff_updated_at = u.updated_at AND u.active
-  AND (UPPER(r.name) NOT LIKE '%ADMIN%' OR s.created_at > ?)
+WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ? AND u.active
 """,
                             (rs, row) ->
                                     new Verified(
@@ -404,14 +409,81 @@ WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ?
                                             rs.getString(3),
                                             rs.getTimestamp(4).toInstant()),
                             hash(token),
-                            Timestamp.from(Instant.now(inventoryClock)),
-                            Timestamp.from(Instant.now(inventoryClock).minusSeconds(15 * 3600)))
+                            Timestamp.from(now))
                     .stream()
                     .findFirst()
                     .orElse(null);
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos, StaffSessionService.class, "verify(String)");
+        }
+    }
+
+    /**
+     * Pauses this phone’s staff alerts even if the registration still points to an older session.
+     *
+     * @param staffId the authenticated staff account
+     * @param deviceId the browser’s opaque push registration ID
+     * @param token the current session token
+     */
+    @Transactional
+    public void signOut(long staffId, java.util.UUID deviceId, String token) {
+        final long started =
+                MethodTiming.start(
+                        StaffSessionService.class, "signOut(long,java.util.UUID,String)");
+        try {
+            signOutDevices(
+                    staffId,
+                    deviceId == null ? java.util.List.of() : java.util.List.of(deviceId),
+                    token);
+        } finally {
+            MethodTiming.finish(
+                    started, StaffSessionService.class, "signOut(long,java.util.UUID,String)");
+        }
+    }
+
+    /**
+     * Pauses both possible registrations before revoking this browser's session.
+     *
+     * @param staffId the authenticated staff account
+     * @param deviceIds the saved and staged push registration IDs for this browser
+     * @param token the current session token
+     */
+    @Transactional
+    public void signOutDevices(
+            long staffId, java.util.List<java.util.UUID> deviceIds, String token) {
+        final long started =
+                MethodTiming.start(
+                        StaffSessionService.class,
+                        "signOutDevices(long,java.util.List<java.util.UUID>,String)");
+        try {
+            if (!deviceIds.isEmpty()) {
+                // A timed-out setup may still be recording the alias for this browser.
+                jdbc.queryForList(
+                        "SELECT id FROM staff_users WHERE id=? FOR UPDATE", Long.class, staffId);
+                var first = deviceIds.getFirst();
+                var second = deviceIds.size() > 1 ? deviceIds.get(1) : first;
+                jdbc.update(
+                        """
+UPDATE staff_push_subscriptions s SET paused_at=COALESCE(s.paused_at,CURRENT_TIMESTAMP)
+WHERE s.staff_id=? AND (s.id IN (?,?) OR EXISTS (
+    SELECT 1 FROM staff_push_setup_aliases a
+    WHERE a.environment=s.environment AND a.staff_id=s.staff_id
+      AND a.registration_id=s.id AND a.setup_id IN (?,?)
+))
+""",
+                        staffId,
+                        first,
+                        second,
+                        first,
+                        second);
+            }
+            revoke(token);
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    StaffSessionService.class,
+                    "signOutDevices(long,java.util.List<java.util.UUID>,String)");
         }
     }
 

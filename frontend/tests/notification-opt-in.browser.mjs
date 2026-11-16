@@ -31,8 +31,8 @@ await context.addInitScript(() => {
         if (!options.userVisibleOnly) throw new Error("Invisible subscription");
         window._pushSubscriptions++; subscribed = subscription; return subscription;
     }}, async unregister() {return true;}};
-    Object.defineProperty(navigator, "serviceWorker", {value: {async register() {return registration;}, ready: Promise.resolve(registration),
-        async getRegistration() {return registration;}, async getRegistrations() {return [];}}});
+    Object.defineProperty(navigator, "serviceWorker", {value: Object.assign(new EventTarget(), {async register() {return registration;}, ready: Promise.resolve(registration),
+        async getRegistration() {return registration;}, async getRegistrations() {return [];}})});
 });
 await context.route("**/api/**", async route => {
     const path = new URL(route.request().url()).pathname;
@@ -50,7 +50,17 @@ await context.route("**/api/**", async route => {
     } else if (path === "/api/customer/identity/consents") json = Object.fromEntries(["MARKETING", "OCCASION_REMINDERS", "COARSE_AREA_ANALYTICS"].map(key => [key, {granted: key === "MARKETING" && marketing, policyVersion: "test", recordedAt: null}]));
     else if (path === "/api/customer/identity/consents/MARKETING") {consentWrites++; marketing = route.request().postDataJSON().granted; json = {granted: marketing, policyVersion: "test", recordedAt: null};}
     else if (path === "/api/customer/identity/privacy-requests") json = [];
-    else if (path === "/api/customer/identity/push-subscriptions") {subscriptions++; if (failSubscription) return route.fulfill({status: 503, json: {message: "Retry"}}); json = {id: "browser-registration"};}
+    else if (path === "/api/customer/identity/push-subscriptions") {
+        if (route.request().postDataJSON().pausePrevious) return route.fulfill({json: {id: null}});
+        subscriptions++;
+        if (failSubscription) return route.fulfill({status: 503, json: {message: "Retry"}});
+        const replacement = route.request().postDataJSON().registrationId;
+        if (replacement) {
+            assert.equal(replacement, "browser-registration");
+            registrationActive = true;
+        }
+        json = {id: "browser-registration"};
+    }
     else if (path === "/api/customer/identity/push-subscriptions/browser-registration") {if (route.request().method() === "GET") json = {enabled: registrationActive, fingerprint: createHash("sha256").update(`https://fcm.googleapis.com/fcm/send/${rotated ? "old-device" : "browser-test"}\ntest-key\ntest-auth`).digest("hex")}; else {revoked = true; return route.fulfill({status: 204});}}
     return route.fulfill({json});
 });
@@ -128,8 +138,12 @@ try {
     assert.equal(subscriptions, 2, "Rotation requires an explicit registration action");
     rotated = false;
     registrationActive = false;
-    await page.reload(); await card.waitFor();
-    assert.equal(await page.evaluate(() => window._permissionRequests), 0, "Expired sessions require an explicit registration action");
+    const restored = page.waitForResponse(response => response.url().endsWith("/push-subscriptions") && response.request().method() === "POST" && !response.request().postDataJSON().pausePrevious);
+    await page.reload();
+    await restored;
+    assert.equal(await card.count(), 0, "An existing device restores its registration after reauthentication");
+    assert.equal(subscriptions, 3);
+    assert.equal(await page.evaluate(() => window._permissionRequests), 0, "Restoring a known device does not request permission");
     await page.evaluate(() => {localStorage.removeItem("gokul-push-device:test-alert-subject");});
     authenticated = false;
     await page.reload(); await card.waitFor();

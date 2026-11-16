@@ -21,6 +21,7 @@ import AdminSidebar
 
 import AdminTopbar
     from "@/components/admin/AdminTopbar";
+import StaffReauthenticationDialog from "@/components/admin/StaffReauthenticationDialog";
 import {LanguagePicker} from "@/lib/language";
 
 
@@ -38,6 +39,9 @@ export default function AdminShell({
 
     const {
         ready,
+        profile,
+        verificationFailed,
+        refresh,
         isAuthenticated
     } =
         useAdminAuth();
@@ -50,82 +54,19 @@ export default function AdminShell({
 
     const isAccountAccessPage = pathname === "/admin/setup" || pathname === "/admin/recover";
 
-    /*
-     * ---------------------------------------------------------
-     * ADMIN ROUTE GUARD
-     * ---------------------------------------------------------
-     *
-     * Not logged in:
-     *
-     * /admin
-     * /admin/menu
-     * /admin/orders
-     * etc.
-     *
-     *        ↓
-     *
-     * /admin/login
-     *
-     *
-     * Already logged in:
-     *
-     * /admin/login
-     *
-     *        ↓
-     *
-     * /admin
-     */
-    useEffect(
-        () => {
-
-            if (!ready) {
-
-                return;
-            }
-
-
-            if (
-                isLoginPage
-                &&
-                isAuthenticated
-            ) {
-
-                router.replace(
-                    "/admin"
-                );
-
-                return;
-            }
-
-
-            if (
-                !isLoginPage
-                && !isAccountAccessPage
-                &&
-                !isAuthenticated
-            ) {
-
-                router.replace(
-                    "/admin/login"
-                );
-            }
-
-        },
-        [
-            ready,
-            isAuthenticated,
-            isLoginPage,
-            isAccountAccessPage,
-            router
-        ]
-    );
-
+    useEffect(() => {
+        if (ready && !verificationFailed && isLoginPage && isAuthenticated) {
+            router.replace("/admin");
+        } else if (ready && !verificationFailed && !isLoginPage && !isAccountAccessPage && !isAuthenticated) {
+            router.replace("/admin/login");
+        }
+    }, [ready, verificationFailed, isAuthenticated, isLoginPage, isAccountAccessPage, router]);
 
     /*
      * Wait until browser session state
      * has been checked.
      */
-    if (!ready) {
+    if ((!ready || (verificationFailed && !isAuthenticated)) && !isAccountAccessPage && !isLoginPage) {
 
         return (
             <div
@@ -145,8 +86,12 @@ export default function AdminShell({
                         text-[#756763]
                     "
                 >
-                    Loading admin portal...
+                    {verificationFailed ? "Could not verify your admin session. Check your connection." : "Loading admin portal..."}
                 </p>
+                {verificationFailed && (
+                    <button type="button" onClick={() => void refresh()}
+                        className="ml-3 min-h-11 rounded-lg border px-3 text-sm font-semibold">Retry</button>
+                )}
             </div>
         );
     }
@@ -202,6 +147,7 @@ export default function AdminShell({
      */
     return (
         <div
+            key={profile?.staffId}
             className="
                 min-h-screen
                 bg-[#fffaf3]
@@ -227,6 +173,14 @@ export default function AdminShell({
                 >
 
                     <AdminTopbar />
+                    <StaffReauthenticationDialog />
+
+                    {verificationFailed && (
+                        <p role="status" className="bg-amber-50 px-4 py-2 text-sm text-amber-950">
+                            The server could not verify your session. Your current page is still open.
+                            <button type="button" onClick={() => void refresh()} className="ml-2 underline">Retry connection</button>
+                        </p>
+                    )}
 
 
                     <div

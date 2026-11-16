@@ -523,6 +523,10 @@ any customer orders were loaded.
 
 The small-container profile uses Serial GC, a 64 MB code cache and a 32 MB direct-buffer cap.
 HTTP workers default to 24 (4 spare), and Hikari defaults to 5 connections (1 idle).
+At a detected cgroup limit of 512 MiB or less, the entrypoint defaults to two glibc
+allocator arenas, 128 accepted Tomcat connections, and a requested socket backlog of
+2048. The operating system can cap the effective backlog. Set MALLOC_ARENA_MAX,
+GOKUL_HTTP_MAX_CONNECTIONS, or GOKUL_HTTP_ACCEPT_COUNT to override those defaults.
 These controls reduce overhead; they do not cap total process memory or prove public traffic capacity.
 Deployments can override the pool sizes using GOKUL_HTTP_MAX_THREADS, GOKUL_HTTP_MIN_THREADS,
 GOKUL_DB_POOL_SIZE and GOKUL_DB_MIN_IDLE. Review throughput before using these values on larger instances.

@@ -44,17 +44,34 @@ export default function CustomerNotificationInbox() {
     }, [query]);
     useEffect(() => {
         const controller = new AbortController();
-        void Promise.all([
-            inboxRequest<Inbox>(`${base}/notifications?${query}`, {credentials: "include", signal: controller.signal}),
-            inboxRequest<Preferences>(`${base}/notification-preferences`, {credentials: "include", signal: controller.signal})
-        ]).then(([next, choices]) => {
-            if (!controller.signal.aborted) {setInbox(next); setPreferences(choices); setError("");}
-        }).catch(reason => {
+        let pending = false, refreshQueued = false;
+        function refresh() {
             if (controller.signal.aborted) return;
-            if (reason instanceof ApiError && reason.status === 404) setUnavailable(true);
-            else setError("Your inbox could not load. Check Order history for current updates, or refresh when connected.");
-        });
-        return () => controller.abort();
+            if (pending) {refreshQueued = true; return;}
+            pending = true;
+            void Promise.all([
+                inboxRequest<Inbox>(`${base}/notifications?${query}`, {credentials: "include", signal: controller.signal}),
+                inboxRequest<Preferences>(`${base}/notification-preferences`, {credentials: "include", signal: controller.signal})
+            ]).then(([next, choices]) => {
+                if (!controller.signal.aborted) {setInbox(next); setPreferences(choices); setError("");}
+            }).catch(reason => {
+                if (controller.signal.aborted) return;
+                if (reason instanceof ApiError && reason.status === 404) setUnavailable(true);
+                else setError("Your inbox could not load. Check Order history for current updates, or refresh when connected.");
+            }).finally(() => {
+                pending = false;
+                if (refreshQueued) {refreshQueued = false; refresh();}
+            });
+        }
+        const pushed = (event: MessageEvent) => {
+            if (event.data?.type === "gokul-customer-alert" && document.visibilityState === "visible") refresh();
+        };
+        refresh();
+        navigator.serviceWorker?.addEventListener("message", pushed);
+        return () => {
+            controller.abort();
+            navigator.serviceWorker?.removeEventListener("message", pushed);
+        };
     }, [query]);
     async function perform(action: () => Promise<void>) {
         setBusy(true); setError(""); setSaved("");

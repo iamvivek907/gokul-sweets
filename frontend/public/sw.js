@@ -2,6 +2,7 @@ const VERSION =
     "v3";
 
 const PUSH_DEDUPE_CACHE = "gokul-push-dedupe-v1";
+const ORDER_PUSH_BINDING_CACHE = "gokul-order-push-binding-v1";
 
 const STATIC_CACHE =
     `gokul-static-${VERSION}`;
@@ -58,7 +59,8 @@ self.addEventListener(
             PAGE_CACHE,
             IMAGE_CACHE,
             IMAGE_META_CACHE,
-            PUSH_DEDUPE_CACHE
+            PUSH_DEDUPE_CACHE,
+            ORDER_PUSH_BINDING_CACHE
         ];
 
         event.waitUntil(
@@ -794,42 +796,126 @@ function notificationDestination(value, staff = false, marketing = false) {
     if (staff) return typeof value === "string" && (/^\/admin\/orders\/[A-Za-z0-9_%.-]{1,200}$/.test(value) || /^\/admin\/occasion-enquiries\?branch=[0-9]{1,20}&enquiry=[a-f0-9-]{36}$/.test(value)) ? value : "/admin/staff-notifications";
     return typeof value === "string" && (/^\/orders\/[A-Za-z0-9_%.-]{1,200}(?:#order-review)?$/.test(value) || /^\/occasions(?:#occasion-|\/requests\?enquiry=)[A-Za-z0-9_%.-]{1,200}$/.test(value)) ? value : "/profile#account-notifications";
 }
+async function orderPushDisplay(payload, staff) {
+    try {
+        const cache = await caches.open(ORDER_PUSH_BINDING_CACHE);
+        if (staff && payload.registrationId) {
+            const cancellation = await cache.match(new Request(new URL("/.__gokul-order-push/staff-cancellations", self.location.origin)));
+            if (cancellation && Object.values(await cancellation.json()).some(
+                ids => Array.isArray(ids) && ids.includes(payload.registrationId))) return "blocked";
+        }
+        const key = new Request(new URL(`/.__gokul-order-push/${staff ? "staff" : "customer"}`, self.location.origin));
+        const response = await cache.match(key);
+        const binding = response ? await response.json() : null;
+        if (!binding) return payload.registrationId ? "generic" : "details";
+        if (staff && binding.signedOut) return "blocked";
+        if (staff && payload.registrationId && binding.setupId === payload.registrationId) return "generic";
+        if (!payload.registrationId || binding.registrationId !== payload.registrationId) return "blocked";
+        return binding.pending ? "generic" : "details";
+    } catch {
+        // Preserve the notification signal without exposing order details when an updated
+        // installation has not yet confirmed the registration or local storage is unavailable.
+        return payload.registrationId ? "generic" : "details";
+    }
+}
+
 let pushSequence = Promise.resolve();
 self.addEventListener("push", event => {
     let payload;
     try {payload = event.data?.json();} catch {return;}
     if (!payload || !/^(?:staff:|marketing:)?[0-9]{1,20}$/.test(String(payload.eventId))) return;
     const eventId = String(payload.eventId);
+    const staff = eventId.startsWith("staff:");
+    const marketing = eventId.startsWith("marketing:");
+    const registration = !marketing && typeof payload.registrationId === "string" && payload.registrationId;
+    const seenId = registration ? JSON.stringify([registration, eventId]) : eventId;
     pushSequence = pushSequence.catch(() => {}).then(async () => {
-        const cache = await caches.open(PUSH_DEDUPE_CACHE);
         const key = new Request(new URL("/__push_seen", self.location.origin));
-        const previous = await cache.match(key);
-        const seen = previous ? await previous.json() : [];
-        if (Array.isArray(seen) && seen.includes(eventId)) return;
-        const staff = eventId.startsWith("staff:");
-        const marketing = eventId.startsWith("marketing:");
-        const destination = notificationDestination(payload.url, staff, marketing);
+        let cache;
+        let seen = [];
+        let staffLatest = [];
+        try {
+            cache = await caches.open(PUSH_DEDUPE_CACHE);
+            const previous = await cache.match(key);
+            const stored = previous ? await previous.json() : [];
+            if (Array.isArray(stored)) seen = stored;
+            else {
+                if (Array.isArray(stored?.seen)) seen = stored.seen;
+                if (Array.isArray(stored?.staffLatest)) staffLatest = stored.staffLatest;
+            }
+        } catch { /* Cache errors must never prevent notification delivery. */ }
+        if (seen.includes(seenId)) return;
+        const display = marketing ? "details" : await orderPushDisplay(payload, staff);
+        if (display === "blocked") return;
+        const target = display === "generic" ? undefined : payload.url;
+        const destination = notificationDestination(target, staff, marketing);
         if (marketing && destination === "/profile#account-notifications") return;
         const custom = destination !== "/profile#account-notifications" && destination !== "/admin/staff-notifications";
-        const title = custom && typeof payload.title === "string" ? payload.title.slice(0, 80) : "Gokul Sweets";
-        const body = custom && typeof payload.body === "string" ? payload.body.slice(0, 500) : "A new account update is waiting in your notification inbox.";
+        const title = custom && typeof payload.title === "string" ? payload.title.slice(0, 80) : staff ? "Gokul kitchen alert" : "Gokul Sweets";
+        const body = custom && typeof payload.body === "string" ? payload.body.slice(0, 500)
+            : staff ? "Open Staff notifications to check the latest order activity." : "Open the app to check your latest order update.";
+        const scope = registration ? `:${encodeURIComponent(registration)}` : "";
+        const legacyGroup = `gokul-${staff ? "staff" : "customer"}-${destination.split("#")[0]}`;
+        const tagGroup = `${legacyGroup}${scope}`;
+        // The generic staff inbox can represent unrelated events, so order only specific targets.
+        const orderedStaff = staff && custom;
+        const tag = marketing ? `gokul-${eventId}` : staff ? `${tagGroup}:${eventId}` : tagGroup;
+        const newerOrSame = other => typeof other === "string" && /^staff:[0-9]{1,20}$/.test(other)
+            && BigInt(other.slice(6)) >= BigInt(eventId.slice(6));
+        if (orderedStaff && newerOrSame(staffLatest.find(entry => entry?.[0] === tagGroup)?.[1])) return;
+        let replacedNotices = [];
+        if (orderedStaff) {
+            try {
+                for (const notice of await self.registration.getNotifications()) {
+                    const group = notice.tag === tagGroup || notice.tag.startsWith(`${tagGroup}:staff:`)
+                        ? tagGroup
+                        : registration && notice.data?.registrationId === registration
+                            && (notice.tag === legacyGroup || notice.tag.startsWith(`${legacyGroup}:staff:`))
+                            ? legacyGroup : null;
+                    if (!group) continue;
+                    if (newerOrSame(notice.tag.slice(group.length + 1))) return;
+                    replacedNotices.push(notice);
+                }
+            } catch { /* Durable ordering still works when the notification list is unavailable. */ }
+        } else if (!staff && custom && registration) {
+            try {
+                replacedNotices = (await self.registration.getNotifications({tag: legacyGroup}))
+                    .filter(notice => notice.tag === legacyGroup && notice.data?.registrationId === registration);
+            } catch { /* A current alert can still display. */ }
+        }
         await self.registration.showNotification(title, {
             body, silent: false, ...(staff ? {vibrate: [300, 120, 300, 120, 500]} : {}), badge: "/notification-badge.svg",
-            icon: "/icon-192.png", tag: marketing ? `gokul-${eventId}` : `gokul-${staff ? "staff" : "customer"}-${destination.split("#")[0]}`, renotify: staff, requireInteraction: staff,
-            data: {url: destination, staff, marketing}
+            icon: "/icon-192.png", tag, renotify: staff, requireInteraction: staff,
+            data: {url: destination, staff, marketing, registrationId: payload.registrationId}
         });
-        if (staff) {
+        const confirmedDisplay = marketing ? display : await orderPushDisplay(payload, staff);
+        if (confirmedDisplay === "blocked" || (display === "details" && confirmedDisplay !== "details")) {
+            try {
+                const notices = await self.registration.getNotifications({tag});
+                for (const notice of notices) if (notice.tag === tag) notice.close();
+            } catch { /* The account has changed, so nothing else from this push should run. */ }
+            return;
+        }
+        if (orderedStaff) {
+            staffLatest = [...staffLatest.filter(entry => entry?.[0] !== tagGroup), [tagGroup, eventId]].slice(-256);
+        }
+        for (const notice of replacedNotices) {
+            try {notice.close();} catch { /* The newer notification is already visible. */ }
+        }
+        try {
+            if (cache) await cache.put(key, new Response(JSON.stringify({seen: [...seen, seenId].slice(-256), staffLatest}),
+                {headers: {"Content-Type": "application/json"}}));
+        } catch { /* The banner already displayed; its tag still replaces duplicates. */ }
+        if (!marketing) {
             try {
                 const windows = await self.clients.matchAll({type: "window", includeUncontrolled: true});
                 for (const client of windows) {
-                    if (new URL(client.url).pathname.startsWith("/admin")) {
-                        try {client.postMessage({type: "gokul-staff-alert"});} catch { /* Client closed. */ }
-                    }
+                    const current = new URL(client.url);
+                    if (current.origin !== self.location.origin || current.pathname.startsWith("/admin") !== staff) continue;
+                    try {client.postMessage({type: staff ? "gokul-staff-alert" : "gokul-customer-alert"});} catch { /* Client closed. */ }
                 }
-            } catch { /* Notification already displayed; client discovery cannot undo delivery or dedupe. */ }
+            } catch { /* A client discovery failure cannot undo notification delivery. */ }
         }
-        await cache.put(key, new Response(JSON.stringify([...(Array.isArray(seen) ? seen : []), eventId].slice(-256)),
-            {headers: {"Content-Type": "application/json"}}));
     });
     event.waitUntil(pushSequence);
 });
