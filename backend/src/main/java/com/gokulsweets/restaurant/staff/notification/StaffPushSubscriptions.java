@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.UUID;
 
 /** Backend staff push subscriptions contract and implementation. */
@@ -37,6 +38,7 @@ public class StaffPushSubscriptions {
      * @param expectedStaffId the account that started this request
      * @param pausePrevious whether to deactivate another account on this device without opting in
      * @param setupId the id reserved by a new setup attempt, also sent on retries
+     * @param pendingCancellationIds registration or setup IDs this browser is still disabling
      */
     public record Input(
             String endpoint,
@@ -45,7 +47,27 @@ public class StaffPushSubscriptions {
             UUID registrationId,
             Long expectedStaffId,
             boolean pausePrevious,
-            UUID setupId) {
+            UUID setupId,
+            List<UUID> pendingCancellationIds) {
+        public Input(
+                String endpoint,
+                String publicKey,
+                String authSecret,
+                UUID registrationId,
+                Long expectedStaffId,
+                boolean pausePrevious,
+                UUID setupId) {
+            this(
+                    endpoint,
+                    publicKey,
+                    authSecret,
+                    registrationId,
+                    expectedStaffId,
+                    pausePrevious,
+                    setupId,
+                    null);
+        }
+
         public Input(
                 String endpoint,
                 String publicKey,
@@ -133,6 +155,21 @@ public class StaffPushSubscriptions {
                     input.registrationId() == null ? input.setupId() : input.registrationId();
             UUID reusedId =
                     requestedId == null ? null : findSetupRegistration(staffId, requestedId);
+            if (input.registrationId() != null && input.pendingCancellationIds() != null) {
+                var pending = input.pendingCancellationIds();
+                if (pending.size() > 8) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+                UUID canonicalId = reusedId == null ? requestedId : reusedId;
+                if (pending.contains(requestedId)
+                        || pending.contains(canonicalId)
+                        || pending.stream()
+                                .filter(id -> id != null)
+                                .anyMatch(
+                                        id ->
+                                                canonicalId.equals(
+                                                        findSetupRegistration(staffId, id)))) {
+                    throw new ResponseStatusException(HttpStatus.GONE);
+                }
+            }
             if (requestedId != null
                     && Boolean.TRUE.equals(
                             jdbc.queryForObject(

@@ -123,12 +123,14 @@ async function verifyStaffOrderPushSignIn(staffId: number, signal: AbortSignal) 
 
 type StaffPushSetupResult = {id: string; created?: boolean; bindingRequired?: boolean};
 
-function syncStaffPushRequest(subscription: PushSubscription, staffId: number, signal: AbortSignal, registrationId?: string) {
+async function syncStaffPushRequest(subscription: PushSubscription, staffId: number, signal: AbortSignal, registrationId?: string) {
     const keys = subscription.toJSON().keys;
+    const pendingCancellationIds = registrationId ? await pendingStaffAlertCancellation(staffId) : [];
     return staffAlertsRequest<Omit<StaffPushSetupResult, "id"> & {id: string | null}>("/push-subscriptions", {
         method: "POST", signal, body: JSON.stringify({
             endpoint: subscription.endpoint, publicKey: keys?.p256dh, authSecret: keys?.auth,
-            expectedStaffId: staffId, registrationId, pausePrevious: !registrationId
+            expectedStaffId: staffId, registrationId, pausePrevious: !registrationId,
+            ...(pendingCancellationIds.length ? {pendingCancellationIds} : {})
         })
     }, staffId);
 }
@@ -357,7 +359,10 @@ async function enrollStaffDevice(settings: StaffAlertSettings, applicationKey: s
         let result: StaffPushSetupResult | undefined;
         const savedId = !existingSetupId && !created ? await resolveConfirmedStaffAlertDevice(settings.staffId) : null;
         if (savedId) {
-            if (previousOwner !== owner) await switchOrderPushOwner("staff", owner, signal, true, previousOwner);
+            if (previousOwner !== owner) {
+                // Recovery verifies the readable binding again and can ring generically if storage is unavailable.
+                await switchOrderPushOwner("staff", owner, signal, true, previousOwner).catch(() => {});
+            }
             try {
                 result = await restoreStaffPushRegistration(subscription, settings.staffId, savedId, signal);
             } catch (error) {

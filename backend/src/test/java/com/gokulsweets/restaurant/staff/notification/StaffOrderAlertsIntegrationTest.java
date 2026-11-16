@@ -475,12 +475,32 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                         + " AND subscription_id=? AND catch_up";
         assertThat(jdbc.queryForObject(catchUpCount, Long.class, event, existing.id())).isZero();
 
+        var blocked =
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(),
+                        browser.publicKey(),
+                        browser.authSecret(),
+                        existing.id(),
+                        staff,
+                        false,
+                        null,
+                        java.util.List.of(alias));
+        assertThatThrownBy(() -> subscriptions.subscribe(staff, nextCookie, blocked))
+                .isInstanceOfSatisfying(
+                        org.springframework.web.server.ResponseStatusException.class,
+                        error -> assertThat(error.getStatusCode().value()).isEqualTo(410));
+        assertThat(subscriptions.live(staff, existing.id(), nextCookie)).isFalse();
+        assertThat(jdbc.queryForObject(catchUpCount, Long.class, event, existing.id())).isZero();
         var ready =
                 new StaffPushSubscriptions.Input(
                         browser.endpoint(),
                         browser.publicKey(),
                         browser.authSecret(),
-                        existing.id());
+                        existing.id(),
+                        staff,
+                        false,
+                        null,
+                        java.util.List.of(UUID.randomUUID()));
         assertThat(subscriptions.subscribe(staff, nextCookie, ready))
                 .isEqualTo(new StaffPushSubscriptions.Result(existing.id(), false));
         assertThat(subscriptions.live(staff, existing.id(), nextCookie)).isTrue();

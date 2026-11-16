@@ -287,6 +287,33 @@ test('a pending cancellation of a staged alias also blocks fallback to the saved
     assert.equal(phone.requests.length, 1);
 });
 
+test('saved-device restore passes pending aliases to the server after an account handoff', async () => {
+    const setupId = '1f9e817c-8883-46ca-ad8b-a3ea20868152';
+    let storageBlocked = true;
+    const phone = fixture({owner: '12', registrationId: null, setupId, setupFingerprint: 'stored'}, {
+        readLocalFails: () => storageBlocked,
+        respond(request, deviceId) {
+            if (request.method === 'DELETE') {
+                assert.ok(request.url.endsWith(setupId));
+                return new Response(null, {status: 503});
+            }
+            assert.equal(request.body.registrationId, deviceId);
+            assert.deepEqual(request.body.pendingCancellationIds, [setupId]);
+            return new Response(null, {status: 410});
+        }
+    });
+    phone.saved.set(phone.key, phone.deviceId);
+    await assert.rejects(phone.disable(), {status: 503});
+    await phone.signOut();
+    storageBlocked = false;
+
+    const signal = new AbortController().signal;
+    await phone.switchOwner('staff', '13', signal, true, '12');
+    await phone.switchOwner('staff', '12', signal, true, '13');
+    assert.equal(phone.read().setupId, undefined);
+    await assert.rejects(phone.restoreAs(phone.deviceId), {status: 410});
+});
+
 for (const operation of ['disable', 'signOut']) {
     test(`${operation} waits for setup and acts on the newly enrolled device`, async () => {
         let finishSetup;
@@ -449,6 +476,15 @@ test('manual Enable resumes an existing alias only after saving the canonical ID
     assert.equal(await phone.enable(), 'granted');
     assert.equal(phone.requests.length, 4);
     assert.deepEqual(phone.read(), {owner: '12', registrationId: phone.deviceId});
+});
+
+test('manual Enable restores a saved registration when CacheStorage is unavailable', async () => {
+    const phone = fixture(null, {readFails: true, createdRegistration: false});
+    phone.saved.set(phone.key, phone.deviceId);
+    assert.equal(await phone.enable(), 'granted');
+    assert.equal(phone.requests.length, 2);
+    assert.equal(phone.requests[1].body.registrationId, phone.deviceId);
+    assert.equal(phone.requests[1].binding, null);
 });
 
 for (const status of [200, 404, 410, 503]) {
