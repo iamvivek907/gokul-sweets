@@ -410,6 +410,31 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
     }
 
     @Test
+    void retryingTheSameSetupKeepsItsRegistrationAndRollbackOwnership() {
+        var browser = input("setup-retry-" + UUID.randomUUID());
+        var setupId = UUID.randomUUID();
+        var request =
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(),
+                        browser.publicKey(),
+                        browser.authSecret(),
+                        null,
+                        staff,
+                        false,
+                        setupId);
+
+        var initial = subscriptions.subscribe(staff, cookie, request);
+        var retry = subscriptions.subscribe(staff, cookie, request);
+        var anotherSetup = subscriptions.subscribe(staff, cookie, browser);
+
+        assertThat(initial.id()).isEqualTo(setupId);
+        assertThat(retry).isEqualTo(initial);
+        assertThat(retry.created()).isTrue();
+        assertThat(anotherSetup.id()).isEqualTo(setupId);
+        assertThat(anotherSetup.created()).isFalse();
+    }
+
+    @Test
     void signingOutPausesTheOlderRegistrationWithoutRevokingAnotherPhone() {
         var browser = input("old-device-" + UUID.randomUUID());
         var old = subscriptions.subscribe(staff, cookie, browser);

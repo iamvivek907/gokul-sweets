@@ -59,10 +59,29 @@ export async function syncStaffAlertDevice(subscription: PushSubscription, staff
 
 /** Start this call from the staff member's tap, before any asynchronous work. */
 export async function enableStaffDeviceAlerts(settings: StaffAlertSettings, scope?: AbortSignal): Promise<NotificationPermission> {
-    if (!settings.applicationServerKey) throw new Error("Staff notifications are unavailable.");
+    const applicationKey = settings.applicationServerKey;
+    if (!applicationKey) throw new Error("Staff notifications are unavailable.");
     scope?.throwIfAborted();
     const permission = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
     if (permission !== "granted") return permission;
+    const enroll = () => enrollStaffDevice(settings, applicationKey, scope);
+    if (navigator.locks) {
+        // The native subscription is shared across staff accounts and tabs on this origin.
+        const wait = AbortSignal.timeout(25000);
+        await navigator.locks.request("gokul-staff-push-setup", {signal: scope ? AbortSignal.any([scope, wait]) : wait}, enroll);
+    } else {
+        await enroll();
+    }
+    return permission;
+}
+
+function uncertainStaffSetup(error: unknown) {
+    return error instanceof TypeError || error instanceof SyntaxError
+        || error instanceof DOMException && ["TimeoutError", "AbortError"].includes(error.name)
+        || error instanceof StaffAlertRequestError && (error.status === 408 || error.status >= 500);
+}
+
+async function enrollStaffDevice(settings: StaffAlertSettings, applicationKey: string, scope?: AbortSignal) {
     const timeout = AbortSignal.timeout(12000);
     const signal = scope ? AbortSignal.any([scope, timeout]) : timeout;
     const owner = String(settings.staffId);
@@ -71,6 +90,8 @@ export async function enableStaffDeviceAlerts(settings: StaffAlertSettings, scop
     let registrationId: string | null = null;
     let newRegistration = false;
     let savedDevice = false;
+    let registrationUncertain = false;
+    scope?.throwIfAborted();
     let expire: () => void = () => {};
     const deadline = new Promise<never>((_, reject) => {
         expire = () => reject(signal.reason);
@@ -78,19 +99,33 @@ export async function enableStaffDeviceAlerts(settings: StaffAlertSettings, scop
     });
     try {
         signal.throwIfAborted();
-        const previousOwner = (await readOrderPushBinding("staff"))?.owner ?? null;
+        const previousOwner = (await Promise.race([readOrderPushBinding("staff"), deadline]))?.owner ?? null;
         const registration = await Promise.race([navigator.serviceWorker.register("/sw.js"), deadline]);
         if (!registration.active) await Promise.race([navigator.serviceWorker.ready, deadline]);
         let subscription = await Promise.race([registration.pushManager.getSubscription(), deadline]);
         if (!subscription) {
-            subscription = await registration.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: applicationServerKey(settings.applicationServerKey)});
+            subscription = await Promise.race([
+                registration.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: applicationServerKey(applicationKey)}),
+                deadline
+            ]);
             created = subscription;
         }
         signal.throwIfAborted();
         const keys = subscription.toJSON().keys;
-        const result = await staffAlertsRequest<{id: string; created?: boolean}>("/push-subscriptions", {
-            method: "POST", signal, body: JSON.stringify({expectedStaffId: settings.staffId, endpoint: subscription.endpoint, publicKey: keys?.p256dh, authSecret: keys?.auth})
-        }, settings.staffId);
+        const body = JSON.stringify({expectedStaffId: settings.staffId, setupId: crypto.randomUUID(),
+            endpoint: subscription.endpoint, publicKey: keys?.p256dh, authSecret: keys?.auth});
+        const register = (requestSignal: AbortSignal) =>
+            staffAlertsRequest<{id: string; created?: boolean}>("/push-subscriptions",
+                {method: "POST", signal: requestSignal, body}, settings.staffId);
+        let result;
+        try {
+            result = await register(AbortSignal.any([signal, AbortSignal.timeout(5000)]));
+        } catch (error) {
+            if (!uncertainStaffSetup(error)) throw error;
+            registrationUncertain = true;
+            signal.throwIfAborted();
+            result = await register(signal);
+        }
         registrationId = result.id;
         newRegistration = result.created ?? result.id !== previousDevice;
         await switchOrderPushOwner("staff", owner, signal, true, previousOwner).catch(() => {});
@@ -106,7 +141,6 @@ export async function enableStaffDeviceAlerts(settings: StaffAlertSettings, scop
         }
         dismissStaffAlertSetup(settings.staffId);
         window.dispatchEvent(new Event(STAFF_ALERT_DEVICE_RESTORED));
-        return permission;
     } catch (error) {
         if (registrationId && newRegistration && (savedDevice || readStaffAlertDevice(settings.staffId) !== registrationId)) {
             if (savedDevice && readStaffAlertDevice(settings.staffId) === registrationId) {
@@ -119,7 +153,7 @@ export async function enableStaffDeviceAlerts(settings: StaffAlertSettings, scop
                 }, settings.staffId),
                 created?.unsubscribe()
             ]);
-        } else if (created && !registrationId) {
+        } else if (created && !registrationId && !registrationUncertain) {
             await created.unsubscribe().catch(() => false);
         }
         throw error;

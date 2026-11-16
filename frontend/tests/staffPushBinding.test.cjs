@@ -4,16 +4,17 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
+const {webcrypto} = require('node:crypto');
 
 function load(file, globals) {
     const source = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
     const code = ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022}}).outputText;
     const exports = {};
-    vm.runInNewContext(code, {exports, Response, Headers, AbortSignal, ...globals});
+    vm.runInNewContext(code, {exports, Response, Headers, AbortSignal, DOMException, TypeError, SyntaxError, Event, crypto: webcrypto, ...globals});
     return exports;
 }
 
-function fixture(binding, {readFails = false, writeFails = false, createdRegistration = true, storageFails = false} = {}) {
+function fixture(binding, {readFails = false, writeFails = false, createdRegistration = true, storageFails = false, locks, respond} = {}) {
     const store = {
         async match() { return binding ? new Response(JSON.stringify(binding)) : undefined; },
         async put(key, value) {
@@ -30,21 +31,27 @@ function fixture(binding, {readFails = false, writeFails = false, createdRegistr
     const saved = new Map();
     const deviceId = 'd1779266-3814-48cf-8f6d-8c23b832c1c3';
     let unsubscribes = 0;
+    let subscribed = !createdRegistration;
     const subscription = {endpoint: 'https://example.invalid/phone', toJSON: () => ({keys: {p256dh: 'key', auth: 'auth'}}),
-        async unsubscribe() {unsubscribes++; return true;}};
-    const navigator = {serviceWorker: {async register() {
+        async unsubscribe() {unsubscribes++; subscribed = false; return true;}};
+    const navigator = {locks, serviceWorker: {async register() {
         return {active: true, pushManager: {
-            async getSubscription() {return createdRegistration ? null : subscription;},
-            async subscribe() {return subscription;}
+            async getSubscription() {return subscribed ? subscription : null;},
+            async subscribe() {subscribed = true; return subscription;}
         }};
     }}};
     const localStorage = {getItem: key => saved.get(key) ?? null, removeItem: key => saved.delete(key),
-        setItem(key, value) {if (storageFails) throw new Error('Storage blocked'); saved.set(key, value);}};
-    const api = load('services/staffAlertsApi.ts', {navigator, localStorage, Notification: {permission: 'granted'}, require: module => {
+        setItem(key, value) {
+            if ((typeof storageFails === 'function' ? storageFails() : storageFails)) throw new Error('Storage blocked');
+            saved.set(key, value);
+        }};
+    const api = load('services/staffAlertsApi.ts', {navigator, localStorage, window: {dispatchEvent() {}}, Notification: {permission: 'granted'}, require: module => {
         if (module.endsWith('/orderPushBinding')) return cached;
         if (module.endsWith('/notificationAlerts')) return {applicationServerKey: () => new Uint8Array(65)};
         if (module.endsWith('/adminApi')) return {async adminFetch(url, authorization, init) {
-            requests.push({url, method: init.method, authorization, body: init.body && JSON.parse(init.body), binding});
+            const request = {url, method: init.method, authorization, body: init.body && JSON.parse(init.body), binding};
+            requests.push(request);
+            if (respond) return respond(request, deviceId);
             return init.method === 'DELETE' ? new Response(null, {status: 204})
                 : new Response(JSON.stringify({id: deviceId, created: createdRegistration}));
         }};
@@ -53,7 +60,7 @@ function fixture(binding, {readFails = false, writeFails = false, createdRegistr
     return {requests, restore: () => api.syncStaffAlertDevice(subscription, 12, new AbortController().signal, 'staff-phone'),
         bind: cached.bindStaffOrderPush, switchOwner: cached.switchOrderPushOwner, read: () => binding,
         enable: () => api.enableStaffDeviceAlerts({staffId: 12, applicationServerKey: 'test'}),
-        deviceId, saved, unsubscribes: () => unsubscribes};
+        deviceId, saved, unsubscribes: () => unsubscribes, subscribed: () => subscribed};
 }
 
 test('restores a staff phone even when CacheStorage is unavailable', async () => {
@@ -117,4 +124,73 @@ test('a failed local save clears the new binding and preserves a reused registra
     assert.deepEqual(existing.requests.map(request => request.method), ['POST']);
     assert.equal(existing.unsubscribes(), 0);
     assert.deepEqual(existing.read(), {owner: '12', registrationId: existing.deviceId});
+});
+
+test('a second setup waits for the first setup to finish rolling back', async () => {
+    let tail = Promise.resolve();
+    const locks = {request(name, options, work) {
+        assert.equal(name, 'gokul-staff-push-setup');
+        const result = tail.then(work);
+        tail = result.catch(() => {});
+        return result;
+    }};
+    let startedRollback;
+    const inRollback = new Promise(resolve => {startedRollback = resolve;});
+    let finishRollback;
+    const releaseRollback = new Promise(resolve => {finishRollback = resolve;});
+    let saves = 0;
+    const phone = fixture({owner: '12', registrationId: null}, {
+        locks,
+        storageFails: () => ++saves === 1,
+        async respond(request, id) {
+            if (request.method === 'DELETE') {
+                startedRollback();
+                await releaseRollback;
+                return new Response(null, {status: 204});
+            }
+            return new Response(JSON.stringify({id, created: true}));
+        }
+    });
+    const first = assert.rejects(phone.enable(), /could not save/);
+    await inRollback;
+    const second = phone.enable();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(phone.requests.map(request => request.method), ['POST', 'DELETE']);
+    finishRollback();
+    await first;
+    assert.equal(await second, 'granted');
+    assert.deepEqual(phone.requests.map(request => request.method), ['POST', 'DELETE', 'POST']);
+    assert.equal(phone.subscribed(), true);
+    assert.equal(phone.unsubscribes(), 1);
+});
+
+test('an ambiguous response is retried with the identical setup ID and endpoint', async () => {
+    let attempts = 0;
+    const phone = fixture({owner: '12', registrationId: null}, {
+        respond(request, id) {
+            if (++attempts === 1) throw new TypeError('Response lost');
+            return new Response(JSON.stringify({id, created: true}));
+        }
+    });
+    assert.equal(await phone.enable(), 'granted');
+    assert.equal(phone.requests.length, 2);
+    assert.deepEqual(phone.requests[1].body, phone.requests[0].body);
+    assert.match(phone.requests[0].body.setupId, /^[0-9a-f-]{36}$/);
+    assert.ok([...phone.saved.values()].includes(phone.deviceId));
+});
+
+test('repeated lost responses leave the endpoint available for a later setup', async () => {
+    let attempts = 0;
+    const phone = fixture({owner: '12', registrationId: null}, {
+        respond(request, id) {
+            if (++attempts <= 2) throw new TypeError('Response lost');
+            assert.equal(request.method, 'POST');
+            return new Response(JSON.stringify({id, created: false}));
+        }
+    });
+    await assert.rejects(phone.enable(), /Response lost/);
+    assert.equal(phone.subscribed(), true);
+    assert.equal(phone.unsubscribes(), 0);
+    assert.equal(await phone.enable(), 'granted');
+    assert.equal(phone.requests[2].body.endpoint, phone.requests[0].body.endpoint);
 });

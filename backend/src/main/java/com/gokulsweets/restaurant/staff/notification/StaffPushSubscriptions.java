@@ -36,6 +36,7 @@ public class StaffPushSubscriptions {
      * @param registrationId the existing device id when restoring an opt-in
      * @param expectedStaffId the account that started this request
      * @param pausePrevious whether to deactivate another account on this device without opting in
+     * @param setupId the id reserved by a new setup attempt, also sent on retries
      */
     public record Input(
             String endpoint,
@@ -43,7 +44,25 @@ public class StaffPushSubscriptions {
             String authSecret,
             UUID registrationId,
             Long expectedStaffId,
-            boolean pausePrevious) {
+            boolean pausePrevious,
+            UUID setupId) {
+        public Input(
+                String endpoint,
+                String publicKey,
+                String authSecret,
+                UUID registrationId,
+                Long expectedStaffId,
+                boolean pausePrevious) {
+            this(
+                    endpoint,
+                    publicKey,
+                    authSecret,
+                    registrationId,
+                    expectedStaffId,
+                    pausePrevious,
+                    null);
+        }
+
         public Input(String endpoint, String publicKey, String authSecret) {
             this(endpoint, publicKey, authSecret, null);
         }
@@ -57,7 +76,7 @@ public class StaffPushSubscriptions {
      * Immutable result data contract.
      *
      * @param id the id
-     * @param created whether this request created the registration
+     * @param created whether the registration belongs to this setup attempt
      */
     public record Result(UUID id, boolean created) {}
 
@@ -203,14 +222,14 @@ RETURNING s.id
                         && old.session().equals(session)
                         && old.publicKey().equals(input.publicKey())
                         && old.auth().equals(input.authSecret()))
-                    return new Result(old.id(), false);
+                    return new Result(old.id(), old.id().equals(input.setupId()));
                 jdbc.update(
                         "UPDATE staff_push_subscriptions SET revoked_at = CURRENT_TIMESTAMP,"
                                 + " endpoint_hash = ? WHERE id = ?",
                         "retired:" + old.id(),
                         old.id());
             }
-            UUID id = UUID.randomUUID();
+            UUID id = input.setupId() == null ? UUID.randomUUID() : input.setupId();
             jdbc.update(
                     """
 INSERT INTO staff_push_subscriptions(id, environment, staff_id, session_hash, endpoint, endpoint_hash, public_key, auth_secret)
