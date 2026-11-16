@@ -3,13 +3,13 @@
 import Link from "next/link";
 import {useEffect, useRef, useState} from "react";
 import {usePathname} from "next/navigation";
-import {bindStaffOrderPush, readOrderPushBinding, switchOrderPushOwner} from "@/lib/orderPushBinding";
+import {readOrderPushBinding, switchOrderPushOwner} from "@/lib/orderPushBinding";
 import {fetchAdminProfile} from "@/services/adminApi";
 import {usePwaInstall} from "@/hooks/usePwaInstall";
 import {T} from "@/lib/language";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
 import NotificationIcon from "@/components/customer/NotificationIcon";
-import {STAFF_ALERT_DEVICE_RESTORED, dismissStaffAlertSetup, enableStaffDeviceAlerts, readStaffAlertDevice, staffAlertPromptKey, staffAlertsRequest, supportsStaffPush, syncStaffAlertDevice, StaffAlertRequestError, type StaffAlertSettings, type StaffInbox} from "@/services/staffAlertsApi";
+import {STAFF_ALERT_DEVICE_RESTORED, confirmStaffAlertDevice, dismissStaffAlertSetup, enableStaffDeviceAlerts, readStaffAlertDevice, staffAlertPromptKey, staffAlertsRequest, supportsStaffPush, syncStaffAlertDevice, StaffAlertRequestError, type StaffAlertSettings, type StaffInbox} from "@/services/staffAlertsApi";
 
 export default function StaffNotificationBell() {
     const {profile, hasPermission, verificationFailed} = useAdminAuth();
@@ -96,7 +96,7 @@ export default function StaffNotificationBell() {
                     }
                 }
                 if (deviceActive && device) {
-                    deviceActive = await bindStaffOrderPush(owner, device, signal);
+                    deviceActive = await confirmStaffAlertDevice(staffId, device, signal);
                     if (!deviceActive) localHandoffChecked = false;
                     if (deviceActive && restored && active) window.dispatchEvent(new Event(STAFF_ALERT_DEVICE_RESTORED));
                 }

@@ -1,9 +1,8 @@
 "use client";
 
 import {createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode} from "react";
-import {authenticateAdmin, fetchAdminProfile, invalidateAdminSessionCheck, logoutAdmin, staffCsrfRejectedEvent, staffSessionCheckEvent} from "@/services/adminApi";
-import {readStaffAlertDevice} from "@/services/staffAlertsApi";
-import {readOrderPushBinding, clearOrderPushBinding} from "@/lib/orderPushBinding";
+import {authenticateAdmin, fetchAdminProfile, invalidateAdminSessionCheck, staffCsrfRejectedEvent, staffSessionCheckEvent} from "@/services/adminApi";
+import {logoutStaffAlertDevice} from "@/services/staffAlertsApi";
 import type {AdminProfile} from "@/types/admin";
 
 interface AdminAuthContextValue {
@@ -131,10 +130,7 @@ export function AdminAuthProvider({children}: {children: ReactNode}) {
         const controller = new AbortController();
         signOutRequest.current = controller;
         try {
-            const bound = await readOrderPushBinding("staff");
-            const device = profile ? readStaffAlertDevice(profile.staffId) : null;
-            const verifiedProfile = await logoutAdmin(controller.signal,
-                device ?? (bound?.owner === String(profile?.staffId) ? bound?.registrationId : null));
+            const verifiedProfile = await logoutStaffAlertDevice(profile?.staffId, controller.signal);
             if (controller.signal.aborted) return;
             setProfile(verifiedProfile);
             setVerificationFailed(false);
@@ -142,7 +138,6 @@ export function AdminAuthProvider({children}: {children: ReactNode}) {
             if (verifiedProfile) {
                 throw new Error("Sign-out could not be confirmed. Check your connection and try again.");
             }
-            await clearOrderPushBinding("staff", profile ? String(profile.staffId) : undefined);
             broadcast();
         } finally {
             signOutRequest.current = null;

@@ -54,7 +54,7 @@ class StaffOrderAlertsIntegrationTest {
     @MockitoSpyBean StaffOrderAlerts alerts;
     @Autowired StaffAlertDispatcher dispatcher;
     @Autowired StaffPushSubscriptions subscriptions;
-    @Autowired StaffSessionService sessions;
+    @MockitoSpyBean StaffSessionService sessions;
     @Autowired org.springframework.security.crypto.password.PasswordEncoder passwords;
     @Autowired PlatformTransactionManager manager;
     @MockitoBean WebPushTransport push;
@@ -432,6 +432,51 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
         assertThat(retry.created()).isTrue();
         assertThat(anotherSetup.id()).isEqualTo(setupId);
         assertThat(anotherSetup.created()).isFalse();
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void setupVerifiedBeforeSignOutCannotReplaceTheNewSessionsRegistration() throws Exception {
+        var checked = new CountDownLatch(1);
+        var resume = new CountDownLatch(1);
+        var browser = input("delayed-setup-" + UUID.randomUUID());
+        doAnswer(
+                        invocation -> {
+                            var verified = invocation.callRealMethod();
+                            checked.countDown();
+                            if (!resume.await(10, TimeUnit.SECONDS))
+                                throw new IllegalStateException("Setup did not resume");
+                            return verified;
+                        })
+                .when(sessions)
+                .verify(cookie);
+
+        var worker = Executors.newSingleThreadExecutor();
+        try {
+            var delayed =
+                    worker.submit(
+                            () -> {
+                                try {
+                                    subscriptions.subscribe(staff, cookie, browser);
+                                    return 200;
+                                } catch (
+                                        org.springframework.web.server.ResponseStatusException
+                                                error) {
+                                    return error.getStatusCode().value();
+                                }
+                            });
+            assertThat(checked.await(10, TimeUnit.SECONDS)).isTrue();
+            sessions.signOut(staff, null, cookie);
+            var current = issueFor(staff);
+            var registration = subscriptions.subscribe(staff, current, browser);
+            resume.countDown();
+
+            assertThat(delayed.get(10, TimeUnit.SECONDS)).isEqualTo(401);
+            assertThat(subscriptions.live(staff, registration.id(), current)).isTrue();
+        } finally {
+            resume.countDown();
+            worker.shutdownNow();
+        }
     }
 
     @Test

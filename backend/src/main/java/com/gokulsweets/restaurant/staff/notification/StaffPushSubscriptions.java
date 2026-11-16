@@ -119,10 +119,11 @@ public class StaffPushSubscriptions {
             var verified = sessions.verify(cookie);
             if (verified == null || verified.staffId() != staffId)
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
-            jdbc.queryForObject(
-                    "SELECT id FROM staff_users WHERE id = ? AND active FOR UPDATE",
-                    Long.class,
-                    staffId);
+            if (jdbc.queryForList(
+                            "SELECT id FROM staff_users WHERE id = ? AND active FOR UPDATE",
+                            Long.class,
+                            staffId)
+                    .isEmpty()) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
             String session = StaffSessionService.hash(cookie),
                     hash = StaffSessionService.hash(input.endpoint());
             var existing =
@@ -144,6 +145,18 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.environment = ? AND s.endpoint_h
                                             rs.getBoolean(7)),
                             alerts.scope(),
                             hash);
+            // Match sign-out's lock order: device first, then session. The initial verification
+            // may have completed before sign-out or reauthentication revoked this cookie.
+            var activeSession =
+                    jdbc.query(
+                            """
+SELECT token_hash FROM staff_sessions WHERE token_hash=? AND staff_id=?
+  AND revoked_at IS NULL AND expires_at>clock_timestamp() FOR SHARE
+""",
+                            (rs, row) -> rs.getString(1),
+                            session,
+                            staffId);
+            if (activeSession.isEmpty()) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
             var old = existing.isEmpty() ? null : existing.getFirst();
             boolean differentOwner = old != null && !(old.staffId() == staffId);
             boolean sameDevice =
@@ -176,17 +189,6 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.environment = ? AND s.staff_id =
                         HttpStatus.CONFLICT, "Maximum five live staff browsers.");
             if (input.registrationId() != null) {
                 // Existing-device restoration must never recreate a removed subscription.
-                var activeSession =
-                        jdbc.query(
-                                """
-SELECT token_hash FROM staff_sessions WHERE token_hash=? AND staff_id=?
-  AND revoked_at IS NULL AND expires_at>CURRENT_TIMESTAMP FOR SHARE
-""",
-                                (rs, row) -> rs.getString(1),
-                                session,
-                                staffId);
-                if (activeSession.isEmpty())
-                    throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
                 var restored =
                         jdbc.query(
                                 """

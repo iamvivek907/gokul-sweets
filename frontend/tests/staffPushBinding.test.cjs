@@ -48,7 +48,10 @@ function fixture(binding, {readFails = false, writeFails = false, createdRegistr
     const api = load('services/staffAlertsApi.ts', {navigator, localStorage, window: {dispatchEvent() {}}, Notification: {permission: 'granted'}, require: module => {
         if (module.endsWith('/orderPushBinding')) return cached;
         if (module.endsWith('/notificationAlerts')) return {applicationServerKey: () => new Uint8Array(65)};
-        if (module.endsWith('/adminApi')) return {async adminFetch(url, authorization, init) {
+        if (module.endsWith('/adminApi')) return {async logoutAdmin(signal, device, staffId) {
+            requests.push({method: 'LOGOUT', device, staffId});
+            return null;
+        }, async adminFetch(url, authorization, init) {
             const request = {url, method: init.method, authorization, body: init.body && JSON.parse(init.body), binding};
             requests.push(request);
             if (respond) return respond(request, deviceId);
@@ -57,10 +60,15 @@ function fixture(binding, {readFails = false, writeFails = false, createdRegistr
         }};
         return {};
     }});
-    return {requests, restore: () => api.syncStaffAlertDevice(subscription, 12, new AbortController().signal, 'staff-phone'),
+    const key = api.staffAlertDeviceKey(12);
+    const restoreAs = id => api.syncStaffAlertDevice(subscription, 12, new AbortController().signal, id);
+    return {requests, restore: () => {saved.set(key, deviceId); return restoreAs(deviceId);}, restoreAs,
         bind: cached.bindStaffOrderPush, switchOwner: cached.switchOrderPushOwner, read: () => binding,
         enable: () => api.enableStaffDeviceAlerts({staffId: 12, applicationServerKey: 'test'}),
-        deviceId, saved, unsubscribes: () => unsubscribes, subscribed: () => subscribed};
+        disable: () => api.disableStaffDeviceAlerts(12),
+        signOut: () => api.logoutStaffAlertDevice(12, new AbortController().signal),
+        confirm: id => api.confirmStaffAlertDevice(12, id, new AbortController().signal),
+        deviceId, key, saved, unsubscribes: () => unsubscribes, subscribed: () => subscribed};
 }
 
 test('restores a staff phone even when CacheStorage is unavailable', async () => {
@@ -193,4 +201,54 @@ test('repeated lost responses leave the endpoint available for a later setup', a
     assert.equal(phone.unsubscribes(), 0);
     assert.equal(await phone.enable(), 'granted');
     assert.equal(phone.requests[2].body.endpoint, phone.requests[0].body.endpoint);
+});
+
+for (const operation of ['disable', 'signOut']) {
+    test(`${operation} waits for setup and acts on the newly enrolled device`, async () => {
+        let finishSetup;
+        const release = new Promise(resolve => {finishSetup = resolve;});
+        let startedSetup;
+        const started = new Promise(resolve => {startedSetup = resolve;});
+        const phone = fixture({owner: '12', registrationId: null}, {
+            async respond(request, id) {
+                if (request.method === 'DELETE') return new Response(null, {status: 204});
+                startedSetup();
+                await release;
+                return new Response(JSON.stringify({id, created: true}));
+            }
+        });
+        const earlierId = '3cf811c5-ba24-40db-ad09-f105fa46c49e';
+        phone.saved.set(phone.key, earlierId);
+        const setup = phone.enable();
+        await started;
+        const action = phone[operation]();
+        await new Promise(resolve => setImmediate(resolve));
+        assert.deepEqual(phone.requests.map(request => request.method), ['POST']);
+        finishSetup();
+        assert.equal(await setup, 'granted');
+        await action;
+        if (operation === 'disable') {
+            assert.ok(phone.requests[1].url.endsWith(phone.deviceId));
+            assert.equal(phone.requests[1].authorization, 'staff-session:12');
+            assert.equal(phone.saved.has(phone.key), false);
+            await assert.rejects(phone.restoreAs(earlierId), /registration changed/);
+            await assert.rejects(phone.restoreAs(phone.deviceId), /registration changed/);
+            assert.equal(await phone.confirm(phone.deviceId), false);
+            assert.equal(phone.requests.length, 2);
+        } else {
+            assert.deepEqual(phone.requests[1], {method: 'LOGOUT', device: phone.deviceId, staffId: 12});
+            assert.equal(phone.saved.get(phone.key), phone.deviceId, 'sign-out preserves the opt-in for later restore');
+        }
+        assert.deepEqual(phone.read(), {owner: '', registrationId: null});
+    });
+}
+
+test('a failed revoke preserves the registration and local binding for retry', async () => {
+    const deviceId = 'd1779266-3814-48cf-8f6d-8c23b832c1c3';
+    const binding = {owner: '12', registrationId: deviceId};
+    const phone = fixture(binding, {respond: () => new Response(null, {status: 503})});
+    phone.saved.set(phone.key, deviceId);
+    await assert.rejects(phone.disable(), /Could not confirm/);
+    assert.equal(phone.saved.get(phone.key), deviceId);
+    assert.deepEqual(phone.read(), binding);
 });

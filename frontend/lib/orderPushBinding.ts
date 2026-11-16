@@ -91,10 +91,12 @@ export async function clearFailedStaffOrderPushBinding(owner: string, registrati
 }
 
 /** Stop displaying this account’s queued notifications after confirmed logout. */
-export async function clearOrderPushBinding(audience: Audience, owner?: string) {
+export async function clearOrderPushBinding(audience: Audience, owner?: string, registrationId?: string) {
     try {
         await updateBinding(audience, previous =>
-            owner && previous && previous.owner !== owner ? null : {owner: "", registrationId: null},
+            previous && ((owner && previous.owner !== owner)
+                || (registrationId && previous.registrationId && previous.registrationId !== registrationId))
+                ? null : {owner: "", registrationId: null},
             undefined, () => closeOrderNotifications(audience));
     } catch { /* The server has already stopped delivery. */ }
 }

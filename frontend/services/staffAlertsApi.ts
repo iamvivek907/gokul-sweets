@@ -1,7 +1,7 @@
 import {ADMIN_API_BASE_URL} from "@/lib/constants";
 import {applicationServerKey} from "@/lib/notificationAlerts";
-import {bindStaffOrderPush, clearFailedStaffOrderPushBinding, readOrderPushBinding, switchOrderPushOwner} from "@/lib/orderPushBinding";
-import {adminFetch} from "@/services/adminApi";
+import {bindStaffOrderPush, clearFailedStaffOrderPushBinding, clearOrderPushBinding, readOrderPushBinding, switchOrderPushOwner} from "@/lib/orderPushBinding";
+import {adminFetch, logoutAdmin} from "@/services/adminApi";
 
 export const STAFF_ALERT_DEVICE_RESTORED = "gokul-staff-alert-device-restored";
 export const staffAlertDeviceKey = (staffId?: number) => `gokul-staff-push:${ADMIN_API_BASE_URL}:${staffId}`;
@@ -41,20 +41,72 @@ export async function staffAlertsRequest<T>(path = "", init?: RequestInit, staff
     return response.status === 204 ? undefined as T : response.json() as Promise<T>;
 }
 
+let localDeviceOperation: Promise<unknown> = Promise.resolve();
 
-export async function syncStaffAlertDevice(subscription: PushSubscription, staffId: number, signal: AbortSignal, registrationId?: string) {
-    // A restore can release queued pushes before its response reaches the browser.
-    // Allow a generic alert for this registration while the server confirms the restore.
-    if (registrationId && !await bindStaffOrderPush(String(staffId), registrationId, signal, true)) {
-        throw new Error("The active staff account changed. Reopen this page and try again.");
+/** One lock for the native subscription and this browser's staff registration across accounts. */
+function withStaffAlertDevice<T>(operation: () => Promise<T>, scope?: AbortSignal): Promise<T> {
+    const wait = AbortSignal.timeout(25000);
+    const signal = scope ? AbortSignal.any([scope, wait]) : wait;
+    if (navigator.locks) {
+        return navigator.locks.request("gokul-staff-push-setup", {signal}, operation);
     }
-    const keys = subscription.toJSON().keys;
-    return staffAlertsRequest<{id: string | null}>("/push-subscriptions", {
-        method: "POST", signal, body: JSON.stringify({
-            endpoint: subscription.endpoint, publicKey: keys?.p256dh, authSecret: keys?.auth,
-            expectedStaffId: staffId, registrationId, pausePrevious: !registrationId
-        })
-    }, staffId);
+    const next = localDeviceOperation.then(() => {
+        signal.throwIfAborted();
+        return operation();
+    });
+    localDeviceOperation = next.catch(() => {});
+    return next;
+}
+
+export function syncStaffAlertDevice(subscription: PushSubscription, staffId: number, signal: AbortSignal, registrationId?: string) {
+    return withStaffAlertDevice(async () => {
+        if (registrationId) {
+            if (readStaffAlertDevice(staffId) !== registrationId) throw new Error("This phone’s alert registration changed.");
+            // A restore may release queued pushes before the response confirms the binding.
+            if (!await bindStaffOrderPush(String(staffId), registrationId, signal, true)) {
+                throw new Error("The active staff account changed. Reopen this page and try again.");
+            }
+        }
+        const keys = subscription.toJSON().keys;
+        return staffAlertsRequest<{id: string | null}>("/push-subscriptions", {
+            method: "POST", signal, body: JSON.stringify({
+                endpoint: subscription.endpoint, publicKey: keys?.p256dh, authSecret: keys?.auth,
+                expectedStaffId: staffId, registrationId, pausePrevious: !registrationId
+            })
+        }, staffId);
+    }, signal);
+}
+
+export function confirmStaffAlertDevice(staffId: number, registrationId: string, signal: AbortSignal) {
+    return withStaffAlertDevice(async () => readStaffAlertDevice(staffId) === registrationId
+        && await bindStaffOrderPush(String(staffId), registrationId, signal), signal);
+}
+
+export function disableStaffDeviceAlerts(staffId: number) {
+    return withStaffAlertDevice(async () => {
+        const id = readStaffAlertDevice(staffId);
+        if (!id) return;
+        await staffAlertsRequest(`/push-subscriptions/${encodeURIComponent(id)}`, {
+            method: "DELETE", signal: AbortSignal.timeout(8000)
+        }, staffId);
+        if (readStaffAlertDevice(staffId) === id) {
+            try {localStorage.removeItem(staffAlertDeviceKey(staffId));} catch { /* Revocation succeeded. */ }
+        }
+        await clearOrderPushBinding("staff", String(staffId), id);
+        dismissStaffAlertSetup(staffId);
+    });
+}
+
+export function logoutStaffAlertDevice(staffId: number | undefined, signal: AbortSignal) {
+    return withStaffAlertDevice(async () => {
+        const binding = await readOrderPushBinding("staff");
+        const owner = staffId === undefined ? undefined : String(staffId);
+        const remembered = staffId === undefined ? null : readStaffAlertDevice(staffId);
+        const device = remembered ?? (binding?.owner === owner ? binding?.registrationId : null);
+        const profile = await logoutAdmin(signal, device, staffId);
+        if (!profile) await clearOrderPushBinding("staff", owner);
+        return profile;
+    }, signal);
 }
 
 /** Start this call from the staff member's tap, before any asynchronous work. */
@@ -64,14 +116,7 @@ export async function enableStaffDeviceAlerts(settings: StaffAlertSettings, scop
     scope?.throwIfAborted();
     const permission = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
     if (permission !== "granted") return permission;
-    const enroll = () => enrollStaffDevice(settings, applicationKey, scope);
-    if (navigator.locks) {
-        // The native subscription is shared across staff accounts and tabs on this origin.
-        const wait = AbortSignal.timeout(25000);
-        await navigator.locks.request("gokul-staff-push-setup", {signal: scope ? AbortSignal.any([scope, wait]) : wait}, enroll);
-    } else {
-        await enroll();
-    }
+    await withStaffAlertDevice(() => enrollStaffDevice(settings, applicationKey, scope), scope);
     return permission;
 }
 

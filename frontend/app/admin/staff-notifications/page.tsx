@@ -1,7 +1,5 @@
 "use client";
-import {clearOrderPushBinding} from "@/lib/orderPushBinding";
 import AdminHelp from "@/components/admin/AdminHelp";
-import {T} from "@/lib/language";
 
 import {useCallback, useEffect, useState} from "react";
 import Link from "next/link";
@@ -9,7 +7,7 @@ import {usePwaInstall} from "@/hooks/usePwaInstall";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
 import {formatBusinessTimestamp} from "@/lib/businessTime";
 import NotificationIcon from "@/components/customer/NotificationIcon";
-import {STAFF_ALERT_DEVICE_RESTORED, dismissStaffAlertSetup, enableStaffDeviceAlerts, readStaffAlertDevice, staffAlertDeviceKey, staffAlertsRequest, supportsStaffPush, type StaffAlertSettings, type StaffInbox} from "@/services/staffAlertsApi";
+import {STAFF_ALERT_DEVICE_RESTORED, disableStaffDeviceAlerts, enableStaffDeviceAlerts, readStaffAlertDevice, staffAlertsRequest, supportsStaffPush, type StaffAlertSettings, type StaffInbox} from "@/services/staffAlertsApi";
 
 export default function StaffNotificationsPage() {
     const {profile, hasPermission} = useAdminAuth();
@@ -26,7 +24,6 @@ export default function StaffNotificationsPage() {
     const [busy, setBusy] = useState(false);
     const [permission, setPermission] = useState<NotificationPermission>("default");
     const [supported, setSupported] = useState(false);
-    const key = staffAlertDeviceKey(profile?.staffId);
     const load = useCallback(async (signal?: AbortSignal) => {
         const device = profile ? readStaffAlertDevice(profile.staffId) : null;
         const next = await staffAlertsRequest<StaffAlertSettings>(`/settings${device ? `?deviceId=${encodeURIComponent(device)}` : ""}`, {signal});
@@ -132,9 +129,7 @@ export default function StaffNotificationsPage() {
                 <div className="mt-4 flex flex-wrap gap-3">
                     <button type="button" disabled={busy || needsHomeScreen || !supported || !settings.pushConfigured || permission === "denied"} onClick={() => void enablePush()} className="min-h-11 rounded-xl bg-[#173c39] px-4 text-sm font-semibold text-white disabled:opacity-50">{settings.deviceActive ? "Check staff registration" : "Enable staff push for this browser"}</button>
                     {deviceId && <button type="button" disabled={busy} onClick={() => void perform(async () => {
-                        await staffAlertsRequest(`/push-subscriptions/${deviceId}`, {method: "DELETE"});
-                        await clearOrderPushBinding("staff", String(settings.staffId));
-                        setDeviceId(null); dismissStaffAlertSetup(settings.staffId); try {localStorage.removeItem(key);} catch { /* server revocation succeeded */ }
+                        await disableStaffDeviceAlerts(settings.staffId);
                         await load(); setMessage("Staff push disabled for this browser. An already accepted notification may still arrive.");
                     })} className="min-h-11 rounded-xl border px-4 text-sm">Disable staff push</button>}
                 </div>
