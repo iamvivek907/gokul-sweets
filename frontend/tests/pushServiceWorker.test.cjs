@@ -63,6 +63,23 @@ test('staff push has a distinct event namespace and safe exact admin destination
     assert.deepEqual(runtime.opened, ['https://dev.gokulsweets.in/admin/orders/GS-44']);
 });
 
+test('a pending Disable blocks the staged staff push without blocking another registration', async () => {
+    const runtime = worker();
+    const staged = '1f9e817c-8883-46ca-ad8b-a3ea20868152';
+    const active = '3cf811c5-ba24-40db-ad09-f105fa46c49e';
+    const prefix = 'https://dev.gokulsweets.in/.__gokul-order-push/';
+    runtime.entries.set(prefix + 'staff-cancellations', JSON.stringify({12: [staged]}));
+    runtime.entries.set(prefix + 'staff', JSON.stringify({owner: '13', setupId: staged, registrationId: active}));
+
+    for (const [id, registrationId] of [[110, staged], [111, active]]) {
+        let pending;
+        runtime.listeners.push({data: {json: () => ({eventId: `staff:${id}`, registrationId,
+            title: 'Kitchen alert', url: '/admin/orders/GS-110'})}, waitUntil(value) {pending = value;}});
+        await pending;
+    }
+    assert.deepEqual(runtime.shown.map(notice => notice.data.registrationId), [active]);
+});
+
 test('order stages replace the same device alert and optional review uses a safe destination', async () => {
     const runtime = worker(); let pending;
     for (const [eventId, url] of [['81','/orders/GS-81'], ['82','/orders/GS-81#order-review'], ['83','/orders/GS-83']]) {

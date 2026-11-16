@@ -1,17 +1,34 @@
 import {ADMIN_API_BASE_URL} from "@/lib/constants";
 import {applicationServerKey} from "@/lib/notificationAlerts";
-import {bindStaffOrderPush, clearFailedStaffOrderPushBinding, clearOrderPushBinding, clearStaffOrderPushSetup, readOrderPushBinding, signOutStaffOrderPushBinding, stageStaffOrderPushSetup, switchOrderPushOwner} from "@/lib/orderPushBinding";
+import {bindStaffOrderPush, clearFailedStaffOrderPushBinding, clearOrderPushBinding, clearStaffOrderPushSetup, readOrderPushBinding, readStaffPushCancellation, signOutStaffOrderPushBinding, stageStaffOrderPushSetup, switchOrderPushOwner, writeStaffPushCancellation} from "@/lib/orderPushBinding";
 import {adminFetch, logoutAdmin} from "@/services/adminApi";
 
 export const STAFF_ALERT_DEVICE_RESTORED = "gokul-staff-alert-device-restored";
 export const staffAlertDeviceKey = (staffId?: number) => `gokul-staff-push:${ADMIN_API_BASE_URL}:${staffId}`;
 
 export const staffAlertPromptKey = (staffId: number) => `${staffAlertDeviceKey(staffId)}:setup-seen`;
+const staffAlertCancellationKey = (staffId: number) => `${staffAlertDeviceKey(staffId)}:cancellation`;
+const validRegistrationId = (id: unknown): id is string => typeof id === "string" && /^[0-9a-f-]{36}$/i.test(id);
+
+async function pendingStaffAlertCancellation(staffId: number) {
+    let saved: unknown;
+    try {saved = JSON.parse(localStorage.getItem(staffAlertCancellationKey(staffId)) ?? "null");} catch { /* The worker marker can still be read. */ }
+    const cached = await readStaffPushCancellation(String(staffId));
+    return [...new Set([...cached, ...(Array.isArray(saved) ? saved : [])].filter(validRegistrationId))];
+}
+
+async function saveStaffAlertCancellation(staffId: number, ids: string[]) {
+    try {
+        if (ids.length) localStorage.setItem(staffAlertCancellationKey(staffId), JSON.stringify(ids));
+        else localStorage.removeItem(staffAlertCancellationKey(staffId));
+    } catch { /* CacheStorage can still record the intent. */ }
+    await writeStaffPushCancellation(String(staffId), ids).catch(() => {});
+}
 
 export function readStaffAlertDevice(staffId: number) {
     try {
         const id = localStorage.getItem(staffAlertDeviceKey(staffId));
-        return id && /^[0-9a-f-]{36}$/i.test(id) ? id : null;
+        return validRegistrationId(id) ? id : null;
     } catch {return null;}
 }
 
@@ -19,16 +36,17 @@ async function staffAlertDeviceIds(staffId: number) {
     const remembered = readStaffAlertDevice(staffId);
     const binding = await readOrderPushBinding("staff");
     const owned = binding?.owner === String(staffId) ? binding : null;
-    const valid = (id?: string | null) => id && /^[0-9a-f-]{36}$/i.test(id) ? id : null;
-    return {remembered, bound: valid(owned?.registrationId), staged: valid(owned?.setupId)};
+    const bound = owned?.registrationId, staged = owned?.setupId;
+    return {remembered, bound: validRegistrationId(bound) ? bound : null, staged: validRegistrationId(staged) ? staged : null};
 }
 
 export async function resolveStaffAlertDevice(staffId: number) {
     const {remembered, bound, staged} = await staffAlertDeviceIds(staffId);
-    return bound ?? remembered ?? staged;
+    return bound ?? remembered ?? staged ?? (await pendingStaffAlertCancellation(staffId))[0] ?? null;
 }
 
 export async function resolveConfirmedStaffAlertDevice(staffId: number) {
+    if ((await pendingStaffAlertCancellation(staffId)).length) return null;
     const {remembered, bound} = await staffAlertDeviceIds(staffId);
     return bound ?? remembered;
 }
@@ -118,6 +136,7 @@ async function staffSetupFingerprint(subscription: PushSubscription) {
 export function recoverStaffAlertSetup(subscription: PushSubscription, staffId: number, signal: AbortSignal) {
     return withStaffAlertDevice(async () => {
         const owner = String(staffId);
+        if ((await pendingStaffAlertCancellation(staffId)).length) return null;
         const binding = await readOrderPushBinding("staff");
         if (binding?.owner !== owner || !binding.setupId || !binding.setupFingerprint
             || binding.setupFingerprint !== await staffSetupFingerprint(subscription)) return null;
@@ -130,7 +149,10 @@ export function recoverStaffAlertSetup(subscription: PushSubscription, staffId: 
             try {localStorage.setItem(staffAlertDeviceKey(staffId), setupId);} catch { /* The confirmed binding is retained. */ }
             return setupId;
         } catch (error) {
-            if (error instanceof StaffAlertRequestError && error.status === 404) return null;
+            if (error instanceof StaffAlertRequestError) {
+                if (error.status === 410) await clearStaffOrderPushSetup(owner, setupId);
+                if ([404, 410].includes(error.status)) return null;
+            }
             throw error;
         }
     }, signal);
@@ -144,24 +166,45 @@ export function confirmStaffAlertDevice(staffId: number, registrationId: string,
     }, signal);
 }
 
+async function finishStaffAlertCancellation(staffId: number, ids: string[], scope?: AbortSignal) {
+    const timeout = AbortSignal.timeout(8000);
+    const signal = scope ? AbortSignal.any([scope, timeout]) : timeout;
+    const results = await Promise.allSettled(ids.map(id =>
+        staffAlertsRequest(`/push-subscriptions/${encodeURIComponent(id)}`, {method: "DELETE", signal}, staffId)
+    ));
+    const failure = results.find(result => result.status === "rejected");
+    if (failure?.status === "rejected") throw failure.reason;
+    const current = readStaffAlertDevice(staffId);
+    if (current && ids.includes(current)) {
+        try {localStorage.removeItem(staffAlertDeviceKey(staffId));} catch { /* Revocation succeeded. */ }
+    }
+    const owner = String(staffId);
+    const binding = await readOrderPushBinding("staff");
+    if (binding?.owner === owner && [binding.registrationId, binding.setupId].some(id => id && ids.includes(id))) {
+        await clearOrderPushBinding("staff", owner, binding.registrationId ?? undefined);
+    }
+    await saveStaffAlertCancellation(staffId, []);
+    dismissStaffAlertSetup(staffId);
+}
+
+/** Resume a previous Disable before attempting to restore push on this browser. */
+export async function retryStaffAlertCancellation(staffId: number, signal: AbortSignal) {
+    if (!(await pendingStaffAlertCancellation(staffId)).length) return;
+    await withStaffAlertDevice(async () => {
+        const ids = await pendingStaffAlertCancellation(staffId);
+        if (ids.length) await finishStaffAlertCancellation(staffId, ids, signal);
+    }, signal);
+}
+
 export function disableStaffDeviceAlerts(staffId: number) {
     return withStaffAlertDevice(async () => {
         const {remembered, bound, staged} = await staffAlertDeviceIds(staffId);
-        const ids = [...new Set([staged, bound, remembered].filter((id): id is string => !!id))];
+        const pending = await pendingStaffAlertCancellation(staffId);
+        const ids = [...new Set([staged, bound, remembered, ...pending].filter(validRegistrationId))];
         if (!ids.length) throw new Error("Could not identify this phone’s alert registration. Push disable could not be confirmed.");
-        const signal = AbortSignal.timeout(8000);
-        const results = await Promise.allSettled(ids.map(id =>
-            staffAlertsRequest(`/push-subscriptions/${encodeURIComponent(id)}`, {method: "DELETE", signal}, staffId)
-        ));
-        // A missing staged registration may still be committing. Keep its ID for a later revoke.
-        const failure = results.find(result => result.status === "rejected");
-        if (failure?.status === "rejected") throw failure.reason;
-        const current = readStaffAlertDevice(staffId);
-        if (current && ids.includes(current)) {
-            try {localStorage.removeItem(staffAlertDeviceKey(staffId));} catch { /* Revocation succeeded. */ }
-        }
-        await clearOrderPushBinding("staff", String(staffId), bound ?? remembered ?? staged ?? undefined);
+        await saveStaffAlertCancellation(staffId, ids);
         dismissStaffAlertSetup(staffId);
+        await finishStaffAlertCancellation(staffId, ids);
     });
 }
 
@@ -211,6 +254,8 @@ async function enrollStaffDevice(settings: StaffAlertSettings, applicationKey: s
     });
     try {
         signal.throwIfAborted();
+        const cancellation = await pendingStaffAlertCancellation(settings.staffId);
+        if (cancellation.length) await finishStaffAlertCancellation(settings.staffId, cancellation, signal);
         const previousBinding = await Promise.race([readOrderPushBinding("staff"), deadline]);
         const previousOwner = previousBinding?.owner ?? null;
         const registration = await Promise.race([navigator.serviceWorker.register("/sw.js"), deadline]);
@@ -232,35 +277,43 @@ async function enrollStaffDevice(settings: StaffAlertSettings, applicationKey: s
         const fingerprint = await staffSetupFingerprint(subscription);
         const existingSetupId = previousBinding?.owner === owner && previousBinding.setupFingerprint === fingerprint
             ? previousBinding.setupId : undefined;
-        setupId = existingSetupId ?? crypto.randomUUID();
-        // A previous request may have committed even if this attempt cannot reach the server.
-        registrationUncertain = Boolean(existingSetupId);
-        if (!await stageStaffOrderPushSetup(owner, setupId, fingerprint, previousOwner, signal)) {
-            throw new Error("The active staff account changed. Reopen this page and try again.");
-        }
-        const body = JSON.stringify({expectedStaffId: settings.staffId, setupId,
-            endpoint: subscription.endpoint, publicKey: keys?.p256dh, authSecret: keys?.auth});
-        const register = (requestSignal: AbortSignal) =>
-            staffAlertsRequest<{id: string; created?: boolean}>("/push-subscriptions",
-                {method: "POST", signal: requestSignal, body}, settings.staffId);
-        let result: {id: string; created?: boolean} | undefined;
-        if (existingSetupId) {
-            try {
-                const recovered = await syncStaffPushRequest(subscription, settings.staffId, signal, setupId);
-                if (recovered.id === setupId) result = {id: setupId, created: false};
-            } catch (error) {
-                if (!(error instanceof StaffAlertRequestError && error.status === 404)) throw error;
+        const stage = async (id: string, retrying: boolean) => {
+            setupId = id;
+            // An earlier request may have committed even if this attempt cannot reach the server.
+            registrationUncertain = retrying;
+            if (!await stageStaffOrderPushSetup(owner, id, fingerprint, previousOwner, signal)) {
+                throw new Error("The active staff account changed. Reopen this page and try again.");
             }
-        }
-        if (!result) {
+        };
+        const register = (id: string, requestSignal: AbortSignal) =>
+            staffAlertsRequest<{id: string; created?: boolean}>("/push-subscriptions",
+                {method: "POST", signal: requestSignal, body: JSON.stringify({expectedStaffId: settings.staffId,
+                    setupId: id, endpoint: subscription.endpoint, publicKey: keys?.p256dh, authSecret: keys?.auth})}, settings.staffId);
+        const enroll = async (id: string, retrying: boolean) => {
+            await stage(id, retrying);
+            if (retrying) {
+                try {
+                    const recovered = await syncStaffPushRequest(subscription, settings.staffId, signal, id);
+                    if (recovered.id === id) return {id, created: false};
+                } catch (error) {
+                    if (!(error instanceof StaffAlertRequestError && error.status === 404)) throw error;
+                }
+            }
             try {
-                result = await register(AbortSignal.any([signal, AbortSignal.timeout(5000)]));
+                return await register(id, AbortSignal.any([signal, AbortSignal.timeout(5000)]));
             } catch (error) {
                 if (!uncertainStaffSetup(error)) throw error;
                 registrationUncertain = true;
                 signal.throwIfAborted();
-                result = await register(signal);
+                return register(id, signal);
             }
+        };
+        let result;
+        try {
+            result = await enroll(existingSetupId ?? crypto.randomUUID(), Boolean(existingSetupId));
+        } catch (error) {
+            if (!existingSetupId || !(error instanceof StaffAlertRequestError && error.status === 410)) throw error;
+            result = await enroll(crypto.randomUUID(), false);
         }
         registrationId = result.id;
         newRegistration = result.created ?? result.id !== previousDevice;

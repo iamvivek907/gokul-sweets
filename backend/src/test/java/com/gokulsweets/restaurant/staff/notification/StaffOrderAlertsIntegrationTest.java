@@ -435,6 +435,46 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
     }
 
     @Test
+    void disableBeforeSetupCommitsRemainsIdempotentAndBlocksTheOldId() {
+        var browser = input("cancelled-setup-" + UUID.randomUUID());
+        var cancelledId = UUID.randomUUID();
+        var late = new StaffPushSubscriptions.Input(
+                browser.endpoint(), browser.publicKey(), browser.authSecret(), null, staff, false, cancelledId);
+
+        subscriptions.revoke(staff, cancelledId);
+        subscriptions.revoke(staff, cancelledId);
+
+        assertThatThrownBy(() -> subscriptions.subscribe(staff, cookie, late))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                        error -> assertThat(error.getStatusCode().value()).isEqualTo(410));
+        assertThat(subscriptions.live(staff, cancelledId, cookie)).isFalse();
+
+        var fresh = subscriptions.subscribe(staff, cookie, browser);
+        assertThat(fresh.id()).isNotEqualTo(cancelledId);
+        assertThat(subscriptions.live(staff, fresh.id(), cookie)).isTrue();
+    }
+
+    @Test
+    void revokedRegistrationCannotBeRestoredOrReusedAsASetupId() {
+        var browser = input("revoked-setup-" + UUID.randomUUID());
+        var registration = subscriptions.subscribe(staff, cookie, browser);
+        var restore = new StaffPushSubscriptions.Input(
+                browser.endpoint(), browser.publicKey(), browser.authSecret(), registration.id());
+        var replay = new StaffPushSubscriptions.Input(
+                browser.endpoint(), browser.publicKey(), browser.authSecret(), null, staff, false, registration.id());
+
+        subscriptions.revoke(staff, registration.id());
+
+        for (var request : java.util.List.of(restore, replay)) {
+            assertThatThrownBy(() -> subscriptions.subscribe(staff, cookie, request))
+                    .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                            error -> assertThat(error.getStatusCode().value()).isEqualTo(410));
+        }
+        assertThat(subscriptions.live(staff, registration.id(), cookie)).isFalse();
+        assertThat(subscriptions.subscribe(staff, cookie, browser).id()).isNotEqualTo(registration.id());
+    }
+
+    @Test
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void setupVerifiedBeforeSignOutCannotReplaceTheNewSessionsRegistration() throws Exception {
         var checked = new CountDownLatch(1);

@@ -124,6 +124,20 @@ public class StaffPushSubscriptions {
                             Long.class,
                             staffId)
                     .isEmpty()) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+            UUID requestedId = input.registrationId() == null ? input.setupId() : input.registrationId();
+            if (requestedId != null && Boolean.TRUE.equals(jdbc.queryForObject(
+                    """
+SELECT EXISTS (SELECT 1 FROM staff_push_cancellations
+               WHERE environment=? AND staff_id=? AND registration_id=?
+               UNION ALL
+               SELECT 1 FROM staff_push_subscriptions
+               WHERE environment=? AND staff_id=? AND id=? AND revoked_at IS NOT NULL)
+""",
+                    Boolean.class,
+                    alerts.scope(), staffId, requestedId,
+                    alerts.scope(), staffId, requestedId))) {
+                throw new ResponseStatusException(HttpStatus.GONE);
+            }
             String session = StaffSessionService.hash(cookie),
                     hash = StaffSessionService.hash(input.endpoint());
             var existing =
@@ -307,6 +321,8 @@ WHERE d.state IN ('QUEUED','SENDING','SKIPPED')
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(StaffPushSubscriptions.class, "revoke(long,UUID)");
         try {
+            // Share setup's staff-row lock so an absent registration cannot commit after cancellation.
+            jdbc.queryForObject("SELECT id FROM staff_users WHERE id = ? FOR UPDATE", Long.class, staffId);
             if (jdbc.update(
                             "UPDATE staff_push_subscriptions SET revoked_at = COALESCE(revoked_at,"
                                     + " CURRENT_TIMESTAMP) WHERE id = ? AND environment = ? AND"
@@ -314,7 +330,14 @@ WHERE d.state IN ('QUEUED','SENDING','SKIPPED')
                             id,
                             alerts.scope(),
                             staffId)
-                    == 0) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+                    == 0) {
+                jdbc.update(
+                        """
+INSERT INTO staff_push_cancellations(environment, staff_id, registration_id)
+VALUES (?, ?, ?) ON CONFLICT DO NOTHING
+""",
+                        alerts.scope(), staffId, id);
+            }
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos, StaffPushSubscriptions.class, "revoke(long,UUID)");

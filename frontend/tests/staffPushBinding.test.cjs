@@ -15,13 +15,23 @@ function load(file, globals) {
 }
 
 function fixture(binding, {readFails = false, writeFails = false, createdRegistration = true, storageFails = false, readLocalFails = false, locks, respond} = {}) {
+    let cancellations;
+    const isCancellation = key => key.endsWith('/staff-cancellations');
     const store = {
-        async match() { return binding ? new Response(JSON.stringify(binding)) : undefined; },
+        async match(key) {
+            const value = isCancellation(key) ? cancellations : binding;
+            return value ? new Response(JSON.stringify(value)) : undefined;
+        },
         async put(key, value) {
             if (writeFails) throw new Error('Storage quota exceeded');
-            binding = await value.json();
+            if (isCancellation(key)) cancellations = await value.json();
+            else binding = await value.json();
         },
-        async delete() { binding = null; return true; }
+        async delete(key) {
+            if (isCancellation(key)) cancellations = undefined;
+            else binding = null;
+            return true;
+        }
     };
     const cached = load('lib/orderPushBinding.ts', {caches: {async open() {
         if (readFails) throw new Error('CacheStorage unavailable');
@@ -70,6 +80,7 @@ function fixture(binding, {readFails = false, writeFails = false, createdRegistr
         bind: cached.bindStaffOrderPush, switchOwner: cached.switchOrderPushOwner, read: () => binding,
         enable: () => api.enableStaffDeviceAlerts({staffId: 12, applicationServerKey: 'test'}),
         disable: () => api.disableStaffDeviceAlerts(12),
+        retryCancellation: () => api.retryStaffAlertCancellation(12, new AbortController().signal),
         signOut: () => api.logoutStaffAlertDevice(12, new AbortController().signal),
         recover: () => api.recoverStaffAlertSetup(subscription, 12, new AbortController().signal),
         confirm: id => api.confirmStaffAlertDevice(12, id, new AbortController().signal),
@@ -299,28 +310,57 @@ test('polling retains the staged ID and disable revokes both possible registrati
     assert.deepEqual(phone.read(), {owner: '', registrationId: null});
 });
 
-test('disable revokes the active registration even when staged setup returns 404', async () => {
+test('disable cancels the staged setup and revokes the active registration', async () => {
     const confirmed = '3cf811c5-ba24-40db-ad09-f105fa46c49e';
     const staged = '1f9e817c-8883-46ca-ad8b-a3ea20868152';
     const binding = {owner: '12', registrationId: confirmed, setupId: staged, setupFingerprint: 'test'};
-    let stagedCommitted = false;
-    const phone = fixture(binding, {respond(request) {
-        const missing = request.url.endsWith(staged) && !stagedCommitted;
-        return new Response(null, {status: missing ? 404 : 204});
-    }});
+    const phone = fixture(binding);
     phone.saved.set(phone.key, confirmed);
-
-    await assert.rejects(phone.disable(), {status: 404});
-    assert.deepEqual(phone.requests.map(request => request.url.split('/').at(-1)), [staged, confirmed]);
-    assert.deepEqual(phone.read(), binding);
-    assert.equal(phone.saved.get(phone.key), confirmed);
-
-    stagedCommitted = true;
     await phone.disable();
-    assert.deepEqual(phone.requests.slice(2).map(request => request.url.split('/').at(-1)), [staged, confirmed]);
+    assert.deepEqual(phone.requests.map(request => request.url.split('/').at(-1)), [staged, confirmed]);
     assert.deepEqual(phone.read(), {owner: '', registrationId: null});
     assert.equal(phone.saved.has(phone.key), false);
 });
+
+test('pending cancellation blocks recovery and a lost DELETE can be retried', async () => {
+    let attempts = 0;
+    const phone = fixture({owner: '12', registrationId: null}, {respond(request) {
+        if (!request.method) return new Response('{"staffId":12}');
+        if (request.method === 'DELETE') {
+            if (++attempts === 1) throw new TypeError('DELETE response lost');
+            return new Response(null, {status: 204});
+        }
+        if (attempts === 0) throw new TypeError('POST response lost');
+        return Response.json({id: request.body.setupId, created: true});
+    }});
+    await assert.rejects(phone.enable(), /POST response lost/);
+    const {setupId} = phone.read();
+    await assert.rejects(phone.disable(), /DELETE response lost/);
+
+    assert.equal(await phone.recover(), null);
+    assert.equal(attempts, 1);
+    assert.equal(phone.requests.length, 3);
+    await phone.retryCancellation();
+    assert.deepEqual(phone.read(), {owner: '', registrationId: null});
+    assert.equal(await phone.enable(), 'granted');
+    assert.notEqual(phone.read().registrationId, setupId);
+});
+
+for (const restoreStatus of [404, 410]) {
+    test(`explicit Enable replaces a server-cancelled staged ID after restore returns ${restoreStatus}`, async () => {
+        let cancelledId;
+        const phone = fixture({owner: '12', registrationId: null}, {respond(request) {
+            if (!cancelledId) throw new TypeError('POST response lost');
+            if (request.body.registrationId === cancelledId) return new Response(null, {status: restoreStatus});
+            if (request.body.setupId === cancelledId) return new Response(null, {status: 410});
+            return Response.json({id: request.body.setupId, created: true});
+        }});
+        await assert.rejects(phone.enable(), /POST response lost/);
+        cancelledId = phone.read().setupId;
+        assert.equal(await phone.enable(), 'granted');
+        assert.notEqual(phone.read().registrationId, cancelledId);
+    });
+}
 
 test('sign-out retains a lost setup response for same-device recovery', async () => {
     let attempts = 0;

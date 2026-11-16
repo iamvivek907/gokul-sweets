@@ -799,6 +799,11 @@ function notificationDestination(value, staff = false, marketing = false) {
 async function orderPushDisplay(payload, staff) {
     try {
         const cache = await caches.open(ORDER_PUSH_BINDING_CACHE);
+        if (staff && payload.registrationId) {
+            const cancellation = await cache.match(new Request(new URL("/.__gokul-order-push/staff-cancellations", self.location.origin)));
+            if (cancellation && Object.values(await cancellation.json()).some(
+                ids => Array.isArray(ids) && ids.includes(payload.registrationId))) return "blocked";
+        }
         const key = new Request(new URL(`/.__gokul-order-push/${staff ? "staff" : "customer"}`, self.location.origin));
         const response = await cache.match(key);
         const binding = response ? await response.json() : null;

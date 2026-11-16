@@ -9,7 +9,7 @@ import {usePwaInstall} from "@/hooks/usePwaInstall";
 import {T} from "@/lib/language";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
 import NotificationIcon from "@/components/customer/NotificationIcon";
-import {STAFF_ALERT_DEVICE_RESTORED, confirmStaffAlertDevice, dismissStaffAlertSetup, enableStaffDeviceAlerts, readStaffAlertDevice, recoverStaffAlertSetup, resolveConfirmedStaffAlertDevice, staffAlertPromptKey, staffAlertsRequest, supportsStaffPush, syncStaffAlertDevice, StaffAlertRequestError, type StaffAlertSettings, type StaffInbox} from "@/services/staffAlertsApi";
+import {STAFF_ALERT_DEVICE_RESTORED, confirmStaffAlertDevice, dismissStaffAlertSetup, enableStaffDeviceAlerts, recoverStaffAlertSetup, resolveConfirmedStaffAlertDevice, retryStaffAlertCancellation, staffAlertPromptKey, staffAlertsRequest, supportsStaffPush, syncStaffAlertDevice, StaffAlertRequestError, type StaffAlertSettings, type StaffInbox} from "@/services/staffAlertsApi";
 
 export default function StaffNotificationBell() {
     const {profile, hasPermission, verificationFailed} = useAdminAuth();
@@ -37,6 +37,7 @@ export default function StaffNotificationBell() {
                 const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]);
                 const staffId = profile.staffId;
                 const owner = String(staffId);
+                await retryStaffAlertCancellation(staffId, signal).catch(() => {});
                 const binding = await readOrderPushBinding("staff");
                 const previousOwner = binding?.owner ?? null;
                 const staged = previousOwner === owner && !!binding?.setupId;
@@ -98,7 +99,7 @@ export default function StaffNotificationBell() {
                         }
                         failures = 0;
                     } catch (cause) {
-                        const permanentlyInactive = cause instanceof StaffAlertRequestError && [404, 409].includes(cause.status);
+                        const permanentlyInactive = cause instanceof StaffAlertRequestError && [404, 409, 410].includes(cause.status);
                         retryAt = permanentlyInactive ? Infinity : Date.now() + Math.min(120_000, 15_000 * 2 ** Math.min(failures++, 3));
                     }
                 }

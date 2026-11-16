@@ -2,6 +2,29 @@ type Audience = "staff" | "customer";
 type Binding = {owner: string; registrationId: string | null; pending?: true; setupId?: string; setupFingerprint?: string; signedOut?: true};
 const cacheName = "gokul-order-push-binding-v1";
 const bindingKey = (audience: Audience) => `/.__gokul-order-push/${audience}`;
+const staffCancellationKey = "/.__gokul-order-push/staff-cancellations";
+
+async function staffPushCancellations(cache: Cache): Promise<Record<string, string[]>> {
+    const entry = await cache.match(staffCancellationKey);
+    return entry ? await entry.json() : {};
+}
+
+export async function readStaffPushCancellation(owner: string) {
+    try {
+        const ids = (await staffPushCancellations(await caches.open(cacheName)))[owner];
+        return Array.isArray(ids) ? ids : [];
+    } catch {return [];}
+}
+
+/** Called under the staff lifecycle lock. The worker also reads this marker. */
+export async function writeStaffPushCancellation(owner: string, ids: string[]) {
+    const cache = await caches.open(cacheName);
+    const pending = await staffPushCancellations(cache);
+    if (ids.length) pending[owner] = ids;
+    else delete pending[owner];
+    if (Object.keys(pending).length) await cache.put(staffCancellationKey, new Response(JSON.stringify(pending)));
+    else await cache.delete(staffCancellationKey);
+}
 
 export async function readOrderPushBinding(audience: Audience): Promise<Binding | null> {
     try {
