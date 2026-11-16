@@ -14,7 +14,7 @@ function load(file, globals) {
     return exports;
 }
 
-function fixture(binding, {readFails = false, writeFails = false, createdRegistration = true, storageFails = false, readLocalFails = false, locks, respond} = {}) {
+function fixture(binding, {readFails = false, writeFails = false, cancellationDeleteFails = false, createdRegistration = true, storageFails = false, readLocalFails = false, locks, respond} = {}) {
     let cancellations;
     const isCancellation = key => key.endsWith('/staff-cancellations');
     const store = {
@@ -23,11 +23,12 @@ function fixture(binding, {readFails = false, writeFails = false, createdRegistr
             return value ? new Response(JSON.stringify(value)) : undefined;
         },
         async put(key, value) {
-            if (writeFails) throw new Error('Storage quota exceeded');
+            if (typeof writeFails === 'function' ? writeFails() : writeFails) throw new Error('Storage quota exceeded');
             if (isCancellation(key)) cancellations = await value.json();
             else binding = await value.json();
         },
         async delete(key) {
+            if (isCancellation(key) && cancellationDeleteFails) throw new Error('Cache deletion failed');
             if (isCancellation(key)) cancellations = undefined;
             else binding = null;
             return true;
@@ -368,18 +369,60 @@ test('Disable stays pending during this visit if neither storage system can save
     assert.equal(phone.requests.length, 2, 'confirmed revocation drops the in-memory cancellation');
 });
 
-test('background recovery replaces a staged alias with the canonical registration', async () => {
+test('background recovery binds the canonical ID before releasing catch-up alerts', async () => {
+    let setupAttempts = 0;
+    let writeFails = false;
+    const phone = fixture({owner: '12', registrationId: null}, {respond(request, deviceId) {
+        if (request.body.setupId && ++setupAttempts <= 2) throw new TypeError('POST response lost');
+        assert.ok(request.body.registrationId);
+        if (request.body.registrationId !== deviceId) {
+            assert.equal(request.binding.setupId, request.body.registrationId);
+            return Response.json({id: deviceId, bindingRequired: true});
+        }
+        assert.equal(request.binding.registrationId, deviceId);
+        assert.equal(request.binding.pending, true);
+        return Response.json({id: deviceId});
+    }, writeFails: () => writeFails});
+    await assert.rejects(phone.enable(), /POST response lost/);
+    assert.notEqual(phone.read().setupId, phone.deviceId);
+
+    writeFails = true;
+    await assert.rejects(phone.recover(), /could not save its alert registration/);
+    assert.equal(phone.requests.length, 3, 'the catch-up request waits for a readable binding');
+    writeFails = false;
+    assert.equal(await phone.recover(), phone.deviceId);
+    assert.equal(phone.requests.length, 5);
+    assert.deepEqual(phone.read(), {owner: '12', registrationId: phone.deviceId});
+    assert.equal(phone.saved.get(phone.key), phone.deviceId);
+});
+
+test('manual Enable resumes an existing alias only after saving the canonical ID', async () => {
     let setupAttempts = 0;
     const phone = fixture({owner: '12', registrationId: null}, {respond(request, deviceId) {
         if (request.body.setupId && ++setupAttempts <= 2) throw new TypeError('POST response lost');
         assert.ok(request.body.registrationId);
+        if (request.body.registrationId !== deviceId) return Response.json({id: deviceId, bindingRequired: true});
+        assert.equal(request.binding.registrationId, deviceId);
+        assert.equal(request.binding.pending, true);
         return Response.json({id: deviceId});
     }});
     await assert.rejects(phone.enable(), /POST response lost/);
-    assert.notEqual(phone.read().setupId, phone.deviceId);
-    assert.equal(await phone.recover(), phone.deviceId);
+    assert.equal(await phone.enable(), 'granted');
+    assert.equal(phone.requests.length, 4);
     assert.deepEqual(phone.read(), {owner: '12', registrationId: phone.deviceId});
-    assert.equal(phone.saved.get(phone.key), phone.deviceId);
+});
+
+test('a stale cancellation marker does not block a replacement registration or its recovery', async () => {
+    const old = '3cf811c5-ba24-40db-ad09-f105fa46c49e';
+    const phone = fixture({owner: '12', registrationId: old}, {cancellationDeleteFails: true});
+    phone.saved.set(phone.key, old);
+    await phone.disable();
+    assert.equal(await phone.enable(), 'granted');
+    assert.equal(await phone.confirm(phone.deviceId), true);
+    await phone.retryCancellation();
+    assert.equal(await phone.restoreAs(phone.deviceId).then(result => result.id), phone.deviceId);
+    assert.deepEqual(phone.read(), {owner: '12', registrationId: phone.deviceId});
+    assert.ok(phone.requests.filter(req => req.method === 'DELETE').every(req => req.url.endsWith(old)));
 });
 
 for (const restoreStatus of [404, 410]) {

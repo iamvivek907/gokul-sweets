@@ -50,8 +50,8 @@ async function updateBinding(audience: Audience, update: (previous: Binding | nu
             await cache.put(key, new Response(JSON.stringify(next)));
         } catch (error) {
             // When storage is full, deleting our empty marker allows the worker's generic fallback.
-            // Preserve an existing registration or another account's marker.
-            if (audience === "staff" && previous && !previous.registrationId &&
+            // Preserve an existing registration, a staged setup, or another account's marker.
+            if (audience === "staff" && previous && !previous.registrationId && !previous.setupId &&
                 (previous.owner === "" || (next.pending && previous.owner === next.owner))) {
                 await cache.delete(key).catch(() => {});
             }
@@ -88,11 +88,12 @@ export async function bindStaffOrderPush(owner: string, registrationId: string, 
     return matches;
 }
 
-async function closeOrderNotifications(audience: Audience) {
+async function closeOrderNotifications(audience: Audience, registrationIds?: string[]) {
     const worker = await navigator.serviceWorker?.getRegistration();
     const notifications = await worker?.getNotifications?.();
     for (const notice of notifications ?? []) {
-        if (notice.tag.startsWith(`gokul-${audience}-`)) notice.close();
+        if (notice.tag.startsWith(`gokul-${audience}-`)
+            && (!registrationIds || registrationIds.includes(notice.data?.registrationId))) notice.close();
     }
 }
 
@@ -147,6 +148,23 @@ export async function clearStaffOrderPushSetup(owner: string, setupId: string) {
         return {owner, registrationId: previous.registrationId,
             ...(previous.pending ? {pending: true} : {}), ...(previous.signedOut ? {signedOut: true} : {})};
     }, AbortSignal.timeout(8000));
+}
+
+export async function clearCancelledStaffOrderPush(owner: string, ids: string[]) {
+    try {
+        await updateBinding("staff", previous => {
+            if (previous?.owner !== owner) return null;
+            const clearRegistration = !!previous.registrationId && ids.includes(previous.registrationId);
+            const clearSetup = !!previous.setupId && ids.includes(previous.setupId);
+            if (!clearRegistration && !clearSetup) return null;
+            const registrationId = clearRegistration ? null : previous.registrationId;
+            const setupId = clearSetup ? undefined : previous.setupId;
+            if (!registrationId && !setupId) return {owner: "", registrationId: null};
+            return {...previous, registrationId, setupId,
+                pending: clearRegistration ? undefined : previous.pending,
+                setupFingerprint: clearSetup ? undefined : previous.setupFingerprint};
+        }, AbortSignal.timeout(8000), () => closeOrderNotifications("staff", ids));
+    } catch { /* The server has already stopped delivery. */ }
 }
 
 /** Retain incomplete setup so the same account can restore it after a verified sign-in. */

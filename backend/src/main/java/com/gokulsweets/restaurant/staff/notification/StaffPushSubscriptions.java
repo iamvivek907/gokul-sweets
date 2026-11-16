@@ -77,8 +77,13 @@ public class StaffPushSubscriptions {
      *
      * @param id the id
      * @param created whether the registration belongs to this setup attempt
+     * @param bindingRequired whether the browser must bind this ID before resuming delivery
      */
-    public record Result(UUID id, boolean created) {}
+    public record Result(UUID id, boolean created, boolean bindingRequired) {
+        public Result(UUID id, boolean created) {
+            this(id, created, false);
+        }
+    }
 
     /**
      * Subscribes to staff push subscriptions data and returns the {@code Result} result.
@@ -128,7 +133,6 @@ public class StaffPushSubscriptions {
                     input.registrationId() == null ? input.setupId() : input.registrationId();
             UUID reusedId =
                     requestedId == null ? null : findSetupRegistration(staffId, requestedId);
-            UUID registrationId = reusedId == null ? input.registrationId() : reusedId;
             if (requestedId != null
                     && Boolean.TRUE.equals(
                             jdbc.queryForObject(
@@ -196,6 +200,13 @@ SELECT token_hash FROM staff_sessions WHERE token_hash=? AND staff_id=?
                 }
                 return new Result(null, false);
             }
+            // An alias alone cannot receive pushes addressed to the canonical ID.
+            if (reusedId != null) {
+                if (differentOwner || !sameDevice || !reusedId.equals(old.id())) {
+                    throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+                }
+                return new Result(reusedId, false, true);
+            }
             Long count =
                     jdbc.queryForObject(
                             """
@@ -211,7 +222,7 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.environment = ? AND s.staff_id =
             if (count != null && count >= 5)
                 throw new ResponseStatusException(
                         HttpStatus.CONFLICT, "Maximum five live staff browsers.");
-            if (registrationId != null) {
+            if (input.registrationId() != null) {
                 // Existing-device restoration must never recreate a removed subscription.
                 var restored =
                         jdbc.query(
@@ -227,7 +238,7 @@ RETURNING s.id
 """,
                                 (rs, row) -> rs.getObject(1, UUID.class),
                                 session,
-                                registrationId,
+                                input.registrationId(),
                                 alerts.scope(),
                                 staffId,
                                 hash,

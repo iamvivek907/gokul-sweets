@@ -465,8 +465,27 @@ VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'CONFIRMED', CURRENT_TIMESTAMP)
                                 existing.id()))
                 .isTrue();
         var nextCookie = issueFor(staff);
-        assertThat(subscriptions.subscribe(staff, nextCookie, restore).id())
-                .isEqualTo(existing.id());
+        alerts.paymentConfirmed(payment);
+        long event = latest();
+        assertThat(subscriptions.subscribe(staff, nextCookie, restore))
+                .isEqualTo(new StaffPushSubscriptions.Result(existing.id(), false, true));
+        assertThat(subscriptions.live(staff, existing.id(), nextCookie)).isFalse();
+        String catchUpCount =
+                "SELECT COUNT(*) FROM staff_alert_deliveries WHERE event_id=?"
+                        + " AND subscription_id=? AND catch_up";
+        assertThat(jdbc.queryForObject(catchUpCount, Long.class, event, existing.id())).isZero();
+
+        var ready =
+                new StaffPushSubscriptions.Input(
+                        browser.endpoint(),
+                        browser.publicKey(),
+                        browser.authSecret(),
+                        existing.id());
+        assertThat(subscriptions.subscribe(staff, nextCookie, ready))
+                .isEqualTo(new StaffPushSubscriptions.Result(existing.id(), false));
+        assertThat(subscriptions.live(staff, existing.id(), nextCookie)).isTrue();
+        assertThat(jdbc.queryForObject(catchUpCount, Long.class, event, existing.id()))
+                .isEqualTo(1L);
         subscriptions.revoke(staff, alias);
         assertThat(subscriptions.live(staff, existing.id(), nextCookie)).isFalse();
 
