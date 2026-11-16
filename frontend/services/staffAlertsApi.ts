@@ -44,7 +44,7 @@ export async function staffAlertsRequest<T>(path = "", init?: RequestInit, staff
 let localDeviceOperation: Promise<unknown> = Promise.resolve();
 
 /** One lock for the native subscription and this browser's staff registration across accounts. */
-function withStaffAlertDevice<T>(operation: () => Promise<T>, scope?: AbortSignal): Promise<T> {
+async function withStaffAlertDevice<T>(operation: () => Promise<T>, scope?: AbortSignal): Promise<T> {
     const wait = AbortSignal.timeout(25000);
     const signal = scope ? AbortSignal.any([scope, wait]) : wait;
     if (navigator.locks) {
