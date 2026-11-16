@@ -75,7 +75,8 @@ public class CustomerAlertPreferences {
      * @param authSecret the auth secret
      * @param registrationId the existing device id when restoring an opt-in
      * @param expectedSubject the account that started this request
-     * @param pausePrevious whether to deactivate another account on this device without opting in
+     * @param pausePrevious whether to deactivate another account on this device without opting in;
+     *     defaults to false when omitted
      */
     public record SubscriptionInput(
             String endpoint,
@@ -83,7 +84,11 @@ public class CustomerAlertPreferences {
             String authSecret,
             UUID registrationId,
             UUID expectedSubject,
-            boolean pausePrevious) {
+            Boolean pausePrevious) {
+        public SubscriptionInput {
+            pausePrevious = Boolean.TRUE.equals(pausePrevious);
+        }
+
         public SubscriptionInput(String endpoint, String publicKey, String authSecret) {
             this(endpoint, publicKey, authSecret, null);
         }

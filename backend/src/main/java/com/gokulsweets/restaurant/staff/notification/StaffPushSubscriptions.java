@@ -36,7 +36,8 @@ public class StaffPushSubscriptions {
      * @param authSecret the auth secret
      * @param registrationId the existing device id when restoring an opt-in
      * @param expectedStaffId the account that started this request
-     * @param pausePrevious whether to deactivate another account on this device without opting in
+     * @param pausePrevious whether to deactivate another account on this device without opting in;
+     *     defaults to false when omitted
      * @param setupId the id reserved by a new setup attempt, also sent on retries
      * @param pendingCancellationIds registration or setup IDs this browser is still disabling
      */
@@ -46,9 +47,13 @@ public class StaffPushSubscriptions {
             String authSecret,
             UUID registrationId,
             Long expectedStaffId,
-            boolean pausePrevious,
+            Boolean pausePrevious,
             UUID setupId,
             List<UUID> pendingCancellationIds) {
+        public Input {
+            pausePrevious = Boolean.TRUE.equals(pausePrevious);
+        }
+
         public Input(
                 String endpoint,
                 String publicKey,
