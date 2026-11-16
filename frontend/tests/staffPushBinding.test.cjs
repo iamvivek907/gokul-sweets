@@ -196,6 +196,7 @@ test('repeated lost responses leave the endpoint available for a later setup', a
         respond(request, id) {
             if (++attempts <= 2) throw new TypeError('Response lost');
             assert.equal(request.method, 'POST');
+            if (request.body.registrationId) return new Response(null, {status: 404});
             return new Response(JSON.stringify({id, created: false}));
         }
     });
@@ -204,7 +205,8 @@ test('repeated lost responses leave the endpoint available for a later setup', a
     assert.equal(phone.unsubscribes(), 0);
     assert.equal(await phone.enable(), 'granted');
     assert.equal(phone.requests[2].body.endpoint, phone.requests[0].body.endpoint);
-    assert.equal(phone.requests[2].body.setupId, phone.requests[0].body.setupId);
+    assert.equal(phone.requests[2].body.registrationId, phone.requests[0].body.setupId);
+    assert.equal(phone.requests[3].body.setupId, phone.requests[0].body.setupId);
 });
 
 test('fresh setup stages its ID after verifying the current account and before posting', async () => {
@@ -297,6 +299,29 @@ test('polling retains the staged ID and disable revokes both possible registrati
     assert.deepEqual(phone.read(), {owner: '', registrationId: null});
 });
 
+test('disable revokes the active registration even when staged setup returns 404', async () => {
+    const confirmed = '3cf811c5-ba24-40db-ad09-f105fa46c49e';
+    const staged = '1f9e817c-8883-46ca-ad8b-a3ea20868152';
+    const binding = {owner: '12', registrationId: confirmed, setupId: staged, setupFingerprint: 'test'};
+    let stagedCommitted = false;
+    const phone = fixture(binding, {respond(request) {
+        const missing = request.url.endsWith(staged) && !stagedCommitted;
+        return new Response(null, {status: missing ? 404 : 204});
+    }});
+    phone.saved.set(phone.key, confirmed);
+
+    await assert.rejects(phone.disable(), {status: 404});
+    assert.deepEqual(phone.requests.map(request => request.url.split('/').at(-1)), [staged, confirmed]);
+    assert.deepEqual(phone.read(), binding);
+    assert.equal(phone.saved.get(phone.key), confirmed);
+
+    stagedCommitted = true;
+    await phone.disable();
+    assert.deepEqual(phone.requests.slice(2).map(request => request.url.split('/').at(-1)), [staged, confirmed]);
+    assert.deepEqual(phone.read(), {owner: '', registrationId: null});
+    assert.equal(phone.saved.has(phone.key), false);
+});
+
 test('sign-out retains a lost setup response for same-device recovery', async () => {
     let attempts = 0;
     const phone = fixture({owner: '12', registrationId: null}, {
@@ -317,4 +342,32 @@ test('sign-out retains a lost setup response for same-device recovery', async ()
     assert.equal(phone.requests[4].binding.signedOut, undefined);
     assert.deepEqual(phone.read(), {owner: '12', registrationId: staged});
     assert.equal(phone.saved.get(phone.key), staged);
+});
+
+test('manual enable after sign-out retries a temporary restore failure with the same staged ID', async () => {
+    let registerAttempts = 0;
+    let restoreAttempts = 0;
+    const phone = fixture({owner: '12', registrationId: null}, {respond(request) {
+        if (!request.method) return new Response('{"staffId":12}');
+        if (request.body.setupId && ++registerAttempts <= 2) throw new TypeError('Response lost');
+        assert.ok(request.body.registrationId);
+        if (++restoreAttempts === 1) return new Response(null, {status: 503});
+        return new Response(JSON.stringify({id: request.body.registrationId}));
+    }});
+    await assert.rejects(phone.enable(), /Response lost/);
+    const {setupId, setupFingerprint} = phone.read();
+    await phone.signOut();
+
+    await assert.rejects(phone.enable(), {status: 503});
+    assert.equal(phone.requests[3].binding.signedOut, true);
+    assert.equal(phone.requests[4].body.registrationId, setupId);
+    assert.equal(phone.read().setupId, setupId);
+    assert.equal(phone.read().setupFingerprint, setupFingerprint);
+    assert.equal(phone.subscribed(), true);
+    assert.equal(phone.unsubscribes(), 0);
+
+    assert.equal(await phone.enable(), 'granted');
+    assert.equal(phone.requests[5].body.registrationId, setupId);
+    assert.deepEqual(phone.read(), {owner: '12', registrationId: setupId});
+    assert.equal(phone.saved.get(phone.key), setupId);
 });

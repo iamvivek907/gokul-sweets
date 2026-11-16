@@ -150,9 +150,12 @@ export function disableStaffDeviceAlerts(staffId: number) {
         const ids = [...new Set([staged, bound, remembered].filter((id): id is string => !!id))];
         if (!ids.length) throw new Error("Could not identify this phone’s alert registration. Push disable could not be confirmed.");
         const signal = AbortSignal.timeout(8000);
-        for (const id of ids) {
-            await staffAlertsRequest(`/push-subscriptions/${encodeURIComponent(id)}`, {method: "DELETE", signal}, staffId);
-        }
+        const results = await Promise.allSettled(ids.map(id =>
+            staffAlertsRequest(`/push-subscriptions/${encodeURIComponent(id)}`, {method: "DELETE", signal}, staffId)
+        ));
+        // A missing staged registration may still be committing. Keep its ID for a later revoke.
+        const failure = results.find(result => result.status === "rejected");
+        if (failure?.status === "rejected") throw failure.reason;
         const current = readStaffAlertDevice(staffId);
         if (current && ids.includes(current)) {
             try {localStorage.removeItem(staffAlertDeviceKey(staffId));} catch { /* Revocation succeeded. */ }
@@ -227,8 +230,11 @@ async function enrollStaffDevice(settings: StaffAlertSettings, applicationKey: s
             if (current.staffId !== settings.staffId) throw new Error("The active staff account changed. Reopen this page and try again.");
         }
         const fingerprint = await staffSetupFingerprint(subscription);
-        setupId = previousBinding?.owner === owner && previousBinding.setupFingerprint === fingerprint && previousBinding.setupId
-            ? previousBinding.setupId : crypto.randomUUID();
+        const existingSetupId = previousBinding?.owner === owner && previousBinding.setupFingerprint === fingerprint
+            ? previousBinding.setupId : undefined;
+        setupId = existingSetupId ?? crypto.randomUUID();
+        // A previous request may have committed even if this attempt cannot reach the server.
+        registrationUncertain = Boolean(existingSetupId);
         if (!await stageStaffOrderPushSetup(owner, setupId, fingerprint, previousOwner, signal)) {
             throw new Error("The active staff account changed. Reopen this page and try again.");
         }
@@ -238,7 +244,7 @@ async function enrollStaffDevice(settings: StaffAlertSettings, applicationKey: s
             staffAlertsRequest<{id: string; created?: boolean}>("/push-subscriptions",
                 {method: "POST", signal: requestSignal, body}, settings.staffId);
         let result: {id: string; created?: boolean} | undefined;
-        if (previousBinding?.signedOut && previousBinding.setupId === setupId) {
+        if (existingSetupId) {
             try {
                 const recovered = await syncStaffPushRequest(subscription, settings.staffId, signal, setupId);
                 if (recovered.id === setupId) result = {id: setupId, created: false};
