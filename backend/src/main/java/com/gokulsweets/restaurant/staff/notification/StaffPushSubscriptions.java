@@ -330,20 +330,35 @@ WHERE d.state IN ('QUEUED','SENDING','SKIPPED')
         }
     }
 
+    /**
+     * Resolves a staged setup that reused a registration in this staff account and environment.
+     *
+     * @param staffId the staff account that owns the setup
+     * @param setupId the UUID saved before the setup request
+     * @return the reused registration UUID, or null if the setup has no mapping
+     */
     private UUID findSetupRegistration(long staffId, UUID setupId) {
-        return jdbc
-                .queryForList(
-                        """
+        final long started =
+                MethodTiming.start(
+                        StaffPushSubscriptions.class, "findSetupRegistration(long,UUID)");
+        try {
+            return jdbc
+                    .queryForList(
+                            """
 SELECT registration_id FROM staff_push_setup_aliases
 WHERE environment=? AND staff_id=? AND setup_id=?
 """,
-                        UUID.class,
-                        alerts.scope(),
-                        staffId,
-                        setupId)
-                .stream()
-                .findFirst()
-                .orElse(null);
+                            UUID.class,
+                            alerts.scope(),
+                            staffId,
+                            setupId)
+                    .stream()
+                    .findFirst()
+                    .orElse(null);
+        } finally {
+            MethodTiming.finish(
+                    started, StaffPushSubscriptions.class, "findSetupRegistration(long,UUID)");
+        }
     }
 
     /**
