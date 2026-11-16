@@ -35,7 +35,14 @@ try{for(const [width,mode] of [[320,'offer'],[390,'offer'],[640,'offer'],[390,'n
  assert.equal(await page.getByRole('navigation',{name:'Branch pages'}).isVisible(),false);assert.equal(await page.getByRole('button',{name:'View customer favourites',exact:true}).count(),0);
  const firstProduct=page.locator('.gokul-menu-product-card').first();await firstProduct.waitFor();
  assert.ok((await firstProduct.boundingBox()).y<750,'first catalogue product appears in the opening viewport');assert.ok((await firstProduct.boundingBox()).y>(await page.locator('.gokul-menu-tools').boundingBox()).y);
- await page.getByLabel('Find a favourite',{exact:true}).fill('Fresh meal 3');await page.locator('#gokul-product-3').waitFor();assert.equal(await page.locator('#gokul-product-2').count(),0);await page.getByLabel('Find a favourite',{exact:true}).fill('');
+ const search=page.getByLabel('Find a favourite',{exact:true});
+ const nonmatchingProduct=page.locator('#gokul-product-2');
+ await nonmatchingProduct.waitFor({state:'visible'});
+ await search.fill('Fresh meal 3');
+ await nonmatchingProduct.waitFor({state:'detached'});
+ await page.locator('#gokul-product-3').waitFor({state:'visible'});
+ await search.fill('');
+ await nonmatchingProduct.waitFor({state:'visible'});
  assert.equal(await page.locator('.mobile-cart-offer-target').count(),0);await page.locator('#menu-offers-open').click();const offers=page.getByRole('dialog',{name:'Offers & savings',exact:true});await offers.getByText('Bigger saving',{exact:true}).waitFor();await offers.locator('.menu-offer-card').getByText('Add ₹200.00 in eligible items',{exact:true}).waitFor();assert.equal(await offers.getByText('Meal saving',{exact:true}).count(),mode==='none'?0:1);await page.keyboard.press('Escape');
  if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/menu-discovery-${width}-${mode}.png`});}
  if(mode==='stale')await page.evaluate(()=>sessionStorage.setItem('gokul-offer-arrival',JSON.stringify({context:'outdated basket',at:Date.now()})));
